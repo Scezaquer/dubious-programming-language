@@ -2,32 +2,35 @@ use crate::lexer::lex::Operator;
 use crate::lexer::lex::Token;
 use std::slice::Iter;
 
-enum Constant {
+#[derive(Debug)]
+pub enum Constant {
     Int(i64),
     Float(f64),
     Bool(bool),
 }
 
-enum Factor {
+#[derive(Debug)]
+pub enum Factor {
     Constant(Constant),
-    Expression(Expression),
+    Expression(Box<Expression>),
     UnaryOp(Box<Factor>, UnaryOp),
     Variable(String),
 }
 
-enum Term {
+#[derive(Debug)]
+pub enum Term {
     Factor(Factor),
-    BinaryOp(Box<Term>, Box<Term>, BinaryOp),
+    BinaryOp(Box<Term>, Factor, BinaryOp),
 }
 
-enum Expression {
-    Constant(Constant),
-    BinaryOp(Box<Expression>, Box<Expression>, BinaryOp),
-    UnaryOp(Box<Expression>, UnaryOp),
-    Variable(String),
+#[derive(Debug)]
+pub enum Expression {
+    Term(Term),
+    BinaryOp(Box<Expression>, Term, BinaryOp),
 }
 
-enum BinaryOp {
+#[derive(Debug)]
+pub enum BinaryOp {
     Add,
     Sub,
     Mul,
@@ -41,12 +44,14 @@ enum BinaryOp {
     Equal,
 }
 
-enum UnaryOp {
+#[derive(Debug)]
+pub enum UnaryOp {
     Neg,
     Not,
 }
 
-enum Statement {
+#[derive(Debug)]
+pub enum Statement {
     Assignment(String, Expression),
     If(Expression, Vec<Statement>),
     While(Expression, Vec<Statement>),
@@ -54,16 +59,19 @@ enum Statement {
     Expression(Expression),
 }
 
-enum Function {
+#[derive(Debug)]
+pub enum Function {
     Function(String, Vec<String>, Vec<Statement>),
 }
 
-enum Program {
+#[derive(Debug)]
+pub enum Program {
     Program(Vec<Function>),
 }
 
-struct Ast {
-    program: Program,
+#[derive(Debug)]
+pub struct Ast {
+    pub program: Program,
 }
 
 fn parse_constant(token: &Token) -> Constant {
@@ -108,7 +116,7 @@ fn get_binary_op(token: &Token) -> BinaryOp {
             Operator::BitwiseOr => BinaryOp::Or,
             Operator::LessThan => BinaryOp::Less,
             Operator::GreaterThan => BinaryOp::Greater,
-            Operator::Equal => BinaryOp::Equal,
+            Operator::Assign => BinaryOp::Equal,
             _ => panic!("Invalid binary operator token: {:?}", token),
         },
         _ => panic!("Invalid binary operator token: {:?}", token),
@@ -123,7 +131,7 @@ fn parse_factor(mut tokens: &mut Iter<Token>) -> Factor {
             let inner_exp = parse_expression(&mut tokens);
 
             if let Token::RParen = tokens.next().unwrap() {
-                return Factor::Expression(inner_exp);
+                return Factor::Expression(Box::new(inner_exp));
             } else {
                 panic!("Expected closing parenthesis, found: {:?}", tok);
             }
@@ -146,56 +154,138 @@ fn parse_factor(mut tokens: &mut Iter<Token>) -> Factor {
 
 fn parse_term(mut tokens: &mut Iter<Token>) -> Term {
     let mut term = Term::Factor(parse_factor(&mut tokens));
-    let &&(mut next) = tokens.peekable().peek().unwrap();
+    let mut next= tokens.clone().next().unwrap();
 
-    while next == Token::Operator(Operator::Multiply)
-        || next == Token::Operator(Operator::Divide)
-        || next == Token::Operator(Operator::Modulus)
-        || next == Token::Operator(Operator::Exponent)
-        || next == Token::Operator(Operator::BitwiseAnd)
-        || next == Token::Operator(Operator::BitwiseOr)
+    while next == &Token::Operator(Operator::Multiply)
+        || next == &Token::Operator(Operator::Divide)
+        || next == &Token::Operator(Operator::Modulus)
+        || next == &Token::Operator(Operator::Exponent)
+        || next == &Token::Operator(Operator::BitwiseAnd)
+        || next == &Token::Operator(Operator::BitwiseOr)
     {
         let tok = tokens.next().unwrap();
         let op = get_binary_op(tok);
-        let next_term = Term::Factor(parse_factor(&mut tokens));
-        term = Term::BinaryOp(Box::new(term), Box::new(next_term), op);
-        next = **tokens.peekable().peek().unwrap()
+        let next_term = parse_factor(&mut tokens);
+        term = Term::BinaryOp(Box::new(term), next_term, op);
+        next = tokens.clone().next().unwrap();
     }
     return term;
 }
 
-fn parse_expression(tokens: &mut Iter<Token>) -> Expression {
-    let term = parse_term(&mut tokens);
+fn parse_expression(mut tokens: &mut Iter<Token>) -> Expression {
+    let mut expression = Expression::Term(parse_term(&mut tokens));
 
-    let &&(mut next) = tokens.peekable().peek().unwrap();
+    let mut next= tokens.clone().next().unwrap();
 
-    while next == Token::Operator(Operator::Add) || next == Token::Operator(Operator::Subtract) {
+    while next == &Token::Operator(Operator::Add) || next == &Token::Operator(Operator::Subtract) {
         let tok = tokens.next().unwrap();
         let op = get_binary_op(tok);
         let next_term = parse_term(&mut tokens);
-        term = Expression::BinaryOp(Box::new(term), Box::new(next_term), op);
-        next = **tokens.peekable().peek().unwrap()
+        expression = Expression::BinaryOp(Box::new(expression), next_term, op);
+        next = tokens.clone().next().unwrap();
     }
 
-    return term;
+    return expression;
 }
 
 fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
-    // TODO
-    return Statement::Expression(Expression::Constant(Constant::Int(0)));
+    let tok = tokens.next().unwrap();
+    let statement;
+
+    match tok {
+        Token::Keyword(k) => {
+            if k == "return" {
+                let exp = parse_expression(tokens);
+                statement = Statement::Return(exp);
+            } else {
+                panic!("Invalid keyword token: {:?}", tok);
+            }
+        }
+        Token::Identifier(_) => {
+            let id = match tok {
+                Token::Identifier(id) => id,
+                _ => panic!("Invalid identifier token: {:?}", tok),
+            };
+
+            if let Token::Operator(Operator::Assign) = tokens.next().unwrap() {
+                let exp = parse_expression(tokens);
+                statement = Statement::Assignment(id.to_string(), exp);
+            } else {
+                panic!("Expected assignment operator, found: {:?}", tok);
+            }
+        }
+        _ => {
+            let exp = parse_expression(tokens);
+            statement = Statement::Expression(exp);
+        }
+    }
+
+    if tokens.next().unwrap() != &Token::Semicolon {
+        panic!("Expected semicolon, found: {:?}", tok);
+    }
+
+    return statement;
 }
 
-fn parse_function(tokens: &mut Iter<Token>) -> Function {
-    // TODO
-    return Function::Function("".to_string(), Vec::new(), Vec::new());
+fn parse_function(mut tokens: &mut Iter<Token>) -> Function {
+    let tok = tokens.next().unwrap();
+
+    let k = match tok {
+        Token::Keyword(k) => k,
+        _ => panic!("Expected keyword, found: {:?}", tok),
+    };
+
+    if k != "fn" {
+        panic!("Expected function keyword, found: {:?}", tok);
+    }
+
+    let id = match tokens.next().unwrap() {
+        Token::Identifier(id) => id.clone(),
+        _ => panic!("Expected identifier, found: {:?}", tok),
+    };
+
+    if &Token::LParen != tokens.next().unwrap() {
+        panic!("Expected opening parenthesis, found: {:?}", tok);
+    }
+
+    let mut params = Vec::new();
+
+    loop {
+        let tok = tokens.next().unwrap();
+
+        if let Token::RParen = tok {
+            break;
+        } else if let Token::Identifier(id) = tok {
+            params.push(id.clone());
+        } else {
+            panic!("Expected identifier or closing parenthesis, found: {:?}", tok);
+        }
+    }
+
+    if &Token::LBrace != tokens.next().unwrap() {
+        panic!("Expected opening brace, found: {:?}", tok);
+    }
+
+    let mut statements = Vec::new();
+
+    loop {
+        let next = tokens.clone().next().unwrap();
+
+        if let &Token::RBrace = next {
+            tokens.next();
+            break;
+        } else {
+            statements.push(parse_statement(&mut tokens));
+        }
+    }
+
+    return Function::Function(id, params, statements);
 }
 
 pub fn parse(tokens: &Vec<Token>) -> Ast {
-    let mut ast = Ast {
-        program: Program::Program(Vec::new()),
+    let ast = Ast {
+        program: Program::Program(vec![parse_function(&mut tokens.iter())]),
     };
-
-    // TODO
 
     return ast;
 }

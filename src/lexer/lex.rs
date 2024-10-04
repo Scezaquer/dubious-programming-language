@@ -1,7 +1,7 @@
 use regex::Regex;
 
 #[derive(Debug)]
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Copy)]
 pub enum Operator {
     Add,
     Subtract,
@@ -13,12 +13,12 @@ pub enum Operator {
     BitwiseOr,
     LessThan,
     GreaterThan,
-    Equal,
+    Assign,
     Not,
 }
 
 #[derive(Debug)]
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum Token {
     Identifier(String),
     PrimitiveType(String),
@@ -60,7 +60,7 @@ pub fn lex(file: &str) -> Vec<Token> {
     let operator_re = Regex::new(r"^[\+\-\*/%\^&\|<>=!]").unwrap();
 
     // Keywords are any of the following strings: if else while for return
-    let keyword_re = Regex::new(r"^(if|else|while|for|return)").unwrap();
+    let keyword_re = Regex::new(r"^(if|else|while|for|return|fn)").unwrap();
 
     let whitespace_re = Regex::new(r"^\s+").unwrap();
 
@@ -107,9 +107,6 @@ pub fn lex(file: &str) -> Vec<Token> {
             pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = multiline_comments_re.captures(rest) {
             pos += caps.get(0).unwrap().end();
-        } else if let Some(caps) = identifier_re.captures(rest) {
-            tokens.push(Token::Identifier(caps.get(0).unwrap().as_str().to_string()));
-            pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = primitive_type_re.captures(rest) {
             tokens.push(Token::PrimitiveType(caps.get(0).unwrap().as_str().to_string()));
             pos += caps.get(0).unwrap().end();
@@ -131,7 +128,7 @@ pub fn lex(file: &str) -> Vec<Token> {
                 "|" => Operator::BitwiseOr,
                 "<" => Operator::LessThan,
                 ">" => Operator::GreaterThan,
-                "=" => Operator::Equal,
+                "=" => Operator::Assign,
                 "!" => Operator::Not,
                 _ => unreachable!(),
             };
@@ -139,6 +136,9 @@ pub fn lex(file: &str) -> Vec<Token> {
             pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = keyword_re.captures(rest) {
             tokens.push(Token::Keyword(caps.get(0).unwrap().as_str().to_string()));
+            pos += caps.get(0).unwrap().end();
+        } else if let Some(caps) = identifier_re.captures(rest) {
+            tokens.push(Token::Identifier(caps.get(0).unwrap().as_str().to_string()));
             pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = whitespace_re.captures(rest) {
             pos += caps.get(0).unwrap().end();
