@@ -66,7 +66,7 @@ pub fn lex(file: &str) -> Vec<Token> {
 
     let comments_re = Regex::new(r"^\/\/.*(?:\n|$)").unwrap();
 
-    let multiline_comments_re = Regex::new(r"^\/\*(?:\s|.)*\*\/").unwrap();
+    let multiline_comments_re = Regex::new(r"^\/\*[\s\S]*?\*\/").unwrap();
 
     let mut pos: usize= 0; // Current position in the file
 
