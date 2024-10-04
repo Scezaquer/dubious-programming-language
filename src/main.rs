@@ -1,4 +1,5 @@
 mod lexer;
+mod ast;
 use std::env;
 use std::fs;
 use std::path::Path;
