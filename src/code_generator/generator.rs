@@ -19,8 +19,7 @@ fn generate_factor(file: &mut File, factor: &Factor){
                 },
                 UnaryOp::Not => {
                     writeln!(file, "    not rax").unwrap();
-                },
-                _ => unimplemented!(),
+                }
             }
         },
         /*Factor::FunctionCall(name, args) => {
@@ -93,8 +92,7 @@ fn generate_term(file: &mut File, term: &Term) {
                     writeln!(file, "    cmp rax, rcx").unwrap();
                     writeln!(file, "    sete al").unwrap();
                     writeln!(file, "    movzx rax, al").unwrap();
-                },
-                _ => unimplemented!(),
+                }
             }
         },
     }
@@ -158,8 +156,7 @@ fn generate_expression(file: &mut File, expression: &Expression) {
                     writeln!(file, "    cmp rax, rcx").unwrap();
                     writeln!(file, "    sete al").unwrap();
                     writeln!(file, "    movzx rax, al").unwrap();
-                },
-                _ => unimplemented!(),
+                }
             }
         },
     }
@@ -180,7 +177,7 @@ fn generate_statement(file: &mut File, statement: &Statement) {
 }
 
 fn generate_function(file: &mut File, function: &Function) {
-    let Function::Function(name, params, statements) = function;
+    let Function::Function(name, _params, statements) = function;
     writeln!(file, "").unwrap();
     writeln!(file, "global {}", name).unwrap();
     writeln!(file, "{}:", name).unwrap();

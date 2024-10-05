@@ -19,7 +19,7 @@ struct Args {
     input_file: String,
 
     /// Output file to write
-    #[arg(short, long, default_value_t = ("out".to_string()))]
+    #[arg(short, long, default_value = "out")]
     output_file: String,
 
     /// Print the AST
