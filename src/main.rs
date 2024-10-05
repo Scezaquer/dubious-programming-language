@@ -73,6 +73,7 @@ fn main() {
 
     generate(&ast, &output_file);
     if !args.output_asm {
+        // nasm -f elf64 out.s -o out.o
         Command::new("nasm")
             .args([
                 "-f",
@@ -84,6 +85,7 @@ fn main() {
             .output()
             .expect("Failed to compile assembly file");
 
+        // ld out.o -o out
         Command::new("ld")
             .args([
                 format!("{}.o", &args.output_file).as_str(),
@@ -93,6 +95,7 @@ fn main() {
             .output()
             .expect("Failed to link object file");
 
+        // rm out.o
         Command::new("rm")
             .args([format!("{}.o", &args.output_file).as_str()])
             .output()

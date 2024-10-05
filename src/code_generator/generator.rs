@@ -181,6 +181,7 @@ fn generate_statement(file: &mut File, statement: &Statement) {
 
 fn generate_function(file: &mut File, function: &Function) {
     let Function::Function(name, params, statements) = function;
+    writeln!(file, "").unwrap();
     writeln!(file, "global {}", name).unwrap();
     writeln!(file, "{}:", name).unwrap();
     writeln!(file, "    push rbx").unwrap();
@@ -202,8 +203,8 @@ pub fn generate(ast: &Ast, out_path: &str) {
     writeln!(file, "global _start").unwrap();
     writeln!(file, "_start:").unwrap();
     writeln!(file, "    call main").unwrap();
+    writeln!(file, "    mov rdi, rax").unwrap();
     writeln!(file, "    mov rax, 60").unwrap();
-    writeln!(file, "    xor edi, edi").unwrap();
     writeln!(file, "    syscall").unwrap();
 
     for function in function_vector.iter(){
