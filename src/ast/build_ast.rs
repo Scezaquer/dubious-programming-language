@@ -220,7 +220,8 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
         }
     }
 
-    if tokens.next().unwrap() != &Token::Semicolon {
+    let tok = tokens.next().unwrap();
+    if tok != &Token::Semicolon {
         panic!("Expected semicolon, found: {:?}", tok);
     }
 
