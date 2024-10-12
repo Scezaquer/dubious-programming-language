@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::build_ast::{Ast, BinaryOp, Constant, Expression, Factor, Function, Program, Statement, Term, UnaryOp};
+use super::build_ast::{Ast, TermBinaryOp, ExpressionBinaryOp, Constant, Expression, Factor, Function, Program, Statement, Term, UnaryOp};
 
 impl fmt::Display for Constant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -21,20 +21,27 @@ impl fmt::Display for UnaryOp {
     }
 }
 
-impl fmt::Display for BinaryOp {
+impl fmt::Display for ExpressionBinaryOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BinaryOp::Add => write!(f, "+"),
-            BinaryOp::Sub => write!(f, "-"),
-            BinaryOp::Mul => write!(f, "*"),
-            BinaryOp::Div => write!(f, "/"),
-            BinaryOp::Mod => write!(f, "%"),
-            BinaryOp::Pow => write!(f, "^"),
-            BinaryOp::And => write!(f, "&"),
-            BinaryOp::Or => write!(f, "|"),
-            BinaryOp::Less => write!(f, "<"),
-            BinaryOp::Greater => write!(f, ">"),
-            BinaryOp::Equal => write!(f, "=="),
+            ExpressionBinaryOp::Add => write!(f, "+"),
+            ExpressionBinaryOp::Sub => write!(f, "-"),
+        }
+    }
+}
+
+impl fmt::Display for TermBinaryOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TermBinaryOp::Mul => write!(f, "*"),
+            TermBinaryOp::Div => write!(f, "/"),
+            TermBinaryOp::Mod => write!(f, "%"),
+            TermBinaryOp::Pow => write!(f, "^"),
+            TermBinaryOp::And => write!(f, "&"),
+            TermBinaryOp::Or => write!(f, "|"),
+            TermBinaryOp::Less => write!(f, "<"),
+            TermBinaryOp::Greater => write!(f, ">"),
+            TermBinaryOp::Equal => write!(f, "=="),
         }
     }
 }

@@ -6,6 +6,7 @@ copy: build
 build:
 	cargo build
 
-
+test:
+	python tests/run_tests.py
 
 

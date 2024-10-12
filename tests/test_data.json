@@ -1,0 +1,100 @@
+[
+    {
+        "name": "return0",
+        "description": "Just returns 0",
+        "filename": "basic_arithmetic/return0.dpl",
+        "input": [],
+        "output": 0
+    },
+    {
+        "name": "return2",
+        "description": "Just returns 2",
+        "filename": "basic_arithmetic/return2.dpl",
+        "input": [],
+        "output": 2
+    },
+    {
+        "name": "return2minus1",
+        "description": "Returns 2 - 1",
+        "filename": "basic_arithmetic/return2minus1.dpl",
+        "input": [],
+        "output": 1
+    },
+    {
+        "name": "return2plus2",
+        "description": "returns 2 + 2",
+        "filename": "basic_arithmetic/return2plus2.dpl",
+        "input": [],
+        "output": 4
+    },
+    {
+        "name": "return2plus3times4",
+        "description": "returns 2 + 3 * 4",
+        "filename": "basic_arithmetic/return2plus3times4.dpl",
+        "input": [],
+        "output": 14
+    },
+    {
+        "name": "return2times3",
+        "description": "returns 2 * 3",
+        "filename": "basic_arithmetic/return2times3.dpl",
+        "input": [],
+        "output": 6
+    },
+    {
+        "name": "return3times4plus2",
+        "description": "returns 3 * 4 + 2",
+        "filename": "basic_arithmetic/return3times4plus2.dpl",
+        "input": [],
+        "output": 14
+    },
+    {
+        "name": "return6over3",
+        "description": "returns 6/3",
+        "filename": "basic_arithmetic/return6over3.dpl",
+        "input": [],
+        "output": 2
+    },
+    {
+        "name": "returnParentheses",
+        "description": "returns 6*(3+1)",
+        "filename": "basic_arithmetic/returnParentheses.dpl",
+        "input": [],
+        "output": 24
+    },
+    {
+        "name": "returnLongSum",
+        "description": "returns 2+2+3+5+6+0+1+2+4",
+        "filename": "basic_arithmetic/returnLongSum.dpl",
+        "input": [],
+        "output": 25
+    },
+    {
+        "name": "returnLongMixedSum",
+        "description": "returns 2+2-3+5-6+0+1+2-4+2",
+        "filename": "basic_arithmetic/returnLongMixedSum.dpl",
+        "input": [],
+        "output": 1
+    },
+    {
+        "name": "returnNestedParentheses",
+        "description": "returns 6*((3-2)+1*(2+(1-(-5))*6)))",
+        "filename": "basic_arithmetic/returnNestedParentheses.dpl",
+        "input": [],
+        "output": 234
+    },
+    {
+        "name": "returnNeg",
+        "description": "returns -3 (the return code is an unsigned byte so it underflows)",
+        "filename": "basic_arithmetic/returnNeg.dpl",
+        "input": [],
+        "output": 253
+    },
+    {
+        "name": "returnNot",
+        "description": "returns !23 (binary not)",
+        "filename": "basic_arithmetic/returnNot.dpl",
+        "input": [],
+        "output": 232
+    }
+]

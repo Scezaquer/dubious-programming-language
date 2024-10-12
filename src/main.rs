@@ -100,5 +100,11 @@ fn main() {
             .args([format!("{}.o", &args.output_file).as_str()])
             .output()
             .expect("Failed to remove intermediary object file");
+
+        // This turns the elf64 into a flat binary file
+        // objcopy -O binary out out
+
+        // And this disassembles it
+        // ndisasm -b 64 out
     }
 }

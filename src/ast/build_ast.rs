@@ -20,19 +20,23 @@ pub enum Factor {
 #[derive(Debug)]
 pub enum Term {
     Factor(Factor),
-    BinaryOp(Box<Term>, Factor, BinaryOp),
+    BinaryOp(Box<Term>, Factor, TermBinaryOp),
 }
 
 #[derive(Debug)]
 pub enum Expression {
     Term(Term),
-    BinaryOp(Box<Expression>, Term, BinaryOp),
+    BinaryOp(Box<Expression>, Term, ExpressionBinaryOp),
 }
 
 #[derive(Debug)]
-pub enum BinaryOp {
+pub enum ExpressionBinaryOp {
     Add,
     Sub,
+}
+
+#[derive(Debug)]
+pub enum TermBinaryOp {
     Mul,
     Div,
     Mod,
@@ -103,20 +107,29 @@ fn get_unary_op(token: &Token) -> UnaryOp {
     }
 }
 
-fn get_binary_op(token: &Token) -> BinaryOp {
+fn get_expression_binary_op(token: &Token) -> ExpressionBinaryOp {
     match token {
         Token::Operator(op) => match op {
-            Operator::Add => BinaryOp::Add,
-            Operator::Subtract => BinaryOp::Sub,
-            Operator::Multiply => BinaryOp::Mul,
-            Operator::Divide => BinaryOp::Div,
-            Operator::Modulus => BinaryOp::Mod,
-            Operator::Exponent => BinaryOp::Pow,
-            Operator::BitwiseAnd => BinaryOp::And,
-            Operator::BitwiseOr => BinaryOp::Or,
-            Operator::LessThan => BinaryOp::Less,
-            Operator::GreaterThan => BinaryOp::Greater,
-            Operator::Assign => BinaryOp::Equal,
+            Operator::Add => ExpressionBinaryOp::Add,
+            Operator::Subtract => ExpressionBinaryOp::Sub,
+            _ => panic!("Invalid binary operator token: {:?}", token),
+        },
+        _ => panic!("Invalid binary operator token: {:?}", token),
+    }
+}
+
+fn get_term_binary_op(token: &Token) -> TermBinaryOp {
+    match token {
+        Token::Operator(op) => match op {
+            Operator::Multiply => TermBinaryOp::Mul,
+            Operator::Divide => TermBinaryOp::Div,
+            Operator::Modulus => TermBinaryOp::Mod,
+            Operator::Exponent => TermBinaryOp::Pow,
+            Operator::BitwiseAnd => TermBinaryOp::And,
+            Operator::BitwiseOr => TermBinaryOp::Or,
+            Operator::LessThan => TermBinaryOp::Less,
+            Operator::GreaterThan => TermBinaryOp::Greater,
+            Operator::Assign => TermBinaryOp::Equal,
             _ => panic!("Invalid binary operator token: {:?}", token),
         },
         _ => panic!("Invalid binary operator token: {:?}", token),
@@ -164,7 +177,7 @@ fn parse_term(mut tokens: &mut Iter<Token>) -> Term {
         || next == &Token::Operator(Operator::BitwiseOr)
     {
         let tok = tokens.next().unwrap();
-        let op = get_binary_op(tok);
+        let op = get_term_binary_op(tok);
         let next_term = parse_factor(&mut tokens);
         term = Term::BinaryOp(Box::new(term), next_term, op);
         next = tokens.clone().next().unwrap();
@@ -179,7 +192,7 @@ fn parse_expression(mut tokens: &mut Iter<Token>) -> Expression {
 
     while next == &Token::Operator(Operator::Add) || next == &Token::Operator(Operator::Subtract) {
         let tok = tokens.next().unwrap();
-        let op = get_binary_op(tok);
+        let op = get_expression_binary_op(tok);
         let next_term = parse_term(&mut tokens);
         expression = Expression::BinaryOp(Box::new(expression), next_term, op);
         next = tokens.clone().next().unwrap();
