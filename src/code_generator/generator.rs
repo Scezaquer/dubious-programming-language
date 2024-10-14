@@ -13,17 +13,6 @@ fn generate_atom(file: &mut File, atom: &Atom){
         Atom::Variable(variable) => {
             writeln!(file, "    mov rax, [rbp-{}]", variable).unwrap();
         },
-        /*Atom::UnaryOp(atom, unary_op) => {
-            generate_atom(file, atom);
-            match unary_op {
-                UnaryOp::Neg => {
-                    writeln!(file, "    neg rax").unwrap();
-                },
-                UnaryOp::Not => {
-                    writeln!(file, "    not rax").unwrap();
-                }
-            }
-        },*/
         Atom::Expression(expression) => {
             generate_expression(file, expression);
         },
@@ -206,91 +195,6 @@ fn generate_expression(file: &mut File, expression: &Expression) {
     }
 }
 
-/*
-fn generate_term(file: &mut File, term: &Term) {
-    match term {
-        Term::Factor(factor) => {
-            generate_factor(file, factor);
-        },
-        Term::BinaryOp(left, right, op) => {
-            generate_term(file, left);
-            writeln!(file, "    push rax").unwrap();
-            generate_factor(file, right);
-            writeln!(file, "    pop rcx").unwrap();
-            writeln!(file, "    xchg rax, rcx").unwrap();   // Exchange the two registers for correct operaton order
-            match op {
-                TermBinaryOp::Mul => {
-                    writeln!(file, "    imul rax, rcx").unwrap();
-                },
-                TermBinaryOp::Div => {
-                    writeln!(file, "    cqo").unwrap();
-                    writeln!(file, "    idiv rcx").unwrap();
-                },
-                TermBinaryOp::Mod => {
-                    writeln!(file, "    cqo").unwrap();
-                    writeln!(file, "    idiv rcx").unwrap();
-                    writeln!(file, "    mov rax, rdx").unwrap();
-                },
-                TermBinaryOp::Pow => {
-                    writeln!(file, "    mov rbx, rax").unwrap();
-                    writeln!(file, "    mov rcx, rax").unwrap();
-                    writeln!(file, "    mov rdx, rcx").unwrap();
-                    writeln!(file, "    mov rax, rbx").unwrap();
-                    writeln!(file, "    mov rsi, rcx").unwrap();
-                    writeln!(file, "    mov rdi, rdx").unwrap();
-                    writeln!(file, "    call pow").unwrap();//TODO
-                },
-                TermBinaryOp::And => {
-                    writeln!(file, "    and rax, rcx").unwrap();
-                },
-                TermBinaryOp::Or => {
-                    writeln!(file, "    or rax, rcx").unwrap();
-                },
-                TermBinaryOp::Less => {
-                    writeln!(file, "    cmp rax, rcx").unwrap();
-                    writeln!(file, "    setl al").unwrap();
-                    writeln!(file, "    movzx rax, al").unwrap();
-                },
-                TermBinaryOp::Greater => {
-                    writeln!(file, "    cmp rax, rcx").unwrap();
-                    writeln!(file, "    setg al").unwrap();
-                    writeln!(file, "    movzx rax, al").unwrap();
-                },
-                TermBinaryOp::Equal => {
-                    writeln!(file, "    cmp rax, rcx").unwrap();
-                    writeln!(file, "    sete al").unwrap();
-                    writeln!(file, "    movzx rax, al").unwrap();
-                }
-            }
-        },
-    }
-}
-    */
-
-/*
-fn generate_expression(file: &mut File, expression: &Expression) {
-    match expression {
-        Expression::Term(term) => {
-            generate_term(file, term);
-        },
-        Expression::BinaryOp(left, right, op) => {
-            generate_expression(file, left);
-            writeln!(file, "    push rax").unwrap();
-            generate_term(file, right);
-            writeln!(file, "    pop rcx").unwrap();
-            writeln!(file, "    xchg rax, rcx").unwrap();
-            match op {
-                ExpressionBinaryOp::Add => {
-                    writeln!(file, "    add rax, rcx").unwrap();
-                },
-                ExpressionBinaryOp::Sub => {
-                    writeln!(file, "    sub rax, rcx").unwrap();
-                },
-            }
-        }
-    }
-}
-*/
 
 fn generate_statement(file: &mut File, statement: &Statement) {
     match statement {
