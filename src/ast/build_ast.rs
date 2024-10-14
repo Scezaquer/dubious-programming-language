@@ -15,8 +15,8 @@ use std::slice::Iter;
 // 10. Bitwise xor (a ^ b)
 // 11. Bitwise or (a | b)
 // 12. Logical and (a && b)
-// 13. Logical or (a ^^ b)
-// 14. Logical xor (a || b)
+// 13. Logical xor (a ^^ b)
+// 14. Logical or (a || b)
 // 15. Assignment (a = b) Add assignment (a += b) Subtract assignment (a -= b) Multiply assignment (a *= b) Divide assignment (a /= b) Modulus assignment (a %= b) Left shift assignment (a <<= b) Right shift assignment (a >>= b) Bitwise and assignment (a &= b) Bitwise xor assignment (a ^= b) Bitwise or assignment (a |= b)
 
 #[derive(Debug)]
@@ -43,7 +43,7 @@ pub enum UnOp { // TODO: We only support prefix unary operators for now
     BitwiseNot,
     Dereference,
     AddressOf,
-    NotAUnaryOp,
+    NotAUnaryOp,    // Not pretty but it makes the code nicer
 }
 
 #[derive(Debug, PartialEq)]
@@ -80,7 +80,7 @@ pub enum BinOp {
     BitwiseAndAssign,
     BitwiseXorAssign,
     BitwiseOrAssign,
-    NotABinaryOp,
+    NotABinaryOp,   // Not pretty but it makes the code nicer
 }
 
 #[derive(Debug)]
