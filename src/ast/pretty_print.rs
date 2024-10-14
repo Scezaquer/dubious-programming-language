@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::build_ast::{Ast, TermBinaryOp, ExpressionBinaryOp, Constant, Expression, Factor, Function, Program, Statement, Term, UnaryOp};
+use super::build_ast::{Ast, BinOp, UnOp, Constant, Expression, Atom, Function, Program, Statement};
 
 impl fmt::Display for Constant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -12,61 +12,68 @@ impl fmt::Display for Constant {
     }
 }
 
-impl fmt::Display for UnaryOp {
+impl fmt::Display for UnOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            UnaryOp::Neg => write!(f, "-"),
-            UnaryOp::Not => write!(f, "!"),
+            UnOp::PreIncrement => write!(f, "++"),
+            UnOp::PreDecrement => write!(f, "--"),
+            UnOp::UnaryPlus => write!(f, "+"),
+            UnOp::UnaryMinus => write!(f, "-"),
+            UnOp::LogicalNot => write!(f, "!"),
+            UnOp::BitwiseNot => write!(f, "~"),
+            UnOp::Dereference => write!(f, "*"),
+            UnOp::AddressOf => write!(f, "&"),
+            _ => write!(f, "Unknown"),
         }
     }
 }
 
-impl fmt::Display for ExpressionBinaryOp {
+impl fmt::Display for BinOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ExpressionBinaryOp::Add => write!(f, "+"),
-            ExpressionBinaryOp::Sub => write!(f, "-"),
+            BinOp::MemberAccess => write!(f, "."),
+            BinOp::Exponent => write!(f, "**"),
+            BinOp::Multiply => write!(f, "*"),
+            BinOp::Divide => write!(f, "/"),
+            BinOp::Modulus => write!(f, "%"),
+            BinOp::Add => write!(f, "+"),
+            BinOp::Subtract => write!(f, "-"),
+            BinOp::LeftShift => write!(f, "<<"),
+            BinOp::RightShift => write!(f, ">>"),
+            BinOp::LessThan => write!(f, "<"),
+            BinOp::GreaterThan => write!(f, ">"),
+            BinOp::LessOrEqualThan => write!(f, "<="),
+            BinOp::GreaterOrEqualThan => write!(f, ">="),
+            BinOp::Equal => write!(f, "=="),
+            BinOp::NotEqual => write!(f, "!="),
+            BinOp::BitwiseAnd => write!(f, "&"),
+            BinOp::BitwiseXor => write!(f, "^"),
+            BinOp::BitwiseOr => write!(f, "|"),
+            BinOp::LogicalAnd => write!(f, "&&"),
+            BinOp::LogicalXor => write!(f, "^^"),
+            BinOp::LogicalOr => write!(f, "||"),
+            BinOp::Assign => write!(f, "="),
+            BinOp::AddAssign => write!(f, "+="),
+            BinOp::SubtractAssign => write!(f, "-="),
+            BinOp::MultiplyAssign => write!(f, "*="),
+            BinOp::DivideAssign => write!(f, "/="),
+            BinOp::ModulusAssign => write!(f, "%="),
+            BinOp::LeftShiftAssign => write!(f, "<<="),
+            BinOp::RightShiftAssign => write!(f, ">>="),
+            BinOp::BitwiseAndAssign => write!(f, "&="),
+            BinOp::BitwiseXorAssign => write!(f, "^="),
+            BinOp::BitwiseOrAssign => write!(f, "|="),
+            _ => write!(f, "Unknown"),
         }
     }
 }
 
-impl fmt::Display for TermBinaryOp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            TermBinaryOp::Mul => write!(f, "*"),
-            TermBinaryOp::Div => write!(f, "/"),
-            TermBinaryOp::Mod => write!(f, "%"),
-            TermBinaryOp::Pow => write!(f, "^"),
-            TermBinaryOp::And => write!(f, "&"),
-            TermBinaryOp::Or => write!(f, "|"),
-            TermBinaryOp::Less => write!(f, "<"),
-            TermBinaryOp::Greater => write!(f, ">"),
-            TermBinaryOp::Equal => write!(f, "=="),
-        }
-    }
-}
-
-impl Factor {
+impl Atom {
     fn pretty_print(&self, indent: usize) -> String {
         match self {
-            Factor::Constant(c) => format!("{}", c),
-            Factor::Expression(e) => format!("({})", e.pretty_print(indent)),
-            Factor::UnaryOp(f, op) => format!("{}({})", op, f.pretty_print(indent)),
-            Factor::Variable(v) => v.clone(),
-        }
-    }
-}
-
-impl Term {
-    fn pretty_print(&self, indent: usize) -> String {
-        match self {
-            Term::Factor(f) => f.pretty_print(indent),
-            Term::BinaryOp(left, right, op) => format!(
-                "{} {} {}",
-                left.pretty_print(indent),
-                op,
-                right.pretty_print(indent)
-            ),
+            Atom::Constant(c) => format!("{}", c),
+            Atom::Expression(e) => format!("({})", e.pretty_print(indent)),
+            Atom::Variable(v) => v.clone(),
         }
     }
 }
@@ -74,7 +81,8 @@ impl Term {
 impl Expression {
     fn pretty_print(&self, indent: usize) -> String {
         match self {
-            Expression::Term(t) => t.pretty_print(indent),
+            Expression::Atom(a) => a.pretty_print(indent),
+            Expression::UnaryOp(expr, op) => format!("{}{}", op, expr.pretty_print(indent)),
             Expression::BinaryOp(left, right, op) => format!(
                 "{} {} {}",
                 left.pretty_print(indent),
@@ -90,7 +98,7 @@ impl Statement {
         let indent_str = " ".repeat(indent);
         match self {
             Statement::Assignment(var, expr) => format!(
-                "{}{}= {}",
+                "{}{} = {}",
                 indent_str,
                 var,
                 expr.pretty_print(indent + 2)

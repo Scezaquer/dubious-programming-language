@@ -2,6 +2,23 @@ use crate::lexer::lex::Operator;
 use crate::lexer::lex::Token;
 use std::slice::Iter;
 
+// OPERATOR PRECEDENCE TABLE:
+// 1. Member access (.)
+// 2. Pre increment (++a) Pre decrement (--a) Unary plus (+a) Unary minus (-a) Logical not (!a) Bitwise not (~a) Dereference (*a) Address of (&a)
+// 3. Exponentiation (a ** b)
+// 4. Multiplication (a * b) Division (a / b) Modulus (a % b)
+// 5. Addition (a + b) Subtraction (a - b)
+// 6. Bitwise left shift (a << b) Bitwise right shift (a >> b)
+// 7. Less than (a < b) Greater than (a > b) Less than or equal to (a <= b) Greater than or equal to (a >= b)
+// 8. Equal to (a == b) Not equal to (a != b)
+// 9. Bitwise and (a & b)
+// 10. Bitwise xor (a ^ b)
+// 11. Bitwise or (a | b)
+// 12. Logical and (a && b)
+// 13. Logical or (a ^^ b)
+// 14. Logical xor (a || b)
+// 15. Assignment (a = b) Add assignment (a += b) Subtract assignment (a -= b) Multiply assignment (a *= b) Divide assignment (a /= b) Modulus assignment (a %= b) Left shift assignment (a <<= b) Right shift assignment (a >>= b) Bitwise and assignment (a &= b) Bitwise xor assignment (a ^= b) Bitwise or assignment (a |= b)
+
 #[derive(Debug)]
 pub enum Constant {
     Int(i64),
@@ -10,48 +27,131 @@ pub enum Constant {
 }
 
 #[derive(Debug)]
-pub enum Factor {
+pub enum Atom {
     Constant(Constant),
     Expression(Box<Expression>),
-    UnaryOp(Box<Factor>, UnaryOp),
     Variable(String),
 }
 
+#[derive(Debug, PartialEq)]
+pub enum UnOp { // TODO: We only support prefix unary operators for now
+    PreIncrement,
+    PreDecrement,
+    UnaryPlus,
+    UnaryMinus,
+    LogicalNot,
+    BitwiseNot,
+    Dereference,
+    AddressOf,
+    NotAUnaryOp,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum BinOp {
+    MemberAccess,
+    Exponent,
+    Multiply,
+    Divide,
+    Modulus,
+    Add,
+    Subtract,
+    LeftShift,
+    RightShift,
+    LessThan,
+    GreaterThan,
+    LessOrEqualThan,
+    GreaterOrEqualThan,
+    Equal,
+    NotEqual,
+    BitwiseAnd,
+    BitwiseXor,
+    BitwiseOr,
+    LogicalAnd,
+    LogicalXor,
+    LogicalOr,
+    Assign,
+    AddAssign,
+    SubtractAssign,
+    MultiplyAssign,
+    DivideAssign,
+    ModulusAssign,
+    LeftShiftAssign,
+    RightShiftAssign,
+    BitwiseAndAssign,
+    BitwiseXorAssign,
+    BitwiseOrAssign,
+    NotABinaryOp,
+}
+
 #[derive(Debug)]
-pub enum Term {
-    Factor(Factor),
-    BinaryOp(Box<Term>, Factor, TermBinaryOp),
+pub struct PrecedenceLevel {
+    binary_ops: Vec<BinOp>,
+    unary_ops: Vec<UnOp>,
 }
 
 #[derive(Debug)]
 pub enum Expression {
-    Term(Term),
-    BinaryOp(Box<Expression>, Term, ExpressionBinaryOp),
+    Atom(Atom),
+    UnaryOp(Box<Expression>, UnOp),
+    BinaryOp(Box<Expression>, Box<Expression>, BinOp),
 }
 
-#[derive(Debug)]
-pub enum ExpressionBinaryOp {
-    Add,
-    Sub,
+fn get_bin_operator_from_token(token: &Token) -> BinOp {
+    match token {
+        Token::Operator(op) => match op {
+            Operator::MemberAccess => BinOp::MemberAccess,
+            Operator::Exponent => BinOp::Exponent,
+            Operator::Multiply => BinOp::Multiply,
+            Operator::Divide => BinOp::Divide,
+            Operator::Modulus => BinOp::Modulus,
+            Operator::Add => BinOp::Add,
+            Operator::Subtract => BinOp::Subtract,
+            Operator::LeftShift => BinOp::LeftShift,
+            Operator::RightShift => BinOp::RightShift,
+            Operator::LessThan => BinOp::LessThan,
+            Operator::GreaterThan => BinOp::GreaterThan,
+            Operator::LessOrEqualThan => BinOp::LessOrEqualThan,
+            Operator::GreaterOrEqualThan => BinOp::GreaterOrEqualThan,
+            Operator::Equal => BinOp::Equal,
+            Operator::NotEqual => BinOp::NotEqual,
+            Operator::BitwiseAnd => BinOp::BitwiseAnd,
+            Operator::BitwiseXor => BinOp::BitwiseXor,
+            Operator::BitwiseOr => BinOp::BitwiseOr,
+            Operator::LogicalAnd => BinOp::LogicalAnd,
+            Operator::LogicalXor => BinOp::LogicalXor,
+            Operator::LogicalOr => BinOp::LogicalOr,
+            Operator::Assign => BinOp::Assign,
+            Operator::AddAssign => BinOp::AddAssign,
+            Operator::SubtractAssign => BinOp::SubtractAssign,
+            Operator::MultiplyAssign => BinOp::MultiplyAssign,
+            Operator::DivideAssign => BinOp::DivideAssign,
+            Operator::ModulusAssign => BinOp::ModulusAssign,
+            Operator::LeftShiftAssign => BinOp::LeftShiftAssign,
+            Operator::RightShiftAssign => BinOp::RightShiftAssign,
+            Operator::BitwiseAndAssign => BinOp::BitwiseAndAssign,
+            Operator::BitwiseXorAssign => BinOp::BitwiseXorAssign,
+            Operator::BitwiseOrAssign => BinOp::BitwiseOrAssign,
+            _ => panic!("Invalid binary operator token: {:?}", token),
+        },
+        _ => BinOp::NotABinaryOp,
+    }
 }
 
-#[derive(Debug)]
-pub enum TermBinaryOp {
-    Mul,
-    Div,
-    Mod,
-    Pow,
-    And,
-    Or,
-    Less,
-    Greater,
-    Equal,
-}
-
-#[derive(Debug)]
-pub enum UnaryOp {
-    Neg,
-    Not,
+fn get_un_operator_from_token(token: &Token) -> UnOp {
+    match token {
+        Token::Operator(op) => match op {
+            Operator::Increment => UnOp::PreIncrement,
+            Operator::Decrement => UnOp::PreDecrement,
+            Operator::Add => UnOp::UnaryPlus,
+            Operator::Subtract => UnOp::UnaryMinus,
+            Operator::LogicalNot => UnOp::LogicalNot,
+            Operator::BitwiseNot => UnOp::BitwiseNot,
+            Operator::Multiply => UnOp::Dereference,
+            Operator::BitwiseAnd => UnOp::AddressOf,
+            _ => panic!("Invalid unary operator token: {:?}", token),
+        },
+        _ => UnOp::NotAUnaryOp,
+    }
 }
 
 #[derive(Debug)]
@@ -96,47 +196,7 @@ fn parse_constant(token: &Token) -> Constant {
     }
 }
 
-fn get_unary_op(token: &Token) -> UnaryOp {
-    match token {
-        Token::Operator(op) => match op {
-            Operator::Subtract => UnaryOp::Neg,
-            Operator::Not => UnaryOp::Not,
-            _ => panic!("Invalid unary operator token: {:?}", token),
-        },
-        _ => panic!("Invalid unary operator token: {:?}", token),
-    }
-}
-
-fn get_expression_binary_op(token: &Token) -> ExpressionBinaryOp {
-    match token {
-        Token::Operator(op) => match op {
-            Operator::Add => ExpressionBinaryOp::Add,
-            Operator::Subtract => ExpressionBinaryOp::Sub,
-            _ => panic!("Invalid binary operator token: {:?}", token),
-        },
-        _ => panic!("Invalid binary operator token: {:?}", token),
-    }
-}
-
-fn get_term_binary_op(token: &Token) -> TermBinaryOp {
-    match token {
-        Token::Operator(op) => match op {
-            Operator::Multiply => TermBinaryOp::Mul,
-            Operator::Divide => TermBinaryOp::Div,
-            Operator::Modulus => TermBinaryOp::Mod,
-            Operator::Exponent => TermBinaryOp::Pow,
-            Operator::BitwiseAnd => TermBinaryOp::And,
-            Operator::BitwiseOr => TermBinaryOp::Or,
-            Operator::LessThan => TermBinaryOp::Less,
-            Operator::GreaterThan => TermBinaryOp::Greater,
-            Operator::Assign => TermBinaryOp::Equal,
-            _ => panic!("Invalid binary operator token: {:?}", token),
-        },
-        _ => panic!("Invalid binary operator token: {:?}", token),
-    }
-}
-
-fn parse_factor(mut tokens: &mut Iter<Token>) -> Factor {
+fn parse_atom(mut tokens: &mut Iter<Token>) -> Atom {
     let tok = tokens.next().unwrap();
 
     match tok {
@@ -144,61 +204,164 @@ fn parse_factor(mut tokens: &mut Iter<Token>) -> Factor {
             let inner_exp = parse_expression(&mut tokens);
 
             if let Token::RParen = tokens.next().unwrap() {
-                return Factor::Expression(Box::new(inner_exp));
+                return Atom::Expression(Box::new(inner_exp));
             } else {
                 panic!("Expected closing parenthesis, found: {:?}", tok);
             }
         }
-        Token::Operator(_op) => {
-            let op = get_unary_op(tok);
-            let factor = parse_factor(&mut tokens);
-            return Factor::UnaryOp(Box::new(factor), op);
-        }
         Token::IntLiteral(_) | Token::FloatLiteral(_) | Token::Keyword(_) => {
-            return Factor::Constant(parse_constant(tok));
+            return Atom::Constant(parse_constant(tok));
         }
         Token::Identifier(_) => {
             // TODO
             panic!("Not implemented");
         }
-        _ => panic!("Invalid factor token: {:?}", tok),
+        _ => panic!("Invalid atom token: {:?}", tok),
     }
 }
 
-fn parse_term(mut tokens: &mut Iter<Token>) -> Term {
-    let mut term = Term::Factor(parse_factor(&mut tokens));
-    let mut next= tokens.clone().next().unwrap();
+fn parse_expression_with_precedence(
+    mut tokens: &mut Iter<Token>,
+    precedence_level: usize,
+    precedence_table: &Vec<PrecedenceLevel>,
+) -> Expression {
+    if precedence_level == 0 {
+        // Parse the lowest precedence, like literals or atoms
+        return Expression::Atom(parse_atom(&mut tokens));
+    }
 
-    while next == &Token::Operator(Operator::Multiply)
-        || next == &Token::Operator(Operator::Divide)
-        || next == &Token::Operator(Operator::Modulus)
-        || next == &Token::Operator(Operator::Exponent)
-        || next == &Token::Operator(Operator::BitwiseAnd)
-        || next == &Token::Operator(Operator::BitwiseOr)
+    // Check if the current token is a unary operator for this precedence level
+    let mut next = tokens.clone().next().unwrap();
+    let mut expr;
+
+    if precedence_table[precedence_level]
+        .unary_ops
+        .contains(&get_un_operator_from_token(&next))
     {
         let tok = tokens.next().unwrap();
-        let op = get_term_binary_op(tok);
-        let next_term = parse_factor(&mut tokens);
-        term = Term::BinaryOp(Box::new(term), next_term, op);
+        let op = get_un_operator_from_token(tok); // Get the unary operator
+        let operand =
+            parse_expression_with_precedence(&mut tokens, precedence_level, precedence_table); // Parse operand
+        expr = Expression::UnaryOp(Box::new(operand), op); // Apply unary operator
+    } else {
+        // No unary operator, so parse the next lower precedence level
+        expr =
+            parse_expression_with_precedence(&mut tokens, precedence_level - 1, precedence_table);
+    }
+
+    // Now handle binary operators for the current precedence level
+    next = tokens.clone().next().unwrap();
+    while precedence_table[precedence_level]
+        .binary_ops
+        .contains(&get_bin_operator_from_token(&next))
+    {
+        let tok = tokens.next().unwrap();
+        let op = get_bin_operator_from_token(tok); // Get the binary operator
+        let next_term =
+            parse_expression_with_precedence(&mut tokens, precedence_level - 1, precedence_table); // Parse next term
+        expr = Expression::BinaryOp(Box::new(expr), Box::new(next_term), op);
         next = tokens.clone().next().unwrap();
     }
-    return term;
+
+    expr
+}
+
+fn build_precedence_table() -> Vec<PrecedenceLevel> {
+    vec![
+        PrecedenceLevel {
+            binary_ops: vec![BinOp::MemberAccess],
+            unary_ops: vec![],
+        },
+        PrecedenceLevel {
+            binary_ops: vec![],
+            unary_ops: vec![
+                UnOp::PreIncrement,
+                UnOp::PreDecrement,
+                UnOp::UnaryPlus,
+                UnOp::UnaryMinus,
+                UnOp::LogicalNot,
+                UnOp::BitwiseNot,
+                UnOp::Dereference,
+                UnOp::AddressOf,
+            ],
+        },
+        PrecedenceLevel {
+            binary_ops: vec![BinOp::Exponent],
+            unary_ops: vec![],
+        },
+        PrecedenceLevel {
+            binary_ops: vec![BinOp::Multiply, BinOp::Divide, BinOp::Modulus],
+            unary_ops: vec![],
+        },
+        PrecedenceLevel {
+            binary_ops: vec![BinOp::Add, BinOp::Subtract],
+            unary_ops: vec![],
+        },
+        PrecedenceLevel {
+            binary_ops: vec![BinOp::LeftShift, BinOp::RightShift],
+            unary_ops: vec![],
+        },
+        PrecedenceLevel {
+            binary_ops: vec![
+                BinOp::LessThan,
+                BinOp::GreaterThan,
+                BinOp::LessOrEqualThan,
+                BinOp::GreaterOrEqualThan,
+            ],
+            unary_ops: vec![],
+        },
+        PrecedenceLevel {
+            binary_ops: vec![BinOp::Equal, BinOp::NotEqual],
+            unary_ops: vec![],
+        },
+        PrecedenceLevel {
+            binary_ops: vec![BinOp::BitwiseAnd],
+            unary_ops: vec![],
+        },
+        PrecedenceLevel {
+            binary_ops: vec![BinOp::BitwiseXor],
+            unary_ops: vec![],
+        },
+        PrecedenceLevel {
+            binary_ops: vec![BinOp::BitwiseOr],
+            unary_ops: vec![],
+        },
+        PrecedenceLevel {
+            binary_ops: vec![BinOp::LogicalAnd],
+            unary_ops: vec![],
+        },
+        PrecedenceLevel {
+            binary_ops: vec![BinOp::LogicalXor],
+            unary_ops: vec![],
+        },
+        PrecedenceLevel {
+            binary_ops: vec![BinOp::LogicalOr],
+            unary_ops: vec![],
+        },
+        PrecedenceLevel {
+            binary_ops: vec![
+                BinOp::Assign,
+                BinOp::AddAssign,
+                BinOp::SubtractAssign,
+                BinOp::MultiplyAssign,
+                BinOp::DivideAssign,
+                BinOp::ModulusAssign,
+                BinOp::LeftShiftAssign,
+                BinOp::RightShiftAssign,
+                BinOp::BitwiseAndAssign,
+                BinOp::BitwiseXorAssign,
+                BinOp::BitwiseOrAssign,
+            ],
+            unary_ops: vec![],
+        },
+    ]
 }
 
 fn parse_expression(mut tokens: &mut Iter<Token>) -> Expression {
-    let mut expression = Expression::Term(parse_term(&mut tokens));
+    let precedence_table = build_precedence_table();
+    let max_precedence = precedence_table.len() - 1;
 
-    let mut next= tokens.clone().next().unwrap();
-
-    while next == &Token::Operator(Operator::Add) || next == &Token::Operator(Operator::Subtract) {
-        let tok = tokens.next().unwrap();
-        let op = get_expression_binary_op(tok);
-        let next_term = parse_term(&mut tokens);
-        expression = Expression::BinaryOp(Box::new(expression), next_term, op);
-        next = tokens.clone().next().unwrap();
-    }
-
-    return expression;
+    parse_expression_with_precedence(&mut tokens, max_precedence, &precedence_table)
 }
 
 fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
@@ -272,7 +435,10 @@ fn parse_function(mut tokens: &mut Iter<Token>) -> Function {
         } else if let Token::Identifier(id) = tok {
             params.push(id.clone());
         } else {
-            panic!("Expected identifier or closing parenthesis, found: {:?}", tok);
+            panic!(
+                "Expected identifier or closing parenthesis, found: {:?}",
+                tok
+            );
         }
     }
 

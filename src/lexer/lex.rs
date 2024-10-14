@@ -3,18 +3,42 @@ use regex::Regex;
 #[derive(Debug)]
 #[derive(PartialEq, Clone, Copy)]
 pub enum Operator {
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Modulus,
-    Exponent,
-    BitwiseAnd,
-    BitwiseOr,
-    LessThan,
-    GreaterThan,
-    Assign,
-    Not,
+    Add,                // +
+    Subtract,           // -
+    Multiply,           // *
+    Divide,             // /
+    Modulus,            // %
+    Exponent,           // **
+    BitwiseAnd,         // &
+    BitwiseOr,          // |
+    BitwiseXor,         // ^
+    BitwiseNot,         // ~
+    LessThan,           // <
+    GreaterThan,        // >
+    Assign,             // =
+    LogicalAnd,         // &&
+    LogicalOr,          // ||
+    LogicalNot,         // !
+    LogicalXor,         // ^^
+    Equal,              // ==
+    NotEqual,           // !=
+    LessOrEqualThan,    // <=
+    GreaterOrEqualThan, // >=
+    Increment,          // ++
+    Decrement,          // --
+    LeftShift,          // <<
+    RightShift,         // >>
+    AddAssign,          // +=
+    SubtractAssign,     // -=
+    MultiplyAssign,     // *=
+    DivideAssign,       // /=
+    ModulusAssign,      // %=
+    LeftShiftAssign,    // <<=
+    RightShiftAssign,   // >>=
+    BitwiseAndAssign,   // &=
+    BitwiseXorAssign,   // ^=
+    BitwiseOrAssign,    // |=
+    MemberAccess,       // .
 }
 
 #[derive(Debug)]
@@ -56,8 +80,11 @@ pub fn lex(file: &str) -> Vec<Token> {
     // Integers are a sequence of digits
     let int_re = Regex::new(r"^\d+").unwrap();
 
-    // Operators are any of the following characters: + - * / % ^ & | < > = !
-    let operator_re = Regex::new(r"^[\+\-\*/%\^&\|<>=!]").unwrap();
+    // (Short) operators are any of the following characters: + - * / % ^ & | ~ < > = ! .
+    let operator_re = Regex::new(r"^[\+\-\*/%\^&~\|<>=!\.]").unwrap();
+
+    // Large operators are any of the following strings: == != <= >= && || ** ++ -- << >> += -= *= /= %= <<= >>= &= ^= |= ^^
+    let large_operator_re = Regex::new(r"^(==|!=|<=|>=|&&|\|\||\*\*|\+\+|--|<<|>>|\+=|-=|\*=|\/=|%=|<<=|>>=|&=|\^=|\|=|\^\^)").unwrap();
 
     // Keywords are any of the following strings: if else while for return
     let keyword_re = Regex::new(r"^(if|else|while|for|return|fn)").unwrap();
@@ -116,6 +143,34 @@ pub fn lex(file: &str) -> Vec<Token> {
         } else if let Some(caps) = int_re.captures(rest) {
             tokens.push(Token::IntLiteral(caps.get(0).unwrap().as_str().parse().unwrap()));
             pos += caps.get(0).unwrap().end();
+        } else if let Some(caps) = large_operator_re.captures(rest) {
+            let op = match caps.get(0).unwrap().as_str() {
+                "==" => Operator::Equal,
+                "!=" => Operator::NotEqual,
+                "<=" => Operator::LessOrEqualThan,
+                ">=" => Operator::GreaterOrEqualThan,
+                "&&" => Operator::LogicalAnd,
+                "||" => Operator::LogicalOr,
+                "**" => Operator::Exponent,
+                "++" => Operator::Increment,
+                "--" => Operator::Decrement,
+                "<<" => Operator::LeftShift,
+                ">>" => Operator::RightShift,
+                "+=" => Operator::AddAssign,
+                "-=" => Operator::SubtractAssign,
+                "*=" => Operator::MultiplyAssign,
+                "/=" => Operator::DivideAssign,
+                "%=" => Operator::ModulusAssign,
+                "<<=" => Operator::LeftShiftAssign,
+                ">>=" => Operator::RightShiftAssign,
+                "&=" => Operator::BitwiseAndAssign,
+                "^=" => Operator::BitwiseXorAssign,
+                "|=" => Operator::BitwiseOrAssign,
+                "^^" => Operator::LogicalXor,
+                _ => unreachable!(),
+            };
+            tokens.push(Token::Operator(op));
+            pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = operator_re.captures(rest) {
             let op = match caps.get(0).unwrap().as_str() {
                 "+" => Operator::Add,
@@ -123,13 +178,15 @@ pub fn lex(file: &str) -> Vec<Token> {
                 "*" => Operator::Multiply,
                 "/" => Operator::Divide,
                 "%" => Operator::Modulus,
-                "^" => Operator::Exponent,
                 "&" => Operator::BitwiseAnd,
                 "|" => Operator::BitwiseOr,
                 "<" => Operator::LessThan,
                 ">" => Operator::GreaterThan,
                 "=" => Operator::Assign,
-                "!" => Operator::Not,
+                "!" => Operator::LogicalNot,
+                "~" => Operator::BitwiseNot,
+                "^" => Operator::BitwiseXor,
+                "." => Operator::MemberAccess,
                 _ => unreachable!(),
             };
             tokens.push(Token::Operator(op));
