@@ -1,7 +1,6 @@
 use crate::lexer::lex::Operator;
 use crate::lexer::lex::Token;
 use core::panic;
-use std::f32::consts::E;
 use std::slice::Iter;
 
 // OPERATOR PRECEDENCE TABLE:
