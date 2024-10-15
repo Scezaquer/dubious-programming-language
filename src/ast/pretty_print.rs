@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::build_ast::{Ast, BinOp, UnOp, Constant, Expression, Atom, Function, Program, Statement};
+use super::build_ast::{Ast, BinOp, UnOp, Constant, Expression, Atom, Function, Program, Statement, AssignmentOp};
 
 impl fmt::Display for Constant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -52,17 +52,25 @@ impl fmt::Display for BinOp {
             BinOp::LogicalAnd => write!(f, "&&"),
             BinOp::LogicalXor => write!(f, "^^"),
             BinOp::LogicalOr => write!(f, "||"),
-            BinOp::Assign => write!(f, "="),
-            BinOp::AddAssign => write!(f, "+="),
-            BinOp::SubtractAssign => write!(f, "-="),
-            BinOp::MultiplyAssign => write!(f, "*="),
-            BinOp::DivideAssign => write!(f, "/="),
-            BinOp::ModulusAssign => write!(f, "%="),
-            BinOp::LeftShiftAssign => write!(f, "<<="),
-            BinOp::RightShiftAssign => write!(f, ">>="),
-            BinOp::BitwiseAndAssign => write!(f, "&="),
-            BinOp::BitwiseXorAssign => write!(f, "^="),
-            BinOp::BitwiseOrAssign => write!(f, "|="),
+            _ => write!(f, "Unknown"),
+        }
+    }
+}
+
+impl fmt::Display for AssignmentOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AssignmentOp::Assign => write!(f, "="),
+            AssignmentOp::AddAssign => write!(f, "+="),
+            AssignmentOp::SubtractAssign => write!(f, "-="),
+            AssignmentOp::MultiplyAssign => write!(f, "*="),
+            AssignmentOp::DivideAssign => write!(f, "/="),
+            AssignmentOp::ModulusAssign => write!(f, "%="),
+            AssignmentOp::LeftShiftAssign => write!(f, "<<="),
+            AssignmentOp::RightShiftAssign => write!(f, ">>="),
+            AssignmentOp::BitwiseAndAssign => write!(f, "&="),
+            AssignmentOp::BitwiseXorAssign => write!(f, "^="),
+            AssignmentOp::BitwiseOrAssign => write!(f, "|="),
             _ => write!(f, "Unknown"),
         }
     }
@@ -89,6 +97,12 @@ impl Expression {
                 op,
                 right.pretty_print(indent)
             ),
+            Expression::Assignment(var, expr, op) => format!(
+                "{} {} {}",
+                var,
+                op,
+                expr.pretty_print(indent)
+            ),
         }
     }
 }
@@ -103,6 +117,18 @@ impl Statement {
                 var,
                 expr.pretty_print(indent + 2)
             ),
+            Statement::Let(var, expr_opt) => {
+                if let Some(expr) = expr_opt {
+                    format!(
+                        "{}let {} = {}",
+                        indent_str,
+                        var,
+                        expr.pretty_print(indent + 2)
+                    )
+                } else {
+                    format!("{}let {}", indent_str, var)
+                }
+            },
             Statement::If(cond, body) => {
                 let mut result = format!("{}if {}\n", indent_str, cond.pretty_print(indent));
                 for stmt in body {

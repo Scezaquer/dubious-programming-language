@@ -1,5 +1,7 @@
 use crate::lexer::lex::Operator;
 use crate::lexer::lex::Token;
+use core::panic;
+use std::f32::consts::E;
 use std::slice::Iter;
 
 // OPERATOR PRECEDENCE TABLE:
@@ -34,7 +36,8 @@ pub enum Atom {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum UnOp { // TODO: We only support prefix unary operators for now
+pub enum UnOp {
+    // TODO: We only support prefix unary operators for now
     PreIncrement,
     PreDecrement,
     UnaryPlus,
@@ -43,7 +46,7 @@ pub enum UnOp { // TODO: We only support prefix unary operators for now
     BitwiseNot,
     Dereference,
     AddressOf,
-    NotAUnaryOp,    // Not pretty but it makes the code nicer
+    NotAUnaryOp, // Not pretty but it makes the code nicer
 }
 
 #[derive(Debug, PartialEq)]
@@ -69,6 +72,11 @@ pub enum BinOp {
     LogicalAnd,
     LogicalXor,
     LogicalOr,
+    NotABinaryOp, // Not pretty but it makes the code nicer
+}
+
+#[derive(Debug, PartialEq)]
+pub enum AssignmentOp {
     Assign,
     AddAssign,
     SubtractAssign,
@@ -80,13 +88,14 @@ pub enum BinOp {
     BitwiseAndAssign,
     BitwiseXorAssign,
     BitwiseOrAssign,
-    NotABinaryOp,   // Not pretty but it makes the code nicer
+    NotAnAssignmentOp, // Not pretty but it makes the code nicer
 }
 
 #[derive(Debug)]
 pub struct PrecedenceLevel {
     binary_ops: Vec<BinOp>,
     unary_ops: Vec<UnOp>,
+    assignment_ops: Vec<AssignmentOp>,
 }
 
 #[derive(Debug)]
@@ -94,6 +103,7 @@ pub enum Expression {
     Atom(Atom),
     UnaryOp(Box<Expression>, UnOp),
     BinaryOp(Box<Expression>, Box<Expression>, BinOp),
+    Assignment(String, Box<Expression>, AssignmentOp),
 }
 
 fn get_bin_operator_from_token(token: &Token) -> BinOp {
@@ -120,20 +130,29 @@ fn get_bin_operator_from_token(token: &Token) -> BinOp {
             Operator::LogicalAnd => BinOp::LogicalAnd,
             Operator::LogicalXor => BinOp::LogicalXor,
             Operator::LogicalOr => BinOp::LogicalOr,
-            Operator::Assign => BinOp::Assign,
-            Operator::AddAssign => BinOp::AddAssign,
-            Operator::SubtractAssign => BinOp::SubtractAssign,
-            Operator::MultiplyAssign => BinOp::MultiplyAssign,
-            Operator::DivideAssign => BinOp::DivideAssign,
-            Operator::ModulusAssign => BinOp::ModulusAssign,
-            Operator::LeftShiftAssign => BinOp::LeftShiftAssign,
-            Operator::RightShiftAssign => BinOp::RightShiftAssign,
-            Operator::BitwiseAndAssign => BinOp::BitwiseAndAssign,
-            Operator::BitwiseXorAssign => BinOp::BitwiseXorAssign,
-            Operator::BitwiseOrAssign => BinOp::BitwiseOrAssign,
-            _ => panic!("Invalid binary operator token: {:?}", token),
+            _ => BinOp::NotABinaryOp,
         },
         _ => BinOp::NotABinaryOp,
+    }
+}
+
+fn get_assign_operator_from_token(token: &Token) -> AssignmentOp {
+    match token {
+        Token::Operator(op) => match op {
+            Operator::Assign => AssignmentOp::Assign,
+            Operator::AddAssign => AssignmentOp::AddAssign,
+            Operator::SubtractAssign => AssignmentOp::SubtractAssign,
+            Operator::MultiplyAssign => AssignmentOp::MultiplyAssign,
+            Operator::DivideAssign => AssignmentOp::DivideAssign,
+            Operator::ModulusAssign => AssignmentOp::ModulusAssign,
+            Operator::LeftShiftAssign => AssignmentOp::LeftShiftAssign,
+            Operator::RightShiftAssign => AssignmentOp::RightShiftAssign,
+            Operator::BitwiseAndAssign => AssignmentOp::BitwiseAndAssign,
+            Operator::BitwiseXorAssign => AssignmentOp::BitwiseXorAssign,
+            Operator::BitwiseOrAssign => AssignmentOp::BitwiseOrAssign,
+            _ => AssignmentOp::NotAnAssignmentOp,
+        },
+        _ => AssignmentOp::NotAnAssignmentOp,
     }
 }
 
@@ -157,6 +176,7 @@ fn get_un_operator_from_token(token: &Token) -> UnOp {
 #[derive(Debug)]
 pub enum Statement {
     Assignment(String, Expression),
+    Let(String, Option<Expression>),
     If(Expression, Vec<Statement>),
     While(Expression, Vec<Statement>),
     Return(Expression),
@@ -212,9 +232,8 @@ fn parse_atom(mut tokens: &mut Iter<Token>) -> Atom {
         Token::IntLiteral(_) | Token::FloatLiteral(_) | Token::Keyword(_) => {
             return Atom::Constant(parse_constant(tok));
         }
-        Token::Identifier(_) => {
-            // TODO
-            panic!("Not implemented");
+        Token::Identifier(s) => {
+            return Atom::Variable(s.to_string());
         }
         _ => panic!("Invalid atom token: {:?}", tok),
     }
@@ -249,17 +268,43 @@ fn parse_expression_with_precedence(
             parse_expression_with_precedence(&mut tokens, precedence_level - 1, precedence_table);
     }
 
-    // Now handle binary operators for the current precedence level
+    // Now handle binary and assignment operators for the current precedence level
     next = tokens.clone().next().unwrap();
     while precedence_table[precedence_level]
         .binary_ops
         .contains(&get_bin_operator_from_token(&next))
+        || precedence_table[precedence_level]
+            .assignment_ops
+            .contains(&get_assign_operator_from_token(&next))
     {
         let tok = tokens.next().unwrap();
         let op = get_bin_operator_from_token(tok); // Get the binary operator
-        let next_term =
-            parse_expression_with_precedence(&mut tokens, precedence_level - 1, precedence_table); // Parse next term
-        expr = Expression::BinaryOp(Box::new(expr), Box::new(next_term), op);
+
+        if op == BinOp::NotABinaryOp {
+            // If it's not a binary operator, it must be an assignment operator
+            let op = get_assign_operator_from_token(tok); // Get the assignment operator
+            let next_term = parse_expression_with_precedence(
+                &mut tokens,
+                precedence_level - 1,
+                precedence_table,
+            ); // Parse next term
+
+            if let Expression::Atom(Atom::Variable(var)) = expr {
+                expr = Expression::Assignment(var, Box::new(next_term), op);
+            } else {
+                panic!(
+                    "Invalid assignment target (can only assign to variables): {:?}",
+                    expr
+                );
+            }
+        } else {
+            let next_term = parse_expression_with_precedence(
+                &mut tokens,
+                precedence_level - 1,
+                precedence_table,
+            ); // Parse next term
+            expr = Expression::BinaryOp(Box::new(expr), Box::new(next_term), op);
+        }
         next = tokens.clone().next().unwrap();
     }
 
@@ -271,6 +316,7 @@ fn build_precedence_table() -> Vec<PrecedenceLevel> {
         PrecedenceLevel {
             binary_ops: vec![BinOp::MemberAccess],
             unary_ops: vec![],
+            assignment_ops: vec![],
         },
         PrecedenceLevel {
             binary_ops: vec![],
@@ -284,22 +330,27 @@ fn build_precedence_table() -> Vec<PrecedenceLevel> {
                 UnOp::Dereference,
                 UnOp::AddressOf,
             ],
+            assignment_ops: vec![],
         },
         PrecedenceLevel {
             binary_ops: vec![BinOp::Exponent],
             unary_ops: vec![],
+            assignment_ops: vec![],
         },
         PrecedenceLevel {
             binary_ops: vec![BinOp::Multiply, BinOp::Divide, BinOp::Modulus],
             unary_ops: vec![],
+            assignment_ops: vec![],
         },
         PrecedenceLevel {
             binary_ops: vec![BinOp::Add, BinOp::Subtract],
             unary_ops: vec![],
+            assignment_ops: vec![],
         },
         PrecedenceLevel {
             binary_ops: vec![BinOp::LeftShift, BinOp::RightShift],
             unary_ops: vec![],
+            assignment_ops: vec![],
         },
         PrecedenceLevel {
             binary_ops: vec![
@@ -309,50 +360,59 @@ fn build_precedence_table() -> Vec<PrecedenceLevel> {
                 BinOp::GreaterOrEqualThan,
             ],
             unary_ops: vec![],
+            assignment_ops: vec![],
         },
         PrecedenceLevel {
             binary_ops: vec![BinOp::Equal, BinOp::NotEqual],
             unary_ops: vec![],
+            assignment_ops: vec![],
         },
         PrecedenceLevel {
             binary_ops: vec![BinOp::BitwiseAnd],
             unary_ops: vec![],
+            assignment_ops: vec![],
         },
         PrecedenceLevel {
             binary_ops: vec![BinOp::BitwiseXor],
             unary_ops: vec![],
+            assignment_ops: vec![],
         },
         PrecedenceLevel {
             binary_ops: vec![BinOp::BitwiseOr],
             unary_ops: vec![],
+            assignment_ops: vec![],
         },
         PrecedenceLevel {
             binary_ops: vec![BinOp::LogicalAnd],
             unary_ops: vec![],
+            assignment_ops: vec![],
         },
         PrecedenceLevel {
             binary_ops: vec![BinOp::LogicalXor],
             unary_ops: vec![],
+            assignment_ops: vec![],
         },
         PrecedenceLevel {
             binary_ops: vec![BinOp::LogicalOr],
             unary_ops: vec![],
+            assignment_ops: vec![],
         },
         PrecedenceLevel {
-            binary_ops: vec![
-                BinOp::Assign,
-                BinOp::AddAssign,
-                BinOp::SubtractAssign,
-                BinOp::MultiplyAssign,
-                BinOp::DivideAssign,
-                BinOp::ModulusAssign,
-                BinOp::LeftShiftAssign,
-                BinOp::RightShiftAssign,
-                BinOp::BitwiseAndAssign,
-                BinOp::BitwiseXorAssign,
-                BinOp::BitwiseOrAssign,
-            ],
+            binary_ops: vec![],
             unary_ops: vec![],
+            assignment_ops: vec![
+                AssignmentOp::Assign,
+                AssignmentOp::AddAssign,
+                AssignmentOp::SubtractAssign,
+                AssignmentOp::MultiplyAssign,
+                AssignmentOp::DivideAssign,
+                AssignmentOp::ModulusAssign,
+                AssignmentOp::LeftShiftAssign,
+                AssignmentOp::RightShiftAssign,
+                AssignmentOp::BitwiseAndAssign,
+                AssignmentOp::BitwiseXorAssign,
+                AssignmentOp::BitwiseOrAssign,
+            ],
         },
     ]
 }
@@ -371,8 +431,37 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
     match tok {
         Token::Keyword(k) => {
             if k == "return" {
+                // return exp;
                 let exp = parse_expression(tokens);
                 statement = Statement::Return(exp);
+            } else if k == "let" {
+                // let id: type = exp;
+
+                let next_tok = tokens.next().unwrap();
+                let id = match next_tok {
+                    Token::Identifier(id) => id.clone(),
+                    _ => panic!("Expected identifier, found: {:?}", next_tok),
+                };
+
+                let next_tok = tokens.next().unwrap();
+                if &Token::Colon != next_tok {
+                    panic!("Expected colon, found: {:?}", next_tok);
+                };
+
+                let _ = tokens.next().unwrap(); // Skip type for now. // TODO: Implement types
+
+                let next_tok = tokens.next().unwrap();
+                if let Token::Operator(Operator::Assign) = next_tok {
+                    let exp = parse_expression(tokens);
+                    statement = Statement::Let(id.to_string(), Some(exp));
+                } else if let Token::Semicolon = next_tok {
+                    statement = Statement::Let(id.to_string(), None);
+                } else {
+                    panic!(
+                        "Expected semicolon or assignment operator, found: {:?}",
+                        next_tok
+                    );
+                }
             } else {
                 panic!("Invalid keyword token: {:?}", tok);
             }
@@ -416,12 +505,14 @@ fn parse_function(mut tokens: &mut Iter<Token>) -> Function {
         panic!("Expected function keyword, found: {:?}", tok);
     }
 
-    let id = match tokens.next().unwrap() {
+    let tok = tokens.next().unwrap();
+    let id = match tok {
         Token::Identifier(id) => id.clone(),
         _ => panic!("Expected identifier, found: {:?}", tok),
     };
 
-    if &Token::LParen != tokens.next().unwrap() {
+    let tok = tokens.next().unwrap();
+    if &Token::LParen != tok {
         panic!("Expected opening parenthesis, found: {:?}", tok);
     }
 
@@ -442,7 +533,8 @@ fn parse_function(mut tokens: &mut Iter<Token>) -> Function {
         }
     }
 
-    if &Token::LBrace != tokens.next().unwrap() {
+    let tok = tokens.next().unwrap();
+    if &Token::LBrace != tok {
         panic!("Expected opening brace, found: {:?}", tok);
     }
 

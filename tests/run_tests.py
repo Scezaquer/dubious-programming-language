@@ -29,7 +29,7 @@ def compile_test(filename):
         f"-o tests/dubious_executables/{filename}.out", shell=True)
     if os.path.exists(f"tests/dubious_executables/{filename}.out"):
         return True
-    raise Exception(f"Failed to compile {filename}")
+    print(f"Failed to compile {filename}")
 
 
 if __name__ == '__main__':
@@ -39,6 +39,14 @@ if __name__ == '__main__':
 
     for test in tests:
         print(f'Compiling {test["name"]}')
+        try:
+            os.remove(f"tests/dubious_asm/{test['filename']}.s")
+        except FileNotFoundError:
+            pass
+        try:
+            os.remove(f"tests/dubious_executables/{test['filename']}.out")
+        except FileNotFoundError:
+            pass
         compile_test(test['filename'])
 
     for test in tests:

@@ -1,6 +1,6 @@
 use std::path;
 use std::fs::File;
-use crate::ast::build_ast::{Ast, Program, Function, Statement, Expression, Atom, UnOp, BinOp};
+use crate::ast::build_ast::{Ast, Program, Function, Statement, Expression, Atom, UnOp, BinOp, AssignmentOp};
 use std::io::Write;
 
 // TODO: test all of these one by one (pain)
@@ -152,44 +152,50 @@ fn generate_expression(file: &mut File, expression: &Expression) {
                     writeln!(file, "    shr rax, cl").unwrap();
                 },
                 _ => unimplemented!(),
-                /*BinOp::Assign => {
-                    writeln!(file, "    mov [rbp-{}], rax", right).unwrap();
+            }
+        },
+        Expression::Assignment(str, expr, op ) => {
+            generate_expression(file, expr);
+            match op {
+                AssignmentOp::Assign => {
+                    writeln!(file, "    mov [rbp-{}], rax", str).unwrap();
                 },
-                BinOp::AddAssign => {
-                    writeln!(file, "    add [rbp-{}], rax", right).unwrap();
+                AssignmentOp::AddAssign => {
+                    writeln!(file, "    add [rbp-{}], rax", str).unwrap();
                 },
-                BinOp::SubtractAssign => {
-                    writeln!(file, "    sub [rbp-{}], rax", right).unwrap();
+                AssignmentOp::SubtractAssign => {
+                    writeln!(file, "    sub [rbp-{}], rax", str).unwrap();
                 },
-                BinOp::MultiplyAssign => {
-                    writeln!(file, "    imul [rbp-{}], rax", right).unwrap();
+                AssignmentOp::MultiplyAssign => {
+                    writeln!(file, "    imul [rbp-{}], rax", str).unwrap();
                 },
-                BinOp::DivideAssign => {
+                AssignmentOp::DivideAssign => {
                     writeln!(file, "    cqo").unwrap();
-                    writeln!(file, "    idiv [rbp-{}]", right).unwrap();
+                    writeln!(file, "    idiv [rbp-{}]", str).unwrap();
                 },
-                BinOp::ModulusAssign => {
+                AssignmentOp::ModulusAssign => {
                     writeln!(file, "    cqo").unwrap();
-                    writeln!(file, "    idiv [rbp-{}]", right).unwrap();
+                    writeln!(file, "    idiv [rbp-{}]", str).unwrap();
                     writeln!(file, "    mov rax, rdx").unwrap();
                 },
-                BinOp::LeftShiftAssign => {
+                AssignmentOp::LeftShiftAssign => {
                     writeln!(file, "    mov rcx, rax").unwrap();
-                    writeln!(file, "    shl [rbp-{}], cl", right).unwrap();
+                    writeln!(file, "    shl [rbp-{}], cl", str).unwrap();
                 },
-                BinOp::RightShiftAssign => {
+                AssignmentOp::RightShiftAssign => {
                     writeln!(file, "    mov rcx, rax").unwrap();
-                    writeln!(file, "    shr [rbp-{}], cl", right).unwrap();
+                    writeln!(file, "    shr [rbp-{}], cl", str).unwrap();
                 },
-                BinOp::BitwiseAndAssign => {
-                    writeln!(file, "    and [rbp-{}], rax", right).unwrap();
+                AssignmentOp::BitwiseAndAssign => {
+                    writeln!(file, "    and [rbp-{}], rax", str).unwrap();
                 },
-                BinOp::BitwiseXorAssign => {
-                    writeln!(file, "    xor [rbp-{}], rax", right).unwrap();
+                AssignmentOp::BitwiseXorAssign => {
+                    writeln!(file, "    xor [rbp-{}], rax", str).unwrap();
                 },
-                BinOp::BitwiseOrAssign => {
-                    writeln!(file, "    or [rbp-{}], rax", right).unwrap();
-                },*/
+                AssignmentOp::BitwiseOrAssign => {
+                    writeln!(file, "    or [rbp-{}], rax", str).unwrap();
+                },
+                _ => unimplemented!(),
             }
         },
     }
@@ -205,6 +211,19 @@ fn generate_statement(file: &mut File, statement: &Statement) {
         },
         Statement::Expression(expression) => {
             generate_expression(file, expression);
+        },
+        Statement::Assignment(str, expr) => {
+            generate_expression(file, expr);
+            writeln!(file, "    mov [rbp-{}], rax", str).unwrap();
+        },
+        Statement::Let(str, expr) => {
+            // TODO: symbol table
+            if let Some(expr) = expr {
+                generate_expression(file, expr);
+                writeln!(file, "    mov [rbp-{}], rax", str).unwrap();
+            } else {
+                writeln!(file, "    mov [rbp-{}], 0", str).unwrap();
+            }
         },
         _ => unimplemented!(),
     }

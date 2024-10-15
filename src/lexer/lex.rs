@@ -52,7 +52,6 @@ pub enum Token {
     LParen,
     RParen,
     Comma,
-    Assign,
     Semicolon,
     Colon,
     LBrace,
@@ -87,7 +86,7 @@ pub fn lex(file: &str) -> Vec<Token> {
     let large_operator_re = Regex::new(r"^(==|!=|<=|>=|&&|\|\||\*\*|\+\+|--|<<|>>|\+=|-=|\*=|\/=|%=|<<=|>>=|&=|\^=|\|=|\^\^)").unwrap();
 
     // Keywords are any of the following strings: if else while for return
-    let keyword_re = Regex::new(r"^(if|else|while|for|return|fn)").unwrap();
+    let keyword_re = Regex::new(r"^(if|else|while|for|return|fn|let)").unwrap();
 
     let whitespace_re = Regex::new(r"^\s+").unwrap();
 
@@ -108,9 +107,6 @@ pub fn lex(file: &str) -> Vec<Token> {
             pos += 1;
         } else if rest.starts_with(",") {
             tokens.push(Token::Comma);
-            pos += 1;
-        } else if rest.starts_with("=") {
-            tokens.push(Token::Assign);
             pos += 1;
         } else if rest.starts_with(";") {
             tokens.push(Token::Semicolon);
