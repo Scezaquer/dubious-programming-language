@@ -1,5 +1,7 @@
 {
     "workbench.colorTheme": "Default Dark Modern",
     "workbench.preferredDarkColorTheme": "Default Dark Modern",
-    "workbench.preferredHighContrastColorTheme": "Default High Contrast"
+	"workbench.preferredHighContrastColorTheme": "Default High Contrast",
+	"editor.insertSpaces": false,
+	"editor.detectIndentation": false
 }

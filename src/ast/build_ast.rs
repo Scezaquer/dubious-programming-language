@@ -180,11 +180,12 @@ pub enum Statement {
     While(Expression, Vec<Statement>),
     Return(Expression),
     Expression(Expression),
+    Compound(Vec<Statement>),
 }
 
 #[derive(Debug)]
 pub enum Function {
-    Function(String, Vec<String>, Vec<Statement>),
+    Function(String, Vec<String>, Statement),
 }
 
 #[derive(Debug)]
@@ -195,6 +196,16 @@ pub enum Program {
 #[derive(Debug)]
 pub struct Ast {
     pub program: Program,
+}
+
+impl std::fmt::Display for Constant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Constant::Int(i) => write!(f, "{}", i),
+            Constant::Float(fl) => write!(f, "{}", fl),
+            Constant::Bool(b) => write!(f, "{}", b),
+        }
+    }
 }
 
 fn parse_constant(token: &Token) -> Constant {
@@ -478,10 +489,31 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
                 panic!("Expected assignment operator, found: {:?}", tok);
             }
         }
+        &Token::LBrace => {
+            let mut statements = Vec::new();
+
+            loop {
+                let next = tokens.clone().next().unwrap();
+
+                if let &Token::RBrace = next {
+                    tokens.next();
+                    break;
+                } else {
+                    statements.push(parse_statement(tokens));
+                }
+            }
+
+            statement = Statement::Compound(statements);
+        }
         _ => {
             let exp = parse_expression(tokens);
             statement = Statement::Expression(exp);
         }
+    }
+
+    // Compound statements don't need a semicolon
+    if let Statement::Compound(_) = statement {
+        return statement;
     }
 
     let tok = tokens.next().unwrap();
@@ -532,25 +564,27 @@ fn parse_function(mut tokens: &mut Iter<Token>) -> Function {
         }
     }
 
-    let tok = tokens.next().unwrap();
-    if &Token::LBrace != tok {
-        panic!("Expected opening brace, found: {:?}", tok);
-    }
+    let statement = parse_statement(&mut tokens);
 
-    let mut statements = Vec::new();
+    // let tok = tokens.next().unwrap();
+    // if &Token::LBrace != tok {
+    //     panic!("Expected opening brace, found: {:?}", tok);
+    // }
 
-    loop {
-        let next = tokens.clone().next().unwrap();
+    // let mut statements = Vec::new();
 
-        if let &Token::RBrace = next {
-            tokens.next();
-            break;
-        } else {
-            statements.push(parse_statement(&mut tokens));
-        }
-    }
+    // loop {
+    //     let next = tokens.clone().next().unwrap();
 
-    return Function::Function(id, params, statements);
+    //     if let &Token::RBrace = next {
+    //         tokens.next();
+    //         break;
+    //     } else {
+    //         statements.push(parse_statement(&mut tokens));
+    //     }
+    // }
+
+    return Function::Function(id, params, statement);
 }
 
 pub fn parse(tokens: &Vec<Token>) -> Ast {

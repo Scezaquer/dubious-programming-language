@@ -56,7 +56,7 @@ fn main() {
 
     if args.ast {
         dbg!(&ast);
-        println!("{}", ast.pretty_print());
+        // println!("{}", ast.pretty_print());
     }
 
     // We make a .s file if the user wants to see the assembly code,
