@@ -5,6 +5,9 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Write;
 use std::path;
+use std::sync::atomic::AtomicUsize;
+
+static BRANCH_LABEL: AtomicUsize = AtomicUsize::new(0);
 
 // TODO: test all of these one by one (pain)
 
@@ -249,9 +252,6 @@ fn generate_compound_statement(
 
 					stack_index += 8;
 					var_map.insert(variable, stack_index);
-					let var_address = var_map
-						.get(&variable)
-						.expect(format!("Undeclared variable {}", variable).as_str());
 					context.insert(variable.clone());
 
 					if let Some(_) = expr {
@@ -262,6 +262,23 @@ fn generate_compound_statement(
 				}
 				Statement::Compound(_) => {
 					generate_compound_statement(file, statement, &var_map, &stack_index);
+				}
+				Statement::If(condition, if_statement, else_statement) => {
+					let branch_label = BRANCH_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+					let else_label = format!("else_{}", branch_label);
+					let end_label = format!("end_{}", branch_label);
+
+					writeln!(file, "    ;if statement").unwrap();
+					generate_expression(file, condition, &var_map);
+					writeln!(file, "    cmp rax, 0").unwrap();
+					writeln!(file, "    je {}", else_label).unwrap();
+					generate_compound_statement(file, if_statement, &var_map, &stack_index);
+					writeln!(file, "    jmp {}", end_label).unwrap();
+					writeln!(file, "{}:", else_label).unwrap();
+					if let Some(else_statement) = else_statement {
+						generate_compound_statement(file, else_statement, &var_map, &stack_index);
+					}
+					writeln!(file, "{}:", end_label).unwrap();
 				}
 				_ => unimplemented!(),
 			}

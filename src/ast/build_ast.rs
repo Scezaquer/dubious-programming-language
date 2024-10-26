@@ -176,8 +176,8 @@ fn get_un_operator_from_token(token: &Token) -> UnOp {
 pub enum Statement {
     Assignment(String, Expression),
     Let(String, Option<Expression>),
-    If(Expression, Vec<Statement>),
-    While(Expression, Vec<Statement>),
+    If(Expression, Box<Statement>, Option<Box<Statement>>),
+    While(Expression, Box<Statement>),
     Return(Expression),
     Expression(Expression),
     Compound(Vec<Statement>),
@@ -473,7 +473,35 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
                         next_tok
                     );
                 }
-            } else {
+            } else if k == "if" {
+				// if (exp) statement [else statement]
+				let exp = parse_expression(tokens);
+				let mut if_stmt = parse_statement(tokens);
+
+				if let Statement::Compound(_) = if_stmt {
+				} else {
+					if_stmt = Statement::Compound(vec![if_stmt]);
+				}
+
+				let next_tok = tokens.clone().next().unwrap();
+				if let Token::Keyword(k) = next_tok {
+					if k == "else" {
+						tokens.next();
+						let mut else_stmt = parse_statement(tokens);
+
+						if let Statement::Compound(_) = else_stmt {
+						} else {
+							else_stmt = Statement::Compound(vec![else_stmt]);
+						}
+
+						statement = Statement::If(exp, Box::new(if_stmt), Some(Box::new(else_stmt)));
+					} else {
+						statement = Statement::If(exp, Box::new(if_stmt), None);
+					}
+				} else {
+					statement = Statement::If(exp, Box::new(if_stmt), None);
+				}
+			} else {
                 panic!("Invalid keyword token: {:?}", tok);
             }
         }
@@ -512,10 +540,12 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
         }
     }
 
-    // Compound statements don't need a semicolon
+    // Compound and If statements don't need a semicolon
     if let Statement::Compound(_) = statement {
         return statement;
-    }
+    } else if let Statement::If(_, _, _) = statement {
+		return statement;
+	}
 
     let tok = tokens.next().unwrap();
     if tok != &Token::Semicolon {
@@ -565,7 +595,14 @@ fn parse_function(mut tokens: &mut Iter<Token>) -> Function {
         }
     }
 
-    let statement = parse_statement(&mut tokens);
+    let mut statement = parse_statement(&mut tokens);
+
+	// If the statement is not a compound statement, wrap it in one
+	// This is to allow okay-ish scope handling
+	if let Statement::Compound(_) = statement {
+	} else {
+		statement = Statement::Compound(vec![statement]);
+	}
 
     return Function::Function(id, params, statement);
 }

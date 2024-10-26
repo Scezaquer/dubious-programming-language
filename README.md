@@ -12,6 +12,7 @@ Based on https://norasandler.com/2017/11/29/Write-a-Compiler.html
 - TODO: Checker
 - TODO: binary and hex literals
 - TODO: make generator write comments in asm file
+- TODO: register allocation
 
 
 A simple compiler for the Dubious programming language (DPL).
@@ -62,7 +63,12 @@ an x86_64 assembly file or an elf64 binary.
 9. **Bitwise AND**: `a & b`
 10. **Bitwise XOR**: `a ^ b`
 11. **Bitwise OR**: `a | b`
-12. **Logical AND**: `a && b`
+12. **Logical AND**: `a && b`V
 13. **Logical XOR**: `a ^^ b`
 14. **Logical OR**: `a || b`
 15. **Assignment operators**: `a = b`, `a += b`, `a -= b`, `a *= b`, `a /= b`, `a %= b`, `a <<= b`, `a >>= b`, `a &= b`, `a ^= b`, `a |= b`
+
+Note: Assignment operators have a return value equal to the expression being assigned.
+
+If the expression in if statements evaluates to anything other than 0, then the if
+statement executes. Otherwise else (if present).

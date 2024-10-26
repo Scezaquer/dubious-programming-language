@@ -130,6 +130,62 @@
         "description": "Test that redeclaring a variable on a smaller scope shadows the outer variable",
         "filename": "variables/shadowing.dpl",
         "input": [],
+        "output": 7
+    },
+	{
+        "name": "else_if_chain",
+        "description": "Chain of else ifs",
+        "filename": "control_flow/else_if_chain.dpl",
+        "input": [],
+        "output": 3
+    },
+	{
+        "name": "if0_else_if_0",
+        "description": "If and else if, both false",
+        "filename": "control_flow/if0_else_if_0.dpl",
+        "input": [],
         "output": 5
-    }
+    },
+	{
+		"name": "if0_else_if_1",
+		"description": "If false, else if true",
+		"filename": "control_flow/if0_else_if_1.dpl",
+		"input": [],
+		"output": 4
+	},
+	{
+		"name": "if0_else",
+		"description": "If false, else",
+		"filename": "control_flow/if0_else.dpl",
+		"input": [],
+		"output": 4
+	},
+	{
+		"name": "if0_no_brackets",
+		"description": "If statement evaluating to false without brackets",
+		"filename": "control_flow/if0_no_brackets.dpl",
+		"input": [],
+		"output": 4
+	},
+	{
+		"name": "if0",
+		"description": "If statement evaluating to false",
+		"filename": "control_flow/if0.dpl",
+		"input": [],
+		"output": 4
+	},
+	{
+		"name": "if1_else",
+		"description": "If true, else",
+		"filename": "control_flow/if1_else.dpl",
+		"input": [],
+		"output": 3
+	},
+	{
+		"name": "if1",
+		"description": "If true",
+		"filename": "control_flow/if1.dpl",
+		"input": [],
+		"output": 3
+	}
 ]
