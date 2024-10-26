@@ -96,5 +96,40 @@
         "filename": "basic_arithmetic/returnNot.dpl",
         "input": [],
         "output": 232
+    },
+	{
+        "name": "assign2",
+        "description": "Creates variable a and assigns 2 to it",
+        "filename": "variables/assign2.dpl",
+        "input": [],
+        "output": 2
+    },
+	{
+        "name": "assign2Add1",
+        "description": "Creates variable a and assigns 2 to it, then adds 1",
+        "filename": "variables/assign2Add1.dpl",
+        "input": [],
+        "output": 3
+    },
+	{
+        "name": "declareThenAssign4",
+        "description": "Declares empty variable a, then later assigns 4 to it",
+        "filename": "variables/declareThenAssign4.dpl",
+        "input": [],
+        "output": 4
+    },
+	{
+        "name": "declareAeq1Beq2",
+        "description": "Initializes a and b to 1 and 2, then returns a+b",
+        "filename": "variables/declareAeq1Beq2.dpl",
+        "input": [],
+        "output": 3
+    },
+	{
+        "name": "shadowing",
+        "description": "Test that redeclaring a variable on a smaller scope shadows the outer variable",
+        "filename": "variables/shadowing.dpl",
+        "input": [],
+        "output": 5
     }
 ]

@@ -10,9 +10,14 @@ _start:
 
 global main
 main:
-    push rbx
+    push rbp		;save previous base pointer
+    push rbx		;functions should preserve rbx
+    mov rbp, rsp	;set base pointer
     mov rax, 0
-    pop rbx
+    add rsp, 0		;pop local variables before return
+    pop rbx		;restore rbx for caller function
+    pop rbp		;restore base pointer
     ret
+    add rsp, 0		;end of block, pop local variables
 
 section .data

@@ -460,8 +460,9 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
 
                 let _ = tokens.next().unwrap(); // Skip type for now. // TODO: Implement types
 
-                let next_tok = tokens.next().unwrap();
+                let next_tok = tokens.clone().next().unwrap();
                 if let Token::Operator(Operator::Assign) = next_tok {
+					tokens.next();
                     let exp = parse_expression(tokens);
                     statement = Statement::Let(id.to_string(), Some(exp));
                 } else if let Token::Semicolon = next_tok {
@@ -565,24 +566,6 @@ fn parse_function(mut tokens: &mut Iter<Token>) -> Function {
     }
 
     let statement = parse_statement(&mut tokens);
-
-    // let tok = tokens.next().unwrap();
-    // if &Token::LBrace != tok {
-    //     panic!("Expected opening brace, found: {:?}", tok);
-    // }
-
-    // let mut statements = Vec::new();
-
-    // loop {
-    //     let next = tokens.clone().next().unwrap();
-
-    //     if let &Token::RBrace = next {
-    //         tokens.next();
-    //         break;
-    //     } else {
-    //         statements.push(parse_statement(&mut tokens));
-    //     }
-    // }
 
     return Function::Function(id, params, statement);
 }

@@ -1,24 +1,27 @@
 use crate::ast::build_ast::{
     AssignmentOp, Ast, Atom, BinOp, Expression, Function, Program, Statement, UnOp,
 };
-use crate::code_generator::immutable_map::ImmutableMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Write;
 use std::path;
 
 // TODO: test all of these one by one (pain)
 
-fn generate_atom(file: &mut File, atom: &Atom) {
+fn generate_atom(file: &mut File, atom: &Atom, var_map: &HashMap<&String, i64>) {
     match atom {
         Atom::Constant(constant) => {
             // NOTE: change the std::fmt::Display trait for Constant in build_ast.rs in case it doesn't print the asm correctly
             writeln!(file, "    mov rax, {}", constant).unwrap(); // TODO: Doesn't work for floats
         }
         Atom::Variable(variable) => {
-            writeln!(file, "    mov rax, [rbp-{}]", variable).unwrap();
+			let var_address = var_map
+				.get(&variable)
+				.expect(format!("Undeclared variable {}", variable).as_str());
+            writeln!(file, "    mov rax, [rbp-{}]", var_address).unwrap();
         }
         Atom::Expression(expression) => {
-            generate_expression(file, expression);
+            generate_expression(file, expression, var_map);
         }
         /*Atom::FunctionCall(name, args) => {
             for arg in args.iter() {
@@ -32,13 +35,13 @@ fn generate_atom(file: &mut File, atom: &Atom) {
     }
 }
 
-fn generate_expression(file: &mut File, expression: &Expression) {
+fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashMap<&String, i64>) {
     match expression {
         Expression::Atom(atom) => {
-            generate_atom(file, atom);
+            generate_atom(file, atom, var_map);
         }
         Expression::UnaryOp(expr, unop) => {
-            generate_expression(file, expr);
+            generate_expression(file, expr, var_map);
             match unop {
                 UnOp::UnaryMinus => {
                     writeln!(file, "    neg rax").unwrap();
@@ -68,9 +71,9 @@ fn generate_expression(file: &mut File, expression: &Expression) {
             }
         }
         Expression::BinaryOp(left, right, bin_op) => {
-            generate_expression(file, left);
+            generate_expression(file, left, var_map);
             writeln!(file, "    push rax").unwrap();
-            generate_expression(file, right);
+            generate_expression(file, right, var_map);
             writeln!(file, "    pop rcx").unwrap();
             writeln!(file, "    xchg rax, rcx").unwrap();
             match bin_op {
@@ -158,46 +161,49 @@ fn generate_expression(file: &mut File, expression: &Expression) {
                 _ => unimplemented!(),
             }
         }
-        Expression::Assignment(str, expr, op) => {
-            generate_expression(file, expr);
+        Expression::Assignment(variable, expr, op) => {
+            generate_expression(file, expr, var_map);
+			let var_address = var_map
+				.get(&variable)
+				.expect(format!("Undeclared variable {}", variable).as_str());
             match op {
                 AssignmentOp::Assign => {
-                    writeln!(file, "    mov [rbp-{}], rax", str).unwrap();
+                    writeln!(file, "    mov [rbp-{}], rax", var_address).unwrap();
                 }
                 AssignmentOp::AddAssign => {
-                    writeln!(file, "    add [rbp-{}], rax", str).unwrap();
+                    writeln!(file, "    add [rbp-{}], rax", var_address).unwrap();
                 }
                 AssignmentOp::SubtractAssign => {
-                    writeln!(file, "    sub [rbp-{}], rax", str).unwrap();
+                    writeln!(file, "    sub [rbp-{}], rax", var_address).unwrap();
                 }
                 AssignmentOp::MultiplyAssign => {
-                    writeln!(file, "    imul [rbp-{}], rax", str).unwrap();
+                    writeln!(file, "    imul [rbp-{}], rax", var_address).unwrap();
                 }
                 AssignmentOp::DivideAssign => {
                     writeln!(file, "    cqo").unwrap();
-                    writeln!(file, "    idiv [rbp-{}]", str).unwrap();
+                    writeln!(file, "    idiv [rbp-{}]", var_address).unwrap();
                 }
                 AssignmentOp::ModulusAssign => {
                     writeln!(file, "    cqo").unwrap();
-                    writeln!(file, "    idiv [rbp-{}]", str).unwrap();
+                    writeln!(file, "    idiv [rbp-{}]", var_address).unwrap();
                     writeln!(file, "    mov rax, rdx").unwrap();
                 }
                 AssignmentOp::LeftShiftAssign => {
                     writeln!(file, "    mov rcx, rax").unwrap();
-                    writeln!(file, "    shl [rbp-{}], cl", str).unwrap();
+                    writeln!(file, "    shl [rbp-{}], cl", var_address).unwrap();
                 }
                 AssignmentOp::RightShiftAssign => {
                     writeln!(file, "    mov rcx, rax").unwrap();
-                    writeln!(file, "    shr [rbp-{}], cl", str).unwrap();
+                    writeln!(file, "    shr [rbp-{}], cl", var_address).unwrap();
                 }
                 AssignmentOp::BitwiseAndAssign => {
-                    writeln!(file, "    and [rbp-{}], rax", str).unwrap();
+                    writeln!(file, "    and [rbp-{}], rax", var_address).unwrap();
                 }
                 AssignmentOp::BitwiseXorAssign => {
-                    writeln!(file, "    xor [rbp-{}], rax", str).unwrap();
+                    writeln!(file, "    xor [rbp-{}], rax", var_address).unwrap();
                 }
                 AssignmentOp::BitwiseOrAssign => {
-                    writeln!(file, "    or [rbp-{}], rax", str).unwrap();
+                    writeln!(file, "    or [rbp-{}], rax", var_address).unwrap();
                 }
                 _ => unimplemented!(),
             }
@@ -205,45 +211,81 @@ fn generate_expression(file: &mut File, expression: &Expression) {
     }
 }
 
-fn generate_statement(file: &mut File, statement: &Statement) {
-    match statement {
-        Statement::Return(expression) => {
-            generate_expression(file, expression);
-            writeln!(file, "    pop rbx").unwrap();
-            writeln!(file, "    ret").unwrap();
-        }
-        Statement::Expression(expression) => {
-            generate_expression(file, expression);
-        }
-        Statement::Assignment(str, expr) => {
-            generate_expression(file, expr);
-            writeln!(file, "    mov [rbp-{}], rax", str).unwrap();
-        }
-        Statement::Let(str, expr) => {
-            // TODO: symbol table
-            if let Some(expr) = expr {
-                generate_expression(file, expr);
-                writeln!(file, "    mov [rbp-{}], rax", str).unwrap();
-            } else {
-                writeln!(file, "    mov [rbp-{}], 0", str).unwrap();
-            }
-        }
-        Statement::Compound(statements) => {
-            for statement in statements.iter() {
-                generate_statement(file, statement);
-            }
-        }
-        _ => unimplemented!(),
-    }
+fn generate_compound_statement(
+    file: &mut File,
+    cmp_statement: &Statement,
+    var_map: &HashMap<&String, i64>,
+    stack_index: &i64,
+) {
+    let mut var_map = var_map.clone();
+    let mut stack_index = stack_index.clone();
+	let mut context = HashSet::new();
+
+	if let Statement::Compound(statements) = cmp_statement{
+		for statement in statements.iter() {
+			match statement {
+				Statement::Return(expression) => {
+					generate_expression(file, expression, &var_map);
+					// Pop all the variables from the stack
+					writeln!(file, "    add rsp, {}		;pop local variables before return", context.len() * 8).unwrap();
+					writeln!(file, "    pop rbx		;restore rbx for caller function").unwrap();
+					writeln!(file, "    pop rbp		;restore base pointer").unwrap();
+					writeln!(file, "    ret").unwrap();
+				}
+				Statement::Expression(expression) => {
+					generate_expression(file, expression, &var_map);
+				}
+				Statement::Assignment(variable, expr) => {
+					generate_expression(file, expr, &var_map);
+					let var_address = var_map
+						.get(&variable)
+						.expect(format!("Undeclared variable {}", variable).as_str());
+					writeln!(file, "    mov [rbp-{}], rax", var_address).unwrap();
+				}
+				Statement::Let(variable, expr) => {
+					if let Some(expr) = expr {
+						generate_expression(file, expr, &var_map);
+					}
+
+					stack_index += 8;
+					var_map.insert(variable, stack_index);
+					let var_address = var_map
+						.get(&variable)
+						.expect(format!("Undeclared variable {}", variable).as_str());
+					context.insert(variable.clone());
+
+					if let Some(_) = expr {
+						writeln!(file, "    push rax").unwrap();
+					} else {
+						writeln!(file, "    push 0").unwrap();
+					}
+				}
+				Statement::Compound(_) => {
+					generate_compound_statement(file, statement, &var_map, &stack_index);
+				}
+				_ => unimplemented!(),
+			}
+		}
+	} else {
+		panic!("Expected a compound statement, got {:?}", cmp_statement);
+	}
+
+	// Pop all the variables from the stack
+	writeln!(file, "    add rsp, {}		;end of block, pop local variables", context.len() * 8).unwrap();
 }
 
 fn generate_function(file: &mut File, function: &Function) {
+    let var_map: HashMap<&String, i64> = HashMap::new();
+    let stack_index = 0;
+
     let Function::Function(name, _params, statement) = function;
     writeln!(file, "").unwrap();
     writeln!(file, "global {}", name).unwrap();
     writeln!(file, "{}:", name).unwrap();
-    writeln!(file, "    push rbx").unwrap();
-    generate_statement(file, statement);
+	writeln!(file, "    push rbp		;save previous base pointer").unwrap();
+    writeln!(file, "    push rbx		;functions should preserve rbx").unwrap();
+	writeln!(file, "    mov rbp, rsp	;set base pointer").unwrap();
+    generate_compound_statement(file, statement, &var_map, &stack_index);
 }
 
 pub fn generate(ast: &Ast, out_path: &str) {
