@@ -337,16 +337,65 @@ fn generate_compound_statement(
 					writeln!(file, "    jmp {}", start_label).unwrap();
 					writeln!(file, "{}:", end_label).unwrap();
 				}
+				Statement::Loop(statement) => {
+					let loop_label = LOOP_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+					let start_label = format!("loop_start_{}", loop_label);
+					let end_label = format!("loop_end_{}", loop_label);
+
+					context.continue_label = Some(start_label.clone());
+					context.break_label = Some(end_label.clone());
+
+					writeln!(file, "    ;loop statement").unwrap();
+					writeln!(file, "{}:", start_label).unwrap();
+					generate_compound_statement(file, statement, &context);
+					writeln!(file, "    jmp {}", start_label).unwrap();
+					writeln!(file, "{}:", end_label).unwrap();
+				}
+				Statement::Dowhile(condition, statement) => {
+					let loop_label = LOOP_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+					let start_label = format!("dowhile_start_{}", loop_label);
+					let end_label = format!("dowhile_end_{}", loop_label);
+
+					context.continue_label = Some(start_label.clone());
+					context.break_label = Some(end_label.clone());
+
+					writeln!(file, "    ;do while statement").unwrap();
+					writeln!(file, "{}:", start_label).unwrap();
+					generate_compound_statement(file, statement, &context);
+					generate_expression(file, condition, &context.var_map);
+					writeln!(file, "    cmp rax, 0").unwrap();
+					writeln!(file, "    jne {}", start_label).unwrap();
+					writeln!(file, "{}:", end_label).unwrap();
+				}
+				Statement::For(init, condition, update, statement) => {
+					let loop_label = LOOP_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+					let start_label = format!("for_start_{}", loop_label);
+					let end_label = format!("for_end_{}", loop_label);
+
+					context.continue_label = Some(start_label.clone());
+					context.break_label = Some(end_label.clone());
+
+					writeln!(file, "    ;for statement").unwrap();
+					generate_expression(file, init, &context.var_map);
+					writeln!(file, "{}:", start_label).unwrap();
+					generate_expression(file, condition, &context.var_map);
+					writeln!(file, "    cmp rax, 0").unwrap();
+					writeln!(file, "    je {}", end_label).unwrap();
+					generate_compound_statement(file, statement, &context);
+					generate_expression(file, update, &context.var_map);
+					writeln!(file, "    jmp {}", start_label).unwrap();
+					writeln!(file, "{}:", end_label).unwrap();
+				}
 				Statement::Break => {
 					if let Some(label) = &context.break_label {
-						writeln!(file, "    jmp {}", label).unwrap();
+						writeln!(file, "    jmp {}	;break statement", label).unwrap();
 					} else {
 						panic!("Break statement outside of loop");
 					}
 				}
 				Statement::Continue => {
 					if let Some(label) = &context.continue_label {
-						writeln!(file, "    jmp {}", label).unwrap();
+						writeln!(file, "    jmp {}	;continue statement", label).unwrap();
 					} else {
 						panic!("Continue statement outside of loop");
 					}

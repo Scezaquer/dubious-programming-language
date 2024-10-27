@@ -178,12 +178,14 @@ pub enum Statement {
     Let(String, Option<Expression>),
     If(Expression, Box<Statement>, Option<Box<Statement>>),
     While(Expression, Box<Statement>),
-	For(Expression, Expression, Expression, Box<Statement>),
+    Loop(Box<Statement>),
+    Dowhile(Expression, Box<Statement>),
+    For(Expression, Expression, Expression, Box<Statement>),
     Return(Expression),
     Expression(Expression),
     Compound(Vec<Statement>),
-	Break,
-	Continue,
+    Break,
+    Continue,
 }
 
 #[derive(Debug)]
@@ -465,7 +467,7 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
 
                 let next_tok = tokens.clone().next().unwrap();
                 if let Token::Operator(Operator::Assign) = next_tok {
-					tokens.next();
+                    tokens.next();
                     let exp = parse_expression(tokens);
                     statement = Statement::Let(id.to_string(), Some(exp));
                 } else if let Token::Semicolon = next_tok {
@@ -477,49 +479,104 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
                     );
                 }
             } else if k == "if" {
-				// if (exp) statement [else statement]
-				let exp = parse_expression(tokens);
-				let mut if_stmt = parse_statement(tokens);
+                // if (exp) statement [else statement]
+                let exp = parse_expression(tokens);
+                let mut if_stmt = parse_statement(tokens);
 
-				if let Statement::Compound(_) = if_stmt {
-				} else {
-					if_stmt = Statement::Compound(vec![if_stmt]);
-				}
+                if !matches!(if_stmt, Statement::Compound(_)) {
+                    if_stmt = Statement::Compound(vec![if_stmt]);
+                }
 
-				let next_tok = tokens.clone().next().unwrap();
-				if let Token::Keyword(k) = next_tok {
-					if k == "else" {
-						tokens.next();
-						let mut else_stmt = parse_statement(tokens);
+                let next_tok = tokens.clone().next().unwrap();
+                if let Token::Keyword(k) = next_tok {
+                    if k == "else" {
+                        tokens.next();
+                        let mut else_stmt = parse_statement(tokens);
 
-						if let Statement::Compound(_) = else_stmt {
-						} else {
-							else_stmt = Statement::Compound(vec![else_stmt]);
-						}
+                        if !matches!(else_stmt, Statement::Compound(_)) {
+                            else_stmt = Statement::Compound(vec![else_stmt]);
+                        }
 
-						statement = Statement::If(exp, Box::new(if_stmt), Some(Box::new(else_stmt)));
-					} else {
-						statement = Statement::If(exp, Box::new(if_stmt), None);
-					}
-				} else {
-					statement = Statement::If(exp, Box::new(if_stmt), None);
-				}
-			} else if k == "while" {
-				// while (exp) statement
-				let exp = parse_expression(tokens);
-				let mut while_stmt = parse_statement(tokens);
+                        statement =
+                            Statement::If(exp, Box::new(if_stmt), Some(Box::new(else_stmt)));
+                    } else {
+                        statement = Statement::If(exp, Box::new(if_stmt), None);
+                    }
+                } else {
+                    statement = Statement::If(exp, Box::new(if_stmt), None);
+                }
+            } else if k == "while" {
+                // while (exp) statement
+                let exp = parse_expression(tokens);
+                let mut while_stmt = parse_statement(tokens);
 
-				if let Statement::Compound(_) = while_stmt {
-				} else {
-					while_stmt = Statement::Compound(vec![while_stmt]);
-				}
+                if !matches!(while_stmt, Statement::Compound(_)) {
+                    while_stmt = Statement::Compound(vec![while_stmt]);
+                }
 
-				statement = Statement::While(exp, Box::new(while_stmt));
-			} else if k == "break" {
-				statement = Statement::Break;
-			} else if k == "continue" {
-				statement = Statement::Continue;
-			} else {
+                statement = Statement::While(exp, Box::new(while_stmt));
+            } else if k == "loop" {
+                // loop statement
+                let mut loop_stmt = parse_statement(tokens);
+
+                if let Statement::Compound(_) = loop_stmt {
+                } else {
+                    loop_stmt = Statement::Compound(vec![loop_stmt]);
+                }
+
+                statement = Statement::Loop(Box::new(loop_stmt));
+            } else if k == "for" {
+                // for (exp; exp; exp) statement
+                let next_tok = tokens.next().unwrap(); // Skip opening parenthesis
+                if !matches!(next_tok, Token::LParen) {
+                    panic!("Expected opening parenthesis, found: {:?}", next_tok);
+                }
+                let init = parse_expression(tokens);
+                let next_tok = tokens.next().unwrap(); // Skip semicolon
+                if !matches!(next_tok, Token::Semicolon) {
+                    panic!("Expected semicolon, found: {:?}", next_tok);
+                }
+                let cond = parse_expression(tokens);
+                let next_tok = tokens.next().unwrap(); // Skip semicolon
+                if !matches!(next_tok, Token::Semicolon) {
+                    panic!("Expected semicolon, found: {:?}", next_tok);
+                }
+                let step = parse_expression(tokens);
+                let next_tok = tokens.next().unwrap(); // Skip closing parenthesis
+                if !matches!(next_tok, Token::RParen) {
+                    panic!("Expected closing parenthesis, found: {:?}", next_tok);
+                }
+                let mut for_stmt = parse_statement(tokens);
+
+                if !matches!(for_stmt, Statement::Compound(_)) {
+                    for_stmt = Statement::Compound(vec![for_stmt]);
+                }
+
+                statement = Statement::For(init, cond, step, Box::new(for_stmt));
+            } else if k == "do" {
+                // do statement while (exp);
+                let mut do_stmt = parse_statement(tokens);
+
+                if !matches!(do_stmt, Statement::Compound(_)) {
+                    do_stmt = Statement::Compound(vec![do_stmt]);
+                }
+
+                let next_tok = tokens.next().unwrap();
+                if let Token::Keyword(k) = next_tok {
+                    if k == "while" {
+                        let exp = parse_expression(tokens);
+                        statement = Statement::Dowhile(exp, Box::new(do_stmt));
+                    } else {
+                        panic!("Expected while keyword, found: {:?}", next_tok);
+                    }
+                } else {
+                    panic!("Expected while keyword, found: {:?}", next_tok);
+                }
+            } else if k == "break" {
+                statement = Statement::Break;
+            } else if k == "continue" {
+                statement = Statement::Continue;
+            } else {
                 panic!("Invalid keyword token: {:?}", tok);
             }
         }
@@ -562,12 +619,14 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
     if let Statement::Compound(_) = statement {
         return statement;
     } else if let Statement::If(_, _, _) = statement {
-		return statement;
-	} else if let Statement::While(_, _) = statement {
-		return statement;
-	} else if let Statement::For(_, _, _, _) = statement {
-		return statement;
-	}
+        return statement;
+    } else if let Statement::While(_, _) = statement {
+        return statement;
+    } else if let Statement::Loop(_) = statement {
+        return statement;
+    } else if let Statement::For(_, _, _, _) = statement {
+        return statement;
+    }
 
     let tok = tokens.next().unwrap();
     if tok != &Token::Semicolon {
@@ -619,12 +678,12 @@ fn parse_function(mut tokens: &mut Iter<Token>) -> Function {
 
     let mut statement = parse_statement(&mut tokens);
 
-	// If the statement is not a compound statement, wrap it in one
-	// This is to allow okay-ish scope handling
-	if let Statement::Compound(_) = statement {
-	} else {
-		statement = Statement::Compound(vec![statement]);
-	}
+    // If the statement is not a compound statement, wrap it in one
+    // This is to allow okay-ish scope handling
+    if let Statement::Compound(_) = statement {
+    } else {
+        statement = Statement::Compound(vec![statement]);
+    }
 
     return Function::Function(id, params, statement);
 }

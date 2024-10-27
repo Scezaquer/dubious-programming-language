@@ -36,7 +36,7 @@ while_start_0:
     xchg rax, rcx
     add rax, rcx
     mov [rbp-8], rax
-    jmp while_start_0
+    jmp while_start_0	;continue statement
     mov rax, [rbp-16]
     push rax
     mov rax, 1
