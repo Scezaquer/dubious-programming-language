@@ -174,7 +174,7 @@ fn get_un_operator_from_token(token: &Token) -> UnOp {
 
 #[derive(Debug)]
 pub enum Statement {
-    Assignment(String, Expression),
+    Assignment(String, Expression, AssignmentOp),
     Let(String, Option<Expression>),
     If(Expression, Box<Statement>, Option<Box<Statement>>),
     While(Expression, Box<Statement>),
@@ -586,11 +586,26 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
                 _ => panic!("Invalid identifier token: {:?}", tok),
             };
 
-            if let Token::Operator(Operator::Assign) = tokens.next().unwrap() {
-                let exp = parse_expression(tokens);
-                statement = Statement::Assignment(id.to_string(), exp);
-            } else {
-                panic!("Expected assignment operator, found: {:?}", tok);
+            let next_tok = tokens.next().unwrap();
+            match next_tok {
+                Token::Operator(Operator::Assign)
+                | Token::Operator(Operator::AddAssign)
+                | Token::Operator(Operator::SubtractAssign)
+                | Token::Operator(Operator::MultiplyAssign)
+                | Token::Operator(Operator::DivideAssign)
+                | Token::Operator(Operator::ModulusAssign)
+                | Token::Operator(Operator::LeftShiftAssign)
+                | Token::Operator(Operator::RightShiftAssign)
+                | Token::Operator(Operator::BitwiseAndAssign)
+                | Token::Operator(Operator::BitwiseXorAssign)
+                | Token::Operator(Operator::BitwiseOrAssign) => {
+					let op = get_assign_operator_from_token(next_tok);
+					let exp = parse_expression(tokens);
+					statement = Statement::Assignment(id.to_string(), exp, op);
+                }
+                _ => {
+                    panic!("Expected assignment operator, found: {:?}", next_tok);
+                }
             }
         }
         &Token::LBrace => {

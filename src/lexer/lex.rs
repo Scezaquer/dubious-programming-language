@@ -83,7 +83,7 @@ pub fn lex(file: &str) -> Vec<Token> {
     let operator_re = Regex::new(r"^[\+\-\*/%\^&~\|<>=!\.]").unwrap();
 
     // Large operators are any of the following strings: == != <= >= && || ** ++ -- << >> += -= *= /= %= <<= >>= &= ^= |= ^^
-    let large_operator_re = Regex::new(r"^(==|!=|<=|>=|&&|\|\||\*\*|\+\+|--|<<|>>|\+=|-=|\*=|\/=|%=|<<=|>>=|&=|\^=|\|=|\^\^)").unwrap();
+    let large_operator_re = Regex::new(r"^(==|!=|<=|>=|&&|\|\||\*\*|\+\+|--|<<=|>>=|<<|>>|\+=|-=|\*=|\/=|%=|&=|\^=|\|=|\^\^)").unwrap();
 
     // Keywords are any of the following strings: if else while for return
     let keyword_re = Regex::new(r"^(if|else|do|while|for|loop|return|fn|let|break|continue)").unwrap();
@@ -150,6 +150,8 @@ pub fn lex(file: &str) -> Vec<Token> {
                 "**" => Operator::Exponent,
                 "++" => Operator::Increment,
                 "--" => Operator::Decrement,
+                "<<=" => Operator::LeftShiftAssign,
+                ">>=" => Operator::RightShiftAssign,
                 "<<" => Operator::LeftShift,
                 ">>" => Operator::RightShift,
                 "+=" => Operator::AddAssign,
@@ -157,8 +159,6 @@ pub fn lex(file: &str) -> Vec<Token> {
                 "*=" => Operator::MultiplyAssign,
                 "/=" => Operator::DivideAssign,
                 "%=" => Operator::ModulusAssign,
-                "<<=" => Operator::LeftShiftAssign,
-                ">>=" => Operator::RightShiftAssign,
                 "&=" => Operator::BitwiseAndAssign,
                 "^=" => Operator::BitwiseXorAssign,
                 "|=" => Operator::BitwiseOrAssign,

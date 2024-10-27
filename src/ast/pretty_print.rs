@@ -1,204 +1,161 @@
-use std::fmt;
+use crate::ast::build_ast::{
+	Ast, Atom, BinOp, Constant, Expression, Function, Program, Statement, UnOp, AssignmentOp,
+};
 
-use super::build_ast::{Ast, BinOp, UnOp, Constant, Expression, Atom, Function, Program, Statement, AssignmentOp};
-
-impl fmt::Display for Constant {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Constant::Int(i) => write!(f, "{}", i),
-            Constant::Float(fl) => write!(f, "{}", fl),
-            Constant::Bool(b) => write!(f, "{}", b),
-        }
-    }
+impl std::fmt::Display for Ast {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.program)
+	}
 }
 
-impl fmt::Display for UnOp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            UnOp::PreIncrement => write!(f, "++"),
-            UnOp::PreDecrement => write!(f, "--"),
-            UnOp::UnaryPlus => write!(f, "+"),
-            UnOp::UnaryMinus => write!(f, "-"),
-            UnOp::LogicalNot => write!(f, "!"),
-            UnOp::BitwiseNot => write!(f, "~"),
-            UnOp::Dereference => write!(f, "*"),
-            UnOp::AddressOf => write!(f, "&"),
-            _ => write!(f, "Unknown"),
-        }
-    }
+impl std::fmt::Display for Program {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Program::Program(functions) => {
+				for function in functions {
+					writeln!(f, "{}", function)?;
+				}
+				Ok(())
+			}
+		}
+	}
 }
 
-impl fmt::Display for BinOp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            BinOp::MemberAccess => write!(f, "."),
-            BinOp::Exponent => write!(f, "**"),
-            BinOp::Multiply => write!(f, "*"),
-            BinOp::Divide => write!(f, "/"),
-            BinOp::Modulus => write!(f, "%"),
-            BinOp::Add => write!(f, "+"),
-            BinOp::Subtract => write!(f, "-"),
-            BinOp::LeftShift => write!(f, "<<"),
-            BinOp::RightShift => write!(f, ">>"),
-            BinOp::LessThan => write!(f, "<"),
-            BinOp::GreaterThan => write!(f, ">"),
-            BinOp::LessOrEqualThan => write!(f, "<="),
-            BinOp::GreaterOrEqualThan => write!(f, ">="),
-            BinOp::Equal => write!(f, "=="),
-            BinOp::NotEqual => write!(f, "!="),
-            BinOp::BitwiseAnd => write!(f, "&"),
-            BinOp::BitwiseXor => write!(f, "^"),
-            BinOp::BitwiseOr => write!(f, "|"),
-            BinOp::LogicalAnd => write!(f, "&&"),
-            BinOp::LogicalXor => write!(f, "^^"),
-            BinOp::LogicalOr => write!(f, "||"),
-            _ => write!(f, "Unknown"),
-        }
-    }
+impl std::fmt::Display for Function {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Function::Function(name, params, body) => {
+				write!(f, "fn {}(", name)?;
+				for (i, param) in params.iter().enumerate() {
+					write!(f, "{}", param)?;
+					if i < params.len() - 1 {
+						write!(f, ", ")?;
+					}
+				}
+				writeln!(f, ") {{")?;
+				writeln!(f, "{}", body)?;
+				writeln!(f, "}}")
+			}
+		}
+	}
 }
 
-impl fmt::Display for AssignmentOp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            AssignmentOp::Assign => write!(f, "="),
-            AssignmentOp::AddAssign => write!(f, "+="),
-            AssignmentOp::SubtractAssign => write!(f, "-="),
-            AssignmentOp::MultiplyAssign => write!(f, "*="),
-            AssignmentOp::DivideAssign => write!(f, "/="),
-            AssignmentOp::ModulusAssign => write!(f, "%="),
-            AssignmentOp::LeftShiftAssign => write!(f, "<<="),
-            AssignmentOp::RightShiftAssign => write!(f, ">>="),
-            AssignmentOp::BitwiseAndAssign => write!(f, "&="),
-            AssignmentOp::BitwiseXorAssign => write!(f, "^="),
-            AssignmentOp::BitwiseOrAssign => write!(f, "|="),
-            _ => write!(f, "Unknown"),
-        }
-    }
+impl std::fmt::Display for Statement {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Statement::Assignment(var, expr, op) => write!(f, "{} {} {};", var, op, expr),
+			Statement::Let(var, Some(expr)) => write!(f, "let {} = {};", var, expr),
+			Statement::Let(var, None) => write!(f, "let {};", var),
+			Statement::If(cond, then_stmt, Some(else_stmt)) => {
+				write!(f, "if ({}) {{\n{}\n}} else {{\n{}\n}}", cond, then_stmt, else_stmt)
+			}
+			Statement::If(cond, then_stmt, None) => {
+				write!(f, "if ({}) {{\n{}\n}}", cond, then_stmt)
+			}
+			Statement::While(cond, body) => write!(f, "while ({}) {{\n{}\n}}", cond, body),
+			Statement::Loop(body) => write!(f, "loop {{\n{}\n}}", body),
+			Statement::Dowhile(cond, body) => write!(f, "do {{\n{}\n}} while ({});", body, cond),
+			Statement::For(init, cond, step, body) => {
+				write!(f, "for ({}; {}; {}) {{\n{}\n}}", init, cond, step, body)
+			}
+			Statement::Return(expr) => write!(f, "return {};", expr),
+			Statement::Expression(expr) => write!(f, "{};", expr),
+			Statement::Compound(statements) => {
+				for stmt in statements {
+					writeln!(f, "{}", stmt)?;
+				}
+				Ok(())
+			}
+			Statement::Break => write!(f, "break;"),
+			Statement::Continue => write!(f, "continue;"),
+		}
+	}
 }
 
-impl Atom {
-    fn pretty_print(&self, indent: usize) -> String {
-        match self {
-            Atom::Constant(c) => format!("{}", c),
-            Atom::Expression(e) => format!("({})", e.pretty_print(indent)),
-            Atom::Variable(v) => v.clone(),
-        }
-    }
+impl std::fmt::Display for Expression {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Expression::Atom(atom) => write!(f, "{}", atom),
+			Expression::UnaryOp(expr, op) => write!(f, "({}{})", op, expr),
+			Expression::BinaryOp(lhs, rhs, op) => write!(f, "({} {} {})", lhs, rhs, op),
+			Expression::Assignment(var, expr, op) => write!(f, "{} {} {}", var, op, expr),
+		}
+	}
 }
 
-impl Expression {
-    fn pretty_print(&self, indent: usize) -> String {
-        match self {
-            Expression::Atom(a) => a.pretty_print(indent),
-            Expression::UnaryOp(expr, op) => format!("{}{}", op, expr.pretty_print(indent)),
-            Expression::BinaryOp(left, right, op) => format!(
-                "{} {} {}",
-                left.pretty_print(indent),
-                op,
-                right.pretty_print(indent)
-            ),
-            Expression::Assignment(var, expr, op) => format!(
-                "{} {} {}",
-                var,
-                op,
-                expr.pretty_print(indent)
-            ),
-        }
-    }
+impl std::fmt::Display for Atom {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Atom::Constant(constant) => write!(f, "{}", constant),
+			Atom::Expression(expr) => write!(f, "({})", expr),
+			Atom::Variable(var) => write!(f, "{}", var),
+		}
+	}
 }
 
-impl Statement {
-    fn pretty_print(&self, indent: usize) -> String {
-        let indent_str = " ".repeat(indent);
-        match self {
-            Statement::Assignment(var, expr) => format!(
-                "{}{} = {}",
-                indent_str,
-                var,
-                expr.pretty_print(indent + 2)
-            ),
-            Statement::Let(var, expr_opt) => {
-                if let Some(expr) = expr_opt {
-                    format!(
-                        "{}let {} = {}",
-                        indent_str,
-                        var,
-                        expr.pretty_print(indent + 2)
-                    )
-                } else {
-                    format!("{}let {}", indent_str, var)
-                }
-            },
-            Statement::If(cond, body) => {
-                let mut result = format!("{}if {}\n", indent_str, cond.pretty_print(indent));
-                for stmt in body {
-                    result.push_str(&format!(
-                        "{}\n",
-                        stmt.pretty_print(indent + 2)
-                    ));
-                }
-                result
-            },
-            Statement::While(cond, body) => {
-                let mut result = format!("{}while {}\n", indent_str, cond.pretty_print(indent));
-                for stmt in body {
-                    result.push_str(&format!(
-                        "{}\n",
-                        stmt.pretty_print(indent + 2)
-                    ));
-                }
-                result
-            },
-            Statement::Return(expr) => format!(
-                "{}return {}",
-                indent_str,
-                expr.pretty_print(indent)
-            ),
-            Statement::Expression(expr) => format!(
-                "{}{}",
-                indent_str,
-                expr.pretty_print(indent)
-            ),
-        }
-    }
+impl std::fmt::Display for UnOp {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let op_str = match self {
+			UnOp::PreIncrement => "++",
+			UnOp::PreDecrement => "--",
+			UnOp::UnaryPlus => "+",
+			UnOp::UnaryMinus => "-",
+			UnOp::LogicalNot => "!",
+			UnOp::BitwiseNot => "~",
+			UnOp::Dereference => "*",
+			UnOp::AddressOf => "&",
+			UnOp::NotAUnaryOp => "",
+		};
+		write!(f, "{}", op_str)
+	}
 }
 
-impl Function {
-    fn pretty_print(&self, indent: usize) -> String {
-        let indent_str = " ".repeat(indent);
-        match self {
-            Function::Function(name, params, body) => {
-                let mut result = format!("{}fn {}({})\n", indent_str, name, params.join(", "));
-                result.push_str(&format!("{}{{\n", indent_str));
-                for stmt in body {
-                    result.push_str(&format!(
-                        "{}\n",
-                        stmt.pretty_print(indent + 2)
-                    ));
-                }
-                result.push_str(&format!("{}}}", indent_str));
-                result
-            }
-        }
-    }
+impl std::fmt::Display for BinOp {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let op_str = match self {
+			BinOp::MemberAccess => ".",
+			BinOp::Exponent => "**",
+			BinOp::Multiply => "*",
+			BinOp::Divide => "/",
+			BinOp::Modulus => "%",
+			BinOp::Add => "+",
+			BinOp::Subtract => "-",
+			BinOp::LeftShift => "<<",
+			BinOp::RightShift => ">>",
+			BinOp::LessThan => "<",
+			BinOp::GreaterThan => ">",
+			BinOp::LessOrEqualThan => "<=",
+			BinOp::GreaterOrEqualThan => ">=",
+			BinOp::Equal => "==",
+			BinOp::NotEqual => "!=",
+			BinOp::BitwiseAnd => "&",
+			BinOp::BitwiseXor => "^",
+			BinOp::BitwiseOr => "|",
+			BinOp::LogicalAnd => "&&",
+			BinOp::LogicalXor => "^^",
+			BinOp::LogicalOr => "||",
+			BinOp::NotABinaryOp => "",
+		};
+		write!(f, "{}", op_str)
+	}
 }
 
-impl Program {
-    fn pretty_print(&self, indent: usize) -> String {
-        match self {
-            Program::Program(functions) => {
-                functions
-                    .iter()
-                    .map(|f| f.pretty_print(indent))
-                    .collect::<Vec<String>>()
-                    .join("\n\n")
-            }
-        }
-    }
-}
-
-impl Ast {
-    pub fn pretty_print(&self) -> String {
-        self.program.pretty_print(0)
-    }
+impl std::fmt::Display for AssignmentOp {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let op_str = match self {
+			AssignmentOp::Assign => "=",
+			AssignmentOp::AddAssign => "+=",
+			AssignmentOp::SubtractAssign => "-=",
+			AssignmentOp::MultiplyAssign => "*=",
+			AssignmentOp::DivideAssign => "/=",
+			AssignmentOp::ModulusAssign => "%=",
+			AssignmentOp::LeftShiftAssign => "<<=",
+			AssignmentOp::RightShiftAssign => ">>=",
+			AssignmentOp::BitwiseAndAssign => "&=",
+			AssignmentOp::BitwiseXorAssign => "^=",
+			AssignmentOp::BitwiseOrAssign => "|=",
+			AssignmentOp::NotAnAssignmentOp => "",
+		};
+		write!(f, "{}", op_str)
+	}
 }

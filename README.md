@@ -76,3 +76,32 @@ If the expression in if statements evaluates to anything other than 0, then the 
 statement executes. Otherwise else (if present).
 
 Uninitialized variables default to 0.
+
+++ and -- are NOT assignment operators (i.e. ++a will evaluate to a+1 but the value of a will be unchanged).
+
+For loop iterator variables can't be declared inside the loop itself they have to be declared before. i.e.
+```
+for (let i: int = 0; i < 10; i += 1){
+	...
+}
+```
+isn't legal syntax and should be replaced by
+```
+let i: int;
+for (i = 0; i < 10; i += 1){
+	...
+}
+```
+Furthermore all 3 fields have to contain an expression, although the expression may have no side effects, i.e
+```
+for (;;){
+	...
+}
+```
+Isn't legal but
+```
+for (0;1;0){
+	...
+}
+```
+Is, and is equivalent to `for (;;)` in C

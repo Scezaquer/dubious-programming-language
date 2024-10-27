@@ -98,6 +98,20 @@
         "output": 232
     },
 	{
+		"name": "returnincrement1",
+		"description": "returns ++1",
+		"filename": "basic_arithmetic/returnincrement1.dpl",
+		"input": [],
+		"output": 2
+	},
+	{
+		"name": "returndecrement1",
+		"description": "returns --1",
+		"filename": "basic_arithmetic/returndecrement1.dpl",
+		"input": [],
+		"output": 0
+	},
+	{
         "name": "assign2",
         "description": "Creates variable a and assigns 2 to it",
         "filename": "variables/assign2.dpl",
@@ -132,6 +146,76 @@
         "input": [],
         "output": 7
     },
+	{
+		"name": "plus_equals",
+		"description": "Test the += operator",
+		"filename": "variables/plus_equals.dpl",
+		"input": [],
+		"output": 5
+	},
+	{
+		"name": "minus_equals",
+		"description": "Test the -= operator",
+		"filename": "variables/minus_equals.dpl",
+		"input": [],
+		"output": 1
+	},
+	{
+		"name": "times_equals",
+		"description": "Test the *= operator",
+		"filename": "variables/times_equals.dpl",
+		"input": [],
+		"output": 6
+	},
+	{
+		"name": "div_equals",
+		"description": "Test the /= operator",
+		"filename": "variables/div_equals.dpl",
+		"input": [],
+		"output": 3
+	},
+	{
+		"name": "mod_equals",
+		"description": "Test the %= operator",
+		"filename": "variables/mod_equals.dpl",
+		"input": [],
+		"output": 2
+	},
+	{
+		"name": "binand_equals",
+		"description": "Test the &= operator",
+		"filename": "variables/binand_equals.dpl",
+		"input": [],
+		"output": 2
+	},
+	{
+		"name": "binor_equals",
+		"description": "Test the |= operator",
+		"filename": "variables/binor_equals.dpl",
+		"input": [],
+		"output": 7
+	},
+	{
+		"name": "binxor_equals",
+		"description": "Test the ^= operator",
+		"filename": "variables/binxor_equals.dpl",
+		"input": [],
+		"output": 5
+	},
+	{
+		"name": "lshift_equals",
+		"description": "Test the <<= operator",
+		"filename": "variables/lshift_equals.dpl",
+		"input": [],
+		"output": 96
+	},
+	{
+		"name": "rshift_equals",
+		"description": "Test the >>= operator",
+		"filename": "variables/rshift_equals.dpl",
+		"input": [],
+		"output": 1
+	},
 	{
         "name": "else_if_chain",
         "description": "Chain of else ifs",

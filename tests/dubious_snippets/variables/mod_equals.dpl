@@ -1,0 +1,5 @@
+fn main() {
+	let a: int = 6;
+	a %= 4;
+	return a;
+}
