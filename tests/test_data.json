@@ -208,5 +208,26 @@
 		"filename": "control_flow/while_continue.dpl",
 		"input": [],
 		"output": 0
+	},
+	{
+		"name": "for",
+		"description": "For loop",
+		"filename": "control_flow/for.dpl",
+		"input": [],
+		"output": 30
+	},
+	{
+		"name": "dowhile",
+		"description": "Do while loop",
+		"filename": "control_flow/dowhile.dpl",
+		"input": [],
+		"output": 10
+	},
+	{
+		"name": "loop",
+		"description": "Loop statement",
+		"filename": "control_flow/loop.dpl",
+		"input": [],
+		"output": 5
 	}
 ]

@@ -1,7 +1,7 @@
 fn main() {
 	let a: int;
 	let b: int = 0;
-    for (a = 0; a < 10; a = a + 1) {
+    for (a = 0; a < 10; a = ++a ) {
 		b = b + 2;
 	}
 	return a + b;
