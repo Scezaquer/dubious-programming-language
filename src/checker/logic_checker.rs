@@ -2,3 +2,4 @@
 // TODO: Typechecking
 // TODO: Check that there is a main function
 // TODO: Check that no function is called _start
+// TODO: Check uninitialized variables aren't called

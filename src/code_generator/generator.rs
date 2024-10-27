@@ -7,11 +7,13 @@ use std::io::Write;
 use std::path;
 use std::sync::atomic::AtomicUsize;
 
+// Separate counters for branch and loop labels for break and continue statements
 static BRANCH_LABEL: AtomicUsize = AtomicUsize::new(0);
+static LOOP_LABEL: AtomicUsize = AtomicUsize::new(0);
 
 // TODO: test all of these one by one (pain)
 
-fn generate_atom(file: &mut File, atom: &Atom, var_map: &HashMap<&String, i64>) {
+fn generate_atom(file: &mut File, atom: &Atom, var_map: &HashMap<String, i64>) {
     match atom {
         Atom::Constant(constant) => {
             // NOTE: change the std::fmt::Display trait for Constant in build_ast.rs in case it doesn't print the asm correctly
@@ -19,7 +21,7 @@ fn generate_atom(file: &mut File, atom: &Atom, var_map: &HashMap<&String, i64>) 
         }
         Atom::Variable(variable) => {
 			let var_address = var_map
-				.get(&variable)
+				.get(variable)
 				.expect(format!("Undeclared variable {}", variable).as_str());
             writeln!(file, "    mov rax, [rbp-{}]", var_address).unwrap();
         }
@@ -38,7 +40,7 @@ fn generate_atom(file: &mut File, atom: &Atom, var_map: &HashMap<&String, i64>) 
     }
 }
 
-fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashMap<&String, i64>) {
+fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashMap<String, i64>) {
     match expression {
         Expression::Atom(atom) => {
             generate_atom(file, atom, var_map);
@@ -167,7 +169,7 @@ fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashM
         Expression::Assignment(variable, expr, op) => {
             generate_expression(file, expr, var_map);
 			let var_address = var_map
-				.get(&variable)
+				.get(variable)
 				.expect(format!("Undeclared variable {}", variable).as_str());
             match op {
                 AssignmentOp::Assign => {
@@ -214,21 +216,60 @@ fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashM
     }
 }
 
+struct Context {
+	var_map: HashMap<String, i64>,
+	stack_index: i64,
+	local_variables: HashSet<String>,
+	continue_label: Option<String>,
+	break_label: Option<String>,
+}
+
+impl Context {
+	fn new() -> Context {
+		Context {
+			var_map: HashMap::new(),
+			stack_index: 0,
+			local_variables: HashSet::new(),
+			continue_label: None,
+			break_label: None,
+		}
+	}
+
+	fn from_last_context(context: &Context) -> Context {
+		Context {
+			var_map: context.var_map.clone(),
+			stack_index: context.stack_index.clone(),
+			local_variables: HashSet::new(),
+			continue_label: context.continue_label.clone(),
+			break_label: context.break_label.clone(),
+		}
+	}
+
+	fn len(&self) -> usize {
+		self.local_variables.len()
+	}
+
+	fn insert(&mut self, key: String, value: i64) {
+		self.var_map.insert(key.clone(), value);
+		self.local_variables.insert(key);
+	}
+}
+
 fn generate_compound_statement(
     file: &mut File,
     cmp_statement: &Statement,
-    var_map: &HashMap<&String, i64>,
-    stack_index: &i64,
+    last_context: &Context,
 ) {
-    let mut var_map = var_map.clone();
-    let mut stack_index = stack_index.clone();
-	let mut context = HashSet::new();
+	let mut context = Context::from_last_context(last_context);
+
+	// Yes I do need to generate compound statements like that otherwise
+	// local variables can't be a thing
 
 	if let Statement::Compound(statements) = cmp_statement{
 		for statement in statements.iter() {
 			match statement {
 				Statement::Return(expression) => {
-					generate_expression(file, expression, &var_map);
+					generate_expression(file, expression, &context.var_map);
 					// Pop all the variables from the stack
 					writeln!(file, "    add rsp, {}		;pop local variables before return", context.len() * 8).unwrap();
 					writeln!(file, "    pop rbx		;restore rbx for caller function").unwrap();
@@ -236,23 +277,22 @@ fn generate_compound_statement(
 					writeln!(file, "    ret").unwrap();
 				}
 				Statement::Expression(expression) => {
-					generate_expression(file, expression, &var_map);
+					generate_expression(file, expression, &context.var_map);
 				}
 				Statement::Assignment(variable, expr) => {
-					generate_expression(file, expr, &var_map);
-					let var_address = var_map
-						.get(&variable)
+					generate_expression(file, expr, &context.var_map);
+					let var_address = context.var_map
+						.get(variable)
 						.expect(format!("Undeclared variable {}", variable).as_str());
 					writeln!(file, "    mov [rbp-{}], rax", var_address).unwrap();
 				}
 				Statement::Let(variable, expr) => {
 					if let Some(expr) = expr {
-						generate_expression(file, expr, &var_map);
+						generate_expression(file, expr, &context.var_map);
 					}
 
-					stack_index += 8;
-					var_map.insert(variable, stack_index);
-					context.insert(variable.clone());
+					context.stack_index += 8;
+					context.insert(variable.clone(), context.stack_index);
 
 					if let Some(_) = expr {
 						writeln!(file, "    push rax").unwrap();
@@ -261,7 +301,7 @@ fn generate_compound_statement(
 					}
 				}
 				Statement::Compound(_) => {
-					generate_compound_statement(file, statement, &var_map, &stack_index);
+					generate_compound_statement(file, statement, &context);
 				}
 				Statement::If(condition, if_statement, else_statement) => {
 					let branch_label = BRANCH_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -269,16 +309,47 @@ fn generate_compound_statement(
 					let end_label = format!("end_{}", branch_label);
 
 					writeln!(file, "    ;if statement").unwrap();
-					generate_expression(file, condition, &var_map);
+					generate_expression(file, condition, &context.var_map);
 					writeln!(file, "    cmp rax, 0").unwrap();
 					writeln!(file, "    je {}", else_label).unwrap();
-					generate_compound_statement(file, if_statement, &var_map, &stack_index);
+					generate_compound_statement(file, if_statement, &context);
 					writeln!(file, "    jmp {}", end_label).unwrap();
 					writeln!(file, "{}:", else_label).unwrap();
 					if let Some(else_statement) = else_statement {
-						generate_compound_statement(file, else_statement, &var_map, &stack_index);
+						generate_compound_statement(file, else_statement, &context);
 					}
 					writeln!(file, "{}:", end_label).unwrap();
+				}
+				Statement::While(condition, statement) => {
+					let loop_label = LOOP_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+					let start_label = format!("while_start_{}", loop_label);
+					let end_label = format!("while_end_{}", loop_label);
+
+					context.continue_label = Some(start_label.clone());
+					context.break_label = Some(end_label.clone());
+
+					writeln!(file, "    ;while statement").unwrap();
+					writeln!(file, "{}:", start_label).unwrap();
+					generate_expression(file, condition, &context.var_map);
+					writeln!(file, "    cmp rax, 0").unwrap();
+					writeln!(file, "    je {}", end_label).unwrap();
+					generate_compound_statement(file, statement, &context);
+					writeln!(file, "    jmp {}", start_label).unwrap();
+					writeln!(file, "{}:", end_label).unwrap();
+				}
+				Statement::Break => {
+					if let Some(label) = &context.break_label {
+						writeln!(file, "    jmp {}", label).unwrap();
+					} else {
+						panic!("Break statement outside of loop");
+					}
+				}
+				Statement::Continue => {
+					if let Some(label) = &context.continue_label {
+						writeln!(file, "    jmp {}", label).unwrap();
+					} else {
+						panic!("Continue statement outside of loop");
+					}
 				}
 				_ => unimplemented!(),
 			}
@@ -288,12 +359,11 @@ fn generate_compound_statement(
 	}
 
 	// Pop all the variables from the stack
-	writeln!(file, "    add rsp, {}		;end of block, pop local variables", context.len() * 8).unwrap();
+	writeln!(file, "    add rsp, {}		;end of block, pop local variables", context.local_variables.len() * 8).unwrap();
 }
 
 fn generate_function(file: &mut File, function: &Function) {
-    let var_map: HashMap<&String, i64> = HashMap::new();
-    let stack_index = 0;
+	let context = Context::new();
 
     let Function::Function(name, _params, statement) = function;
     writeln!(file, "").unwrap();
@@ -302,7 +372,7 @@ fn generate_function(file: &mut File, function: &Function) {
 	writeln!(file, "    push rbp		;save previous base pointer").unwrap();
     writeln!(file, "    push rbx		;functions should preserve rbx").unwrap();
 	writeln!(file, "    mov rbp, rsp	;set base pointer").unwrap();
-    generate_compound_statement(file, statement, &var_map, &stack_index);
+    generate_compound_statement(file, statement, &context);
 }
 
 pub fn generate(ast: &Ast, out_path: &str) {

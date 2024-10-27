@@ -1,0 +1,10 @@
+fn main() {
+	let a:int = 0;
+	let b:int = 0;
+    while a < 10 {
+		a = a + 1;
+		continue;
+		b = b + 1;
+	}
+	return b;
+}

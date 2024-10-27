@@ -5,7 +5,6 @@ Based on https://norasandler.com/2017/11/29/Write-a-Compiler.html
 - TODO: Finish all basic operators
 - TODO: %include
 - TODO: %define
-- TODO: Variables
 - TODO: Function calls
 - TODO: String literals
 - TODO: Structs and enums?
@@ -13,6 +12,9 @@ Based on https://norasandler.com/2017/11/29/Write-a-Compiler.html
 - TODO: binary and hex literals
 - TODO: make generator write comments in asm file
 - TODO: register allocation
+- TODO: testing assignment operators
+- TODO: default function parameters ?
+- TODO: kwargs ?
 
 
 A simple compiler for the Dubious programming language (DPL).
@@ -72,3 +74,5 @@ Note: Assignment operators have a return value equal to the expression being ass
 
 If the expression in if statements evaluates to anything other than 0, then the if
 statement executes. Otherwise else (if present).
+
+Uninitialized variables default to 0.

@@ -178,9 +178,12 @@ pub enum Statement {
     Let(String, Option<Expression>),
     If(Expression, Box<Statement>, Option<Box<Statement>>),
     While(Expression, Box<Statement>),
+	For(Expression, Expression, Expression, Box<Statement>),
     Return(Expression),
     Expression(Expression),
     Compound(Vec<Statement>),
+	Break,
+	Continue,
 }
 
 #[derive(Debug)]
@@ -501,6 +504,21 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
 				} else {
 					statement = Statement::If(exp, Box::new(if_stmt), None);
 				}
+			} else if k == "while" {
+				// while (exp) statement
+				let exp = parse_expression(tokens);
+				let mut while_stmt = parse_statement(tokens);
+
+				if let Statement::Compound(_) = while_stmt {
+				} else {
+					while_stmt = Statement::Compound(vec![while_stmt]);
+				}
+
+				statement = Statement::While(exp, Box::new(while_stmt));
+			} else if k == "break" {
+				statement = Statement::Break;
+			} else if k == "continue" {
+				statement = Statement::Continue;
 			} else {
                 panic!("Invalid keyword token: {:?}", tok);
             }
@@ -540,10 +558,14 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
         }
     }
 
-    // Compound and If statements don't need a semicolon
+    // Compound, If statements and loops don't need a semicolon
     if let Statement::Compound(_) = statement {
         return statement;
     } else if let Statement::If(_, _, _) = statement {
+		return statement;
+	} else if let Statement::While(_, _) = statement {
+		return statement;
+	} else if let Statement::For(_, _, _, _) = statement {
 		return statement;
 	}
 
