@@ -1,5 +1,5 @@
-use crate::lexer::lex::Operator;
-use crate::lexer::lex::Token;
+use crate::lexer::Operator;
+use crate::lexer::Token;
 use core::panic;
 use std::slice::Iter;
 

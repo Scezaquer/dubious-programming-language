@@ -1,13 +1,14 @@
 /// Lexer (tokenizer): Turns the input text file into a list of tokens.
 mod lexer;
 /// Parser: Turns the list of tokens into an abstract syntax tree (AST).
-mod ast;
+mod ast_build;
+mod ast_pretty_print;
 /// Code generator: Turns the AST into x86_64 assembly code.
 mod code_generator;
 
-use ast::build_ast::parse;
-use code_generator::generator::generate;
-use lexer::lex::lex;
+use ast_build::parse;
+use code_generator::generate;
+use lexer::lex;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
