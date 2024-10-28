@@ -1,5 +1,12 @@
 use regex::Regex;
 
+/// All the operators that the lexer can recognize.
+///
+/// The Operator enum represents all the operators that the lexer can
+/// recognize. This includes arithmetic operators, bitwise operators,
+/// comparison operators, logical operators, and assignment operators.
+/// The Operator enum is used to represent operators in the Token enum.
+/// The Operator enum derives the Debug, PartialEq, and Clone traits.
 #[derive(Debug)]
 #[derive(PartialEq, Clone, Copy)]
 pub enum Operator {
@@ -41,6 +48,13 @@ pub enum Operator {
     MemberAccess,       // .
 }
 
+/// All the tokens that the lexer can recognize.
+/// 
+/// The Token enum represents all the tokens that the lexer can recognize.
+/// This includes identifiers, primitive types, literals, operators, and
+/// keywords. The Token enum is used to represent tokens in the list of
+/// tokens that the lexer returns. The Token enum derives the Debug, PartialEq,
+/// and Clone traits.
 #[derive(Debug)]
 #[derive(PartialEq, Clone)]
 pub enum Token {
@@ -62,6 +76,38 @@ pub enum Token {
     EOF,
 }
 
+/// Lexes the input file and returns a list of tokens.
+/// 
+/// The lex function takes a string representing the contents of a file
+/// and returns a list of tokens. The lexer recognizes identifiers, primitive
+/// types, literals, operators, and keywords. This function uses regular expressions
+/// to match the tokens in the input file. It skips whitespace and comments, and panics
+/// if it encounters an unexpected character.
+/// 
+/// # Examples
+/// 
+/// ```
+/// let file = "fn main() { return 0; }";
+/// let tokens = lex(file);
+/// assert_eq!(tokens.len(), 10);
+/// ```
+/// 
+/// # Panics
+/// 
+/// The lex function panics if it encounters an unexpected character in the input file.
+/// 
+/// # Errors
+/// 
+/// The lex function does not return any errors.
+/// 
+/// # Safety
+/// 
+/// The lex function is safe to use with any input file.
+/// 
+/// # Performance
+/// 
+/// The lex function has a time complexity of O(n), where n is the length of the input file.
+/// The lex function has a space complexity of O(n), where n is the length of the input file.
 pub fn lex(file: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
 

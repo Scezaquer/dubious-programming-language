@@ -20,6 +20,7 @@ use std::slice::Iter;
 // 14. Logical or (a || b)
 // 15. Assignment (a = b) Add assignment (a += b) Subtract assignment (a -= b) Multiply assignment (a *= b) Divide assignment (a /= b) Modulus assignment (a %= b) Left shift assignment (a <<= b) Right shift assignment (a >>= b) Bitwise and assignment (a &= b) Bitwise xor assignment (a ^= b) Bitwise or assignment (a |= b)
 
+/// Represents a constant value in the AST.
 #[derive(Debug)]
 pub enum Constant {
     Int(i64),
@@ -27,6 +28,9 @@ pub enum Constant {
     Bool(bool),
 }
 
+/// Represents an atom in the AST.
+/// 
+/// An atom is the smallest unit of an expression. It can be a constant, an expression, a variable, or a function call* (*unimplemented).
 #[derive(Debug)]
 pub enum Atom {
     Constant(Constant),
@@ -34,6 +38,7 @@ pub enum Atom {
     Variable(String),
 }
 
+/// Represents a unary operator in the AST.
 #[derive(Debug, PartialEq)]
 pub enum UnOp {
     // TODO: We only support prefix unary operators for now
@@ -48,6 +53,7 @@ pub enum UnOp {
     NotAUnaryOp, // Not pretty but it makes the code nicer
 }
 
+/// Represents a binary operator in the AST.
 #[derive(Debug, PartialEq)]
 pub enum BinOp {
     MemberAccess,
@@ -74,6 +80,7 @@ pub enum BinOp {
     NotABinaryOp, // Not pretty but it makes the code nicer
 }
 
+/// Represents an assignment operator in the AST.
 #[derive(Debug, PartialEq)]
 pub enum AssignmentOp {
     Assign,
@@ -90,6 +97,27 @@ pub enum AssignmentOp {
     NotAnAssignmentOp, // Not pretty but it makes the code nicer
 }
 
+/// Represents an operator precedence level in the AST.
+/// 
+/// A precedence level is a group of operators that have the same precedence.
+/// Precedence levels are used to determine the order of operations in an expression.
+/// 
+/// # Precedence levels
+/// 1. Member access (.)
+/// 2. Pre increment (++a) Pre decrement (--a) Unary plus (+a) Unary minus (-a) Logical not (!a) Bitwise not (~a) Dereference (*a) Address of (&a)
+/// 3. Exponentiation (a ** b)
+/// 4. Multiplication (a * b) Division (a / b) Modulus (a % b)
+/// 5. Addition (a + b) Subtraction (a - b)
+/// 6. Bitwise left shift (a << b) Bitwise right shift (a >> b)
+/// 7. Less than (a < b) Greater than (a > b) Less than or equal to (a <= b) Greater than or equal to (a >= b)
+/// 8. Equal to (a == b) Not equal to (a != b)
+/// 9. Bitwise and (a & b)
+/// 10. Bitwise xor (a ^ b)
+/// 11. Bitwise or (a | b)
+/// 12. Logical and (a && b)
+/// 13. Logical xor (a ^^ b)
+/// 14. Logical or (a || b)
+/// 15. Assignment (a = b) Add assignment (a += b) Subtract assignment (a -= b) Multiply assignment (a *= b) Divide assignment (a /= b) Modulus assignment (a %= b) Left shift assignment (a <<= b) Right shift assignment (a >>= b) Bitwise and assignment (a &= b) Bitwise xor assignment (a ^= b) Bitwise or assignment (a |= b)
 #[derive(Debug)]
 pub struct PrecedenceLevel {
     binary_ops: Vec<BinOp>,
@@ -97,6 +125,10 @@ pub struct PrecedenceLevel {
     assignment_ops: Vec<AssignmentOp>,
 }
 
+/// Represents an expression in the AST.
+/// 
+/// An expression is a combination of atoms and operators that evaluates to a value.
+/// Expressions can be atoms, unary operations, binary operations, or assignments.
 #[derive(Debug)]
 pub enum Expression {
     Atom(Atom),
@@ -105,6 +137,7 @@ pub enum Expression {
     Assignment(String, Box<Expression>, AssignmentOp),
 }
 
+/// Gets the binary operator corresponding to the token.
 fn get_bin_operator_from_token(token: &Token) -> BinOp {
     match token {
         Token::Operator(op) => match op {
@@ -135,6 +168,7 @@ fn get_bin_operator_from_token(token: &Token) -> BinOp {
     }
 }
 
+/// Gets the assignment operator corresponding to the token.
 fn get_assign_operator_from_token(token: &Token) -> AssignmentOp {
     match token {
         Token::Operator(op) => match op {
@@ -155,6 +189,7 @@ fn get_assign_operator_from_token(token: &Token) -> AssignmentOp {
     }
 }
 
+/// Gets the unary operator corresponding to the token.
 fn get_un_operator_from_token(token: &Token) -> UnOp {
     match token {
         Token::Operator(op) => match op {
@@ -172,6 +207,10 @@ fn get_un_operator_from_token(token: &Token) -> UnOp {
     }
 }
 
+/// Represents a statement in the AST.
+/// 
+/// A statement is a single instruction in the program.
+/// Statements can be assignments, let bindings, if statements, while loops, loops, do-while loops, for loops, return statements, expressions, compound statements, break statements, or continue statements.
 #[derive(Debug)]
 pub enum Statement {
     Assignment(String, Expression, AssignmentOp),
@@ -188,16 +227,19 @@ pub enum Statement {
     Continue,
 }
 
+/// Represents a function in the AST.
 #[derive(Debug)]
 pub enum Function {
     Function(String, Vec<String>, Statement),
 }
 
+/// Represents a program in the AST.
 #[derive(Debug)]
 pub enum Program {
     Program(Vec<Function>),
 }
 
+/// Represents the abstract syntax tree (AST) of a program.
 #[derive(Debug)]
 pub struct Ast {
     pub program: Program,
@@ -213,6 +255,7 @@ impl std::fmt::Display for Constant {
     }
 }
 
+/// Parses a constant from a token.
 fn parse_constant(token: &Token) -> Constant {
     match token {
         Token::IntLiteral(i) => Constant::Int(*i),
@@ -231,6 +274,7 @@ fn parse_constant(token: &Token) -> Constant {
     }
 }
 
+/// Parses an atom from a list of tokens.
 fn parse_atom(mut tokens: &mut Iter<Token>) -> Atom {
     let tok = tokens.next().unwrap();
 
@@ -254,6 +298,7 @@ fn parse_atom(mut tokens: &mut Iter<Token>) -> Atom {
     }
 }
 
+/// Recursively parses an expression, taking into account operator precedence.
 fn parse_expression_with_precedence(
     mut tokens: &mut Iter<Token>,
     precedence_level: usize,
@@ -326,6 +371,28 @@ fn parse_expression_with_precedence(
     expr
 }
 
+/// Builds the precedence table for the parser.
+/// 
+/// The precedence table is used to determine the order of operations in an expression.
+/// It is a list of precedence levels, where each level contains a list of binary operators, unary operators, and assignment operators.
+/// The levels are ordered from highest to lowest precedence.
+/// 
+/// # Precedence levels
+/// 1. Member access (.)
+/// 2. Pre increment (++a) Pre decrement (--a) Unary plus (+a) Unary minus (-a) Logical not (!a) Bitwise not (~a) Dereference (*a) Address of (&a)
+/// 3. Exponentiation (a ** b)
+/// 4. Multiplication (a * b) Division (a / b) Modulus (a % b)
+/// 5. Addition (a + b) Subtraction (a - b)
+/// 6. Bitwise left shift (a << b) Bitwise right shift (a >> b)
+/// 7. Less than (a < b) Greater than (a > b) Less than or equal to (a <= b) Greater than or equal to (a >= b)
+/// 8. Equal to (a == b) Not equal to (a != b)
+/// 9. Bitwise and (a & b)
+/// 10. Bitwise xor (a ^ b)
+/// 11. Bitwise or (a | b)
+/// 12. Logical and (a && b)
+/// 13. Logical xor (a ^^ b)
+/// 14. Logical or (a || b)
+/// 15. Assignment (a = b) Add assignment (a += b) Subtract assignment (a -= b) Multiply assignment (a *= b) Divide assignment (a /= b) Modulus assignment (a %= b) Left shift assignment (a <<= b) Right shift assignment (a >>= b) Bitwise and assignment (a &= b) Bitwise xor assignment (a ^= b) Bitwise or assignment (a |= b)
 fn build_precedence_table() -> Vec<PrecedenceLevel> {
     vec![
         PrecedenceLevel {
@@ -432,6 +499,12 @@ fn build_precedence_table() -> Vec<PrecedenceLevel> {
     ]
 }
 
+/// Parses an expression from a list of tokens.
+/// 
+/// This function is a wrapper around parse_expression_with_precedence that uses the highest precedence level.
+/// It is used to parse the top-level expression.
+/// 
+/// An expression is a combination of atoms and operators that evaluates to a value.
 fn parse_expression(mut tokens: &mut Iter<Token>) -> Expression {
     let precedence_table = build_precedence_table();
     let max_precedence = precedence_table.len() - 1;
@@ -439,6 +512,10 @@ fn parse_expression(mut tokens: &mut Iter<Token>) -> Expression {
     parse_expression_with_precedence(&mut tokens, max_precedence, &precedence_table)
 }
 
+/// Parses a statement from a list of tokens.
+/// 
+/// A statement is a single instruction in the program.
+/// Statements can be assignments, let bindings, if statements, while loops, loops, do-while loops, for loops, return statements, expressions, compound statements, break statements, or continue statements.
 fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
     let tok = tokens.next().unwrap();
     let statement;
@@ -651,6 +728,7 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
     return statement;
 }
 
+/// Parses a function from a list of tokens.
 fn parse_function(mut tokens: &mut Iter<Token>) -> Function {
     let tok = tokens.next().unwrap();
 
@@ -703,6 +781,7 @@ fn parse_function(mut tokens: &mut Iter<Token>) -> Function {
     return Function::Function(id, params, statement);
 }
 
+/// Parses an abstract syntax tree (AST) from a list of tokens.
 pub fn parse(tokens: &Vec<Token>) -> Ast {
     let ast = Ast {
         program: Program::Program(vec![parse_function(&mut tokens.iter())]),

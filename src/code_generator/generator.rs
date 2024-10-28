@@ -8,11 +8,14 @@ use std::path;
 use std::sync::atomic::AtomicUsize;
 
 // Separate counters for branch and loop labels for break and continue statements
+/// Branch label counter for if statements
 static BRANCH_LABEL: AtomicUsize = AtomicUsize::new(0);
+/// Loop label counter for while, loop, and for statements
 static LOOP_LABEL: AtomicUsize = AtomicUsize::new(0);
 
 // TODO: test all of these one by one (pain)
 
+/// Generates the assembly code for an atom
 fn generate_atom(file: &mut File, atom: &Atom, var_map: &HashMap<String, i64>) {
     match atom {
         Atom::Constant(constant) => {
@@ -40,6 +43,7 @@ fn generate_atom(file: &mut File, atom: &Atom, var_map: &HashMap<String, i64>) {
     }
 }
 
+/// Generates the assembly code for an assignment operation
 fn generate_assignment(op: &AssignmentOp, file: &mut File, var_address: &i64) {
     match op {
         AssignmentOp::Assign => {
@@ -95,6 +99,7 @@ fn generate_assignment(op: &AssignmentOp, file: &mut File, var_address: &i64) {
     }
 }
 
+/// Generates the assembly code for an expression
 fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashMap<String, i64>) {
     match expression {
         Expression::Atom(atom) => {
@@ -231,11 +236,17 @@ fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashM
     }
 }
 
+/// Context struct to keep track of local variables and stack index
 struct Context {
+	/// HashMap to store the variables and their addresses
     var_map: HashMap<String, i64>,
+	/// Stack index to keep track of the stack pointer
     stack_index: i64,
+	/// HashSet to store the variables that were declared in the current block
     local_variables: HashSet<String>,
+	/// Label a continue statement should jump to
     continue_label: Option<String>,
+	/// Label a break statement should jump to
     break_label: Option<String>,
 }
 
@@ -250,6 +261,9 @@ impl Context {
         }
     }
 
+	/// Create a new context from the last context
+	/// 
+	/// This clones all the info from the last context except the local variables
     fn from_last_context(context: &Context) -> Context {
         Context {
             var_map: context.var_map.clone(),
@@ -264,12 +278,14 @@ impl Context {
         self.local_variables.len()
     }
 
+	/// Insert a variable into the context
     fn insert(&mut self, key: String, value: i64) {
         self.var_map.insert(key.clone(), value);
         self.local_variables.insert(key);
     }
 }
 
+/// Generates the assembly code for a compound statement
 fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_context: &Context) {
     let mut context = Context::from_last_context(last_context);
 
@@ -434,6 +450,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
     .unwrap();
 }
 
+/// Generates the assembly code for a function
 fn generate_function(file: &mut File, function: &Function) {
     let context = Context::new();
 
@@ -447,6 +464,7 @@ fn generate_function(file: &mut File, function: &Function) {
     generate_compound_statement(file, statement, &context);
 }
 
+/// Generates the assembly code for the given AST
 pub fn generate(ast: &Ast, out_path: &str) {
     let path = path::Path::new(out_path);
     let mut file = File::create(path).unwrap();
