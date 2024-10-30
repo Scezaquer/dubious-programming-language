@@ -46,6 +46,7 @@ pub enum Operator {
     BitwiseXorAssign,   // ^=
     BitwiseOrAssign,    // |=
     MemberAccess,       // .
+	Comma,              // ,
 }
 
 /// All the tokens that the lexer can recognize.
@@ -125,8 +126,8 @@ pub fn lex(file: &str) -> Vec<Token> {
     // Integers are a sequence of digits
     let int_re = Regex::new(r"^\d+").unwrap();
 
-    // (Short) operators are any of the following characters: + - * / % ^ & | ~ < > = ! .
-    let operator_re = Regex::new(r"^[\+\-\*/%\^&~\|<>=!\.]").unwrap();
+    // (Short) operators are any of the following characters: + - * / % ^ & | ~ < > = ! . ,
+    let operator_re = Regex::new(r"^[\+\-\*/%\^&~\|<>=!\.,]").unwrap();
 
     // Large operators are any of the following strings: == != <= >= && || ** ++ -- << >> += -= *= /= %= <<= >>= &= ^= |= ^^
     let large_operator_re = Regex::new(r"^(==|!=|<=|>=|&&|\|\||\*\*|\+\+|--|<<=|>>=|<<|>>|\+=|-=|\*=|\/=|%=|&=|\^=|\|=|\^\^)").unwrap();
@@ -229,6 +230,7 @@ pub fn lex(file: &str) -> Vec<Token> {
                 "~" => Operator::BitwiseNot,
                 "^" => Operator::BitwiseXor,
                 "." => Operator::MemberAccess,
+				"," => Operator::Comma,
                 _ => unreachable!(),
             };
             tokens.push(Token::Operator(op));

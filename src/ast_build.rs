@@ -36,6 +36,7 @@ pub enum Atom {
     Constant(Constant),
     Expression(Box<Expression>),
     Variable(String),
+	FunctionCall(String, Vec<Expression>),
 }
 
 /// Represents a unary operator in the AST.
@@ -292,6 +293,26 @@ fn parse_atom(mut tokens: &mut Iter<Token>) -> Atom {
             return Atom::Constant(parse_constant(tok));
         }
         Token::Identifier(s) => {
+			let next_tok = tokens.clone().next().unwrap();
+			if let Token::LParen = next_tok {
+				// Function call
+				tokens.next();
+				let mut args = Vec::new();
+				loop {
+					let next_tok = tokens.clone().next().unwrap();
+					if let Token::RParen = next_tok {
+						tokens.next();
+						break;
+					} else if let Token::Comma = next_tok {
+						tokens.next();
+					} else {
+						args.push(parse_expression(&mut tokens));
+					}
+				}
+				return Atom::FunctionCall(s.to_string(), args);
+			}
+
+			// Variable
             return Atom::Variable(s.to_string());
         }
         _ => panic!("Invalid atom token: {:?}", tok),
@@ -759,8 +780,18 @@ fn parse_function(mut tokens: &mut Iter<Token>) -> Function {
 
         if let Token::RParen = tok {
             break;
-        } else if let Token::Identifier(id) = tok {
+        } else if let Token::Comma = tok {
+			continue;
+		} else if let Token::Identifier(id) = tok {
             params.push(id.clone());
+			let tok = tokens.next().unwrap();
+			if !matches!(tok, Token::Colon) {
+				panic!("Expected colon, found: {:?}", tok);
+			}
+			let tok = tokens.next().unwrap();
+			if !matches!(tok, Token::PrimitiveType(_)) {
+				panic!("Expected type identifier, found: {:?}", tok);
+			}
         } else {
             panic!(
                 "Expected identifier or closing parenthesis, found: {:?}",
@@ -783,9 +814,16 @@ fn parse_function(mut tokens: &mut Iter<Token>) -> Function {
 
 /// Parses an abstract syntax tree (AST) from a list of tokens.
 pub fn parse(tokens: &Vec<Token>) -> Ast {
-    let ast = Ast {
-        program: Program::Program(vec![parse_function(&mut tokens.iter())]),
-    };
+	let mut tokens = tokens.iter();
+	let mut functions = Vec::new();
 
+	// Parse functions until there are no more tokens
+	while !matches!(tokens.clone().next().unwrap(), Token::EOF) {
+		functions.push(parse_function(&mut tokens));
+	}
+
+	let ast = Ast {
+		program: Program::Program(functions),
+	};
     return ast;
 }

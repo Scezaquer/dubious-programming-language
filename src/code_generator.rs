@@ -26,19 +26,20 @@ fn generate_atom(file: &mut File, atom: &Atom, var_map: &HashMap<String, i64>) {
             let var_address = var_map
                 .get(variable)
                 .expect(format!("Undeclared variable {}", variable).as_str());
-            writeln!(file, "    mov rax, [rbp-{}]", var_address).unwrap();
+			writeln!(file, "    mov rax, [rbp{}{}]", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
         }
         Atom::Expression(expression) => {
             generate_expression(file, expression, var_map);
         }
-        /*Atom::FunctionCall(name, args) => {
-            for arg in args.iter() {
-                generate_expression(file, arg);
-                writeln!(file, "push rax").unwrap();
-            }
-            writeln!(file, "call _{}", name).unwrap();
-            writeln!(file, "add rsp, {}", 8 * args.len()).unwrap();
-        },*/
+		Atom::FunctionCall(name, args) => {
+			writeln!(file, "	;push function arguments to the stack in reverse order").unwrap();
+			for arg in args.iter().rev() {		// Push arguments in reverse order (C convention)
+				generate_expression(file, arg, var_map);
+				writeln!(file, "    push rax").unwrap();
+			}
+			writeln!(file, "    call {}", name).unwrap();
+			writeln!(file, "    add rsp, {}	;pop arguments", args.len() * 8).unwrap();	// Pop arguments from stack
+		}
         _ => unimplemented!(),
     }
 }
@@ -47,53 +48,53 @@ fn generate_atom(file: &mut File, atom: &Atom, var_map: &HashMap<String, i64>) {
 fn generate_assignment(op: &AssignmentOp, file: &mut File, var_address: &i64) {
     match op {
         AssignmentOp::Assign => {
-            writeln!(file, "    mov [rbp-{}], rax", var_address).unwrap();
+            writeln!(file, "    mov [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
         }
         AssignmentOp::AddAssign => {
-            writeln!(file, "    add [rbp-{}], rax", var_address).unwrap();
+            writeln!(file, "    add [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
         }
         AssignmentOp::SubtractAssign => {
-            writeln!(file, "    sub [rbp-{}], rax", var_address).unwrap();
+            writeln!(file, "    sub [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
         }
         AssignmentOp::MultiplyAssign => {
-			writeln!(file, "    mov rcx, [rbp-{}]", var_address).unwrap();
+			writeln!(file, "    mov rcx, [rbp{}{}]", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
 			writeln!(file, "    imul rax, rcx").unwrap();
-			writeln!(file, "    mov [rbp-{}], rax", var_address).unwrap();
+			writeln!(file, "    mov [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
         }
         AssignmentOp::DivideAssign => {
 			writeln!(file, "    mov rcx, rax").unwrap();
-			writeln!(file, "    mov rax, [rbp-{}]", var_address).unwrap();
+			writeln!(file, "    mov rax, [rbp{}{}]", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
 			writeln!(file, "    cqo").unwrap();
 			writeln!(file, "    idiv rcx").unwrap();
-			writeln!(file, "    mov [rbp-{}], rax", var_address).unwrap();
+			writeln!(file, "    mov [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
         }
         AssignmentOp::ModulusAssign => {
 			writeln!(file, "    mov rcx, rax").unwrap();
-			writeln!(file, "    mov rax, [rbp-{}]", var_address).unwrap();
+			writeln!(file, "    mov rax, [rbp{}{}]", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
 			writeln!(file, "    cqo").unwrap();
 			writeln!(file, "    idiv rcx").unwrap();
-			writeln!(file, "    mov [rbp-{}], rdx", var_address).unwrap();
+			writeln!(file, "    mov [rbp{}{}], rdx", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
         }
         AssignmentOp::LeftShiftAssign => {
 			writeln!(file, "    mov rcx, rax").unwrap();
-			writeln!(file, "    mov rax, [rbp-{}]", var_address).unwrap();
+			writeln!(file, "    mov rax, [rbp{}{}]", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
 			writeln!(file, "    shl rax, cl").unwrap();
-			writeln!(file, "    mov [rbp-{}], rax", var_address).unwrap();
+			writeln!(file, "    mov [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
         }
         AssignmentOp::RightShiftAssign => {
 			writeln!(file, "    mov rcx, rax").unwrap();
-			writeln!(file, "    mov rax, [rbp-{}]", var_address).unwrap();
+			writeln!(file, "    mov rax, [rbp{}{}]", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
 			writeln!(file, "    shr rax, cl").unwrap();
-			writeln!(file, "    mov [rbp-{}], rax", var_address).unwrap();
+			writeln!(file, "    mov [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
         }
         AssignmentOp::BitwiseAndAssign => {
-            writeln!(file, "    and [rbp-{}], rax", var_address).unwrap();
+            writeln!(file, "    and [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
         }
         AssignmentOp::BitwiseXorAssign => {
-            writeln!(file, "    xor [rbp-{}], rax", var_address).unwrap();
+            writeln!(file, "    xor [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
         }
         AssignmentOp::BitwiseOrAssign => {
-            writeln!(file, "    or [rbp-{}], rax", var_address).unwrap();
+            writeln!(file, "    or [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
         }
         _ => unimplemented!(),
     }
@@ -324,7 +325,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                         generate_expression(file, expr, &context.var_map);
                     }
 
-                    context.stack_index += 8;
+					context.stack_index -= 8;
                     context.insert(variable.clone(), context.stack_index);
 
                     if let Some(_) = expr {
@@ -452,9 +453,17 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
 
 /// Generates the assembly code for a function
 fn generate_function(file: &mut File, function: &Function) {
-    let context = Context::new();
+    let mut context = Context::new();
 
-    let Function::Function(name, _params, statement) = function;
+    let Function::Function(name, params, statement) = function;
+
+	context.stack_index = 24;	// Skip rbp, rbx and the return address
+	for param in params.iter() {
+		context.insert(param.clone(), context.stack_index);
+		context.stack_index += 8;
+	}
+	context.stack_index = 0;
+
     writeln!(file, "").unwrap();
     writeln!(file, "global {}", name).unwrap();
     writeln!(file, "{}:", name).unwrap();
@@ -462,6 +471,9 @@ fn generate_function(file: &mut File, function: &Function) {
     writeln!(file, "    push rbx		;functions should preserve rbx").unwrap();
     writeln!(file, "    mov rbp, rsp	;set base pointer").unwrap();
     generate_compound_statement(file, statement, &context);
+	writeln!(file, "    pop rbx			;restore rbx for caller function").unwrap();
+	writeln!(file, "    pop rbp			;restore base pointer").unwrap();
+	writeln!(file, "    ret				;return by default if no return statement was reached").unwrap();
 }
 
 /// Generates the assembly code for the given AST

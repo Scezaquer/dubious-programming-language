@@ -37,6 +37,10 @@ struct Args {
     /// Output an assembly file instead of a binary
     #[arg(short = 'S', default_value_t = false)]
     output_asm: bool,
+
+	/// Output both a binary and an assembly file
+	#[arg(short, long, default_value_t = false)]
+	both: bool,
 }
 
 /// A simple compiler for the Dubious programming language (DPL).
@@ -91,21 +95,26 @@ fn main() {
     // There is an edgecase where the user wants to output to a file called
     // "out", and uses -S, which will cause the output file to be "out.s"
     // instead of "out".
-    let output_file;
-    if args.output_asm && args.output_file == "out" {
-        output_file = "out.s".to_string();
-    } else {
-        output_file = args.output_file.clone();
-    }
+    let asm_output_file;
+	let output_file = args.output_file.clone();
+	if args.output_asm || args.both {
+		if args.output_file == "out" {
+			asm_output_file = "out.s".to_string();
+		} else {
+			asm_output_file = args.output_file.clone() + ".s";
+		}
+	} else {
+		asm_output_file = output_file.clone();
+	}
 
-    generate(&ast, &output_file);
+    generate(&ast, &asm_output_file);
     if !args.output_asm {
         // nasm -f elf64 out.s -o out.o
         Command::new("nasm")
             .args([
                 "-f",
                 "elf64",
-                format!("{}", args.output_file).as_str(),
+                format!("{}", asm_output_file).as_str(),
                 "-o",
                 format!("{}.o", &args.output_file).as_str(),
             ])
@@ -122,11 +131,12 @@ fn main() {
             .output()
             .expect("Failed to link object file");
 
-        // rm out.o
-        Command::new("rm")
-            .args([format!("{}.o", &args.output_file).as_str()])
-            .output()
-            .expect("Failed to remove intermediary object file");
+		// rm out.o
+		Command::new("rm")
+			.args([format!("{}.o", &args.output_file).as_str()])
+			.output()
+			.expect("Failed to remove intermediary object file");
+	
 
         // This turns the elf64 into a flat binary file
         // objcopy -O binary out out

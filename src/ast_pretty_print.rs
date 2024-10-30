@@ -89,6 +89,16 @@ impl std::fmt::Display for Atom {
 			Atom::Constant(constant) => write!(f, "{}", constant),
 			Atom::Expression(expr) => write!(f, "({})", expr),
 			Atom::Variable(var) => write!(f, "{}", var),
+			Atom::FunctionCall(name, args) => {
+				write!(f, "{}(", name)?;
+				for (i, arg) in args.iter().enumerate() {
+					write!(f, "{}", arg)?;
+					if i < args.len() - 1 {
+						write!(f, ", ")?;
+					}
+				}
+				write!(f, ")")
+			}
 		}
 	}
 }
