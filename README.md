@@ -105,3 +105,5 @@ for (0;1;0){
 }
 ```
 Is, and is equivalent to `for (;;)` in C
+
+Undefined variables default to 0.

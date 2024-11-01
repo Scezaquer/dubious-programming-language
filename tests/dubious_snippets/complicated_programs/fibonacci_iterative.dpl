@@ -1,0 +1,24 @@
+fn main() {
+	/*
+	Probably not the most beautiful fib code you've ever seen
+	but have you ever written one in your own language? Hm? Didn't think so.
+	*/
+
+	let n: int = 10;
+	let a: int = 0;
+	let b: int = 1;
+
+	if n == 0 return a;
+	else if n == 1 return b;
+
+	n -= 2;		// We already cover 0 and 1 in the if else above
+	let c: int;	// Uninitialized variables default to 0
+	let i: int;
+	for(i = 0; i <= n; i= ++i){
+		c = b + a;
+		a = b;
+		b = c;
+	}
+
+	return c;
+}

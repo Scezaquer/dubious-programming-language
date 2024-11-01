@@ -313,5 +313,26 @@
 		"filename": "control_flow/loop.dpl",
 		"input": [],
 		"output": 5
+	},
+	{
+		"name": "function",
+		"description": "Function call",
+		"filename": "functions/function.dpl",
+		"input": [],
+		"output": 2
+	},
+	{
+		"name": "fibonacci_recursive",
+		"description": "Recursive fibonacci function",
+		"filename": "complicated_programs/fibonacci_recursive.dpl",
+		"input": [],
+		"output": 55
+	},
+	{
+		"name": "fibonacci_iterative",
+		"description": "Iterative fibonacci function",
+		"filename": "complicated_programs/fibonacci_iterative.dpl",
+		"input": [],
+		"output": 55
 	}
 ]

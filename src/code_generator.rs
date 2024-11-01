@@ -331,7 +331,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     if let Some(_) = expr {
                         writeln!(file, "    push rax").unwrap();
                     } else {
-                        writeln!(file, "    push 0").unwrap();
+                        writeln!(file, "    push 0").unwrap();	// Undefined variables default to 0
                     }
                 }
                 Statement::Compound(_) => {
