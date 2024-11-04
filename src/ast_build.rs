@@ -22,7 +22,7 @@ use std::slice::Iter;
 
 /// Represents a constant value in the AST.
 #[derive(Debug)]
-pub enum Constant {
+pub enum Literal {
     Int(i64),
     Float(f64),
     Bool(bool),
@@ -33,7 +33,7 @@ pub enum Constant {
 /// An atom is the smallest unit of an expression. It can be a constant, an expression, a variable, or a function call* (*unimplemented).
 #[derive(Debug)]
 pub enum Atom {
-    Constant(Constant),
+    Literal(Literal),
     Expression(Box<Expression>),
     Variable(String),
 	FunctionCall(String, Vec<Expression>),
@@ -234,10 +234,18 @@ pub enum Function {
     Function(String, Vec<String>, Statement),
 }
 
+/// Represents a constant in the AST.
+/// Constants can only be assigned on declaration, and can only be assigned a literal,
+/// so they're not terribly useful as of now. They're basically static globals.
+#[derive(Debug)]
+pub enum Constant {
+	Constant(String, Literal),
+}
+
 /// Represents a program in the AST.
 #[derive(Debug)]
 pub enum Program {
-    Program(Vec<Function>),
+    Program(Vec<Function>, Vec<Constant>),
 }
 
 /// Represents the abstract syntax tree (AST) of a program.
@@ -246,26 +254,26 @@ pub struct Ast {
     pub program: Program,
 }
 
-impl std::fmt::Display for Constant {
+impl std::fmt::Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Constant::Int(i) => write!(f, "{}", i),
-            Constant::Float(fl) => write!(f, "{}", fl),
-            Constant::Bool(b) => write!(f, "{}", b),
+            Literal::Int(i) => write!(f, "{}", i),
+            Literal::Float(fl) => write!(f, "{}", fl),
+            Literal::Bool(b) => write!(f, "{}", b),
         }
     }
 }
 
 /// Parses a constant from a token.
-fn parse_constant(token: &Token) -> Constant {
+fn parse_literal(token: &Token) -> Literal {
     match token {
-        Token::IntLiteral(i) => Constant::Int(*i),
-        Token::FloatLiteral(f) => Constant::Float(*f),
+        Token::IntLiteral(i) => Literal::Int(*i),
+        Token::FloatLiteral(f) => Literal::Float(*f),
         Token::Keyword(k) => {
             if k == "true" {
-                Constant::Bool(true)
+                Literal::Bool(true)
             } else if k == "false" {
-                Constant::Bool(false)
+                Literal::Bool(false)
             } else {
                 // May be unnecessary if lexer is correct
                 panic!("Invalid constant keyword token: {:?}", token)
@@ -290,7 +298,7 @@ fn parse_atom(mut tokens: &mut Iter<Token>) -> Atom {
             }
         }
         Token::IntLiteral(_) | Token::FloatLiteral(_) | Token::Keyword(_) => {
-            return Atom::Constant(parse_constant(tok));
+            return Atom::Literal(parse_literal(tok));
         }
         Token::Identifier(s) => {
 			let next_tok = tokens.clone().next().unwrap();
@@ -749,6 +757,48 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
     return statement;
 }
 
+fn parse_const(mut tokens: &mut Iter<Token>) -> Constant {
+	// const id: type = exp;
+
+	let next_tok = tokens.next().unwrap();
+
+	if &Token::Keyword("const".to_string()) != next_tok {
+		panic!("Expected const keyword, found: {:?}", next_tok);
+	}
+
+	let next_tok = tokens.next().unwrap();
+	let id = match next_tok {
+		Token::Identifier(id) => id.clone(),
+		_ => panic!("Expected identifier, found: {:?}", next_tok),
+	};
+
+	let next_tok = tokens.next().unwrap();
+	if &Token::Colon != next_tok {
+		panic!("Expected colon, found: {:?}", next_tok);
+	};
+
+	let _ = tokens.next().unwrap(); // Skip type for now. // TODO: Implement types
+
+	let lit;
+	let next_tok = tokens.clone().next().unwrap();
+	if let Token::Operator(Operator::Assign) = next_tok {
+		tokens.next();
+		lit = parse_literal(tokens.next().unwrap());
+	} else {
+		panic!(
+			"Expected assignment operator, found: {:?} (constants must be assigned on declaration)",
+			next_tok
+		);
+	}
+
+	let next_tok = tokens.next().unwrap();
+	if &Token::Semicolon != next_tok {
+		panic!("Expected semicolon, found: {:?}", next_tok);
+	}
+
+	return Constant::Constant(id.to_string(), lit);
+}
+
 /// Parses a function from a list of tokens.
 fn parse_function(mut tokens: &mut Iter<Token>) -> Function {
     let tok = tokens.next().unwrap();
@@ -816,14 +866,21 @@ fn parse_function(mut tokens: &mut Iter<Token>) -> Function {
 pub fn parse(tokens: &Vec<Token>) -> Ast {
 	let mut tokens = tokens.iter();
 	let mut functions = Vec::new();
+	let mut constants = Vec::new();
 
 	// Parse functions until there are no more tokens
-	while !matches!(tokens.clone().next().unwrap(), Token::EOF) {
-		functions.push(parse_function(&mut tokens));
+	loop {
+		let next_tok = tokens.clone().next().unwrap();
+		match next_tok {
+			&Token::EOF => break,
+			&Token::Keyword(ref k) if k == "fn" => functions.push(parse_function(&mut tokens)),
+			&Token::Keyword(ref k) if k == "const" => constants.push(parse_const(&mut tokens)),
+			_ => (panic!("Expected function or constant declaration, found: {:?}", next_tok)),
+		}
 	}
 
 	let ast = Ast {
-		program: Program::Program(functions),
+		program: Program::Program(functions, constants),
 	};
     return ast;
 }

@@ -1,5 +1,5 @@
 use crate::ast_build::{
-	Ast, Atom, BinOp, Constant, Expression, Function, Program, Statement, UnOp, AssignmentOp,
+	AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Literal, Program, Statement, UnOp
 };
 
 impl std::fmt::Display for Ast {
@@ -11,12 +11,23 @@ impl std::fmt::Display for Ast {
 impl std::fmt::Display for Program {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Program::Program(functions) => {
+			Program::Program(functions, constants) => {
+				for constant in constants {
+					writeln!(f, "{}", constant)?;
+				}
 				for function in functions {
 					writeln!(f, "{}", function)?;
 				}
 				Ok(())
 			}
+		}
+	}
+}
+
+impl std::fmt::Display for Constant {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Constant::Constant(name, value) => write!(f, "const {} = {};", name, value)
 		}
 	}
 }
@@ -86,7 +97,7 @@ impl std::fmt::Display for Expression {
 impl std::fmt::Display for Atom {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Atom::Constant(constant) => write!(f, "{}", constant),
+			Atom::Literal(constant) => write!(f, "{}", constant),
 			Atom::Expression(expr) => write!(f, "({})", expr),
 			Atom::Variable(var) => write!(f, "{}", var),
 			Atom::FunctionCall(name, args) => {

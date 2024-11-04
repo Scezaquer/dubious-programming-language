@@ -107,3 +107,9 @@ for (0;1;0){
 Is, and is equivalent to `for (;;)` in C
 
 Undefined variables default to 0.
+
+Constants may be defined anywhere in the global scope and are valid everywhere in the file, even
+before they are declared. Constants may only be declared once, and must be initialized at the time
+they are declared. They are essentially just aliases for literals, so expressions cannot be assigned to them,
+only literals. If I implement expression pre-processing then maybe it'll become possible to have
+conbinations of literals instead.

@@ -1,5 +1,5 @@
 use crate::ast_build::{
-    AssignmentOp, Ast, Atom, BinOp, Expression, Function, Program, Statement, UnOp,
+    AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Program, Statement, UnOp
 };
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -16,25 +16,29 @@ static LOOP_LABEL: AtomicUsize = AtomicUsize::new(0);
 // TODO: test all of these one by one (pain)
 
 /// Generates the assembly code for an atom
-fn generate_atom(file: &mut File, atom: &Atom, var_map: &HashMap<String, i64>) {
+fn generate_atom(file: &mut File, atom: &Atom, var_map: &HashMap<String, i64>, constants: &HashSet<String>) {
     match atom {
-        Atom::Constant(constant) => {
+        Atom::Literal(constant) => {
             // NOTE: change the std::fmt::Display trait for Constant in build_ast.rs in case it doesn't print the asm correctly
             writeln!(file, "    mov rax, {}", constant).unwrap(); // TODO: Doesn't work for floats
         }
         Atom::Variable(variable) => {
-            let var_address = var_map
-                .get(variable)
-                .expect(format!("Undeclared variable {}", variable).as_str());
-			writeln!(file, "    mov rax, [rbp{}{}]", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
+            let var_address = var_map.get(variable);
+			if let Some(var_address) = var_address {
+				writeln!(file, "    mov rax, [rbp{}{}]", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
+				return;
+			}
+			
+			let constant = constants.get(variable).expect(format!("Undeclared variable {}", variable).as_str());
+			writeln!(file, "    mov rax, {}", constant).unwrap();
         }
         Atom::Expression(expression) => {
-            generate_expression(file, expression, var_map);
+            generate_expression(file, expression, var_map, constants);
         }
 		Atom::FunctionCall(name, args) => {
 			writeln!(file, "	;push function arguments to the stack in reverse order").unwrap();
 			for arg in args.iter().rev() {		// Push arguments in reverse order (C convention)
-				generate_expression(file, arg, var_map);
+				generate_expression(file, arg, var_map, constants);
 				writeln!(file, "    push rax").unwrap();
 			}
 			writeln!(file, "    call {}", name).unwrap();
@@ -101,13 +105,13 @@ fn generate_assignment(op: &AssignmentOp, file: &mut File, var_address: &i64) {
 }
 
 /// Generates the assembly code for an expression
-fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashMap<String, i64>) {
+fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashMap<String, i64>, constants: &HashSet<String>) {
     match expression {
         Expression::Atom(atom) => {
-            generate_atom(file, atom, var_map);
+            generate_atom(file, atom, var_map, constants);
         }
         Expression::UnaryOp(expr, unop) => {
-            generate_expression(file, expr, var_map);
+            generate_expression(file, expr, var_map, constants);
             match unop {
                 UnOp::UnaryMinus => {
                     writeln!(file, "    neg rax").unwrap();
@@ -137,9 +141,9 @@ fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashM
             }
         }
         Expression::BinaryOp(left, right, bin_op) => {
-            generate_expression(file, left, var_map);
+            generate_expression(file, left, var_map, constants);
             writeln!(file, "    push rax").unwrap();
-            generate_expression(file, right, var_map);
+            generate_expression(file, right, var_map, constants);
             writeln!(file, "    pop rcx").unwrap();
             writeln!(file, "    xchg rax, rcx").unwrap();
             match bin_op {
@@ -228,11 +232,17 @@ fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashM
             }
         }
         Expression::Assignment(variable, expr, op) => {
-            generate_expression(file, expr, var_map);
-            let var_address = var_map
-                .get(variable)
-                .expect(format!("Undeclared variable {}", variable).as_str());
-            generate_assignment(op, file, var_address);
+            generate_expression(file, expr, var_map, constants);
+            let var_address = var_map.get(variable);
+			if let Some(var_address) = var_address {
+				generate_assignment(op, file, var_address);
+				return;
+			}
+
+			if let Some(_) = constants.get(variable) {
+				panic!("Cannot assign to a constant variable");
+			}
+            panic!("Undeclared variable {:?}", variable);
         }
     }
 }
@@ -241,6 +251,8 @@ fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashM
 struct Context {
 	/// HashMap to store the variables and their addresses
     var_map: HashMap<String, i64>,
+	/// Set of constant variables
+	constants: HashSet<String>,
 	/// Stack index to keep track of the stack pointer
     stack_index: i64,
 	/// HashSet to store the variables that were declared in the current block
@@ -255,6 +267,7 @@ impl Context {
     fn new() -> Context {
         Context {
             var_map: HashMap::new(),
+			constants: HashSet::new(),
             stack_index: 0,
             local_variables: HashSet::new(),
             continue_label: None,
@@ -268,6 +281,7 @@ impl Context {
     fn from_last_context(context: &Context) -> Context {
         Context {
             var_map: context.var_map.clone(),
+			constants: context.constants.clone(),
             stack_index: context.stack_index.clone(),
             local_variables: HashSet::new(),
             continue_label: context.continue_label.clone(),
@@ -297,7 +311,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
         for statement in statements.iter() {
             match statement {
                 Statement::Return(expression) => {
-                    generate_expression(file, expression, &context.var_map);
+                    generate_expression(file, expression, &context.var_map, &context.constants);
                     // Pop all the variables from the stack
                     writeln!(
                         file,
@@ -310,19 +324,22 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     writeln!(file, "    ret").unwrap();
                 }
                 Statement::Expression(expression) => {
-                    generate_expression(file, expression, &context.var_map);
+                    generate_expression(file, expression, &context.var_map, &context.constants);
                 }
                 Statement::Assignment(variable, expr, op) => {
-                    generate_expression(file, expr, &context.var_map);
-                    let var_address = context
-                        .var_map
-                        .get(variable)
-                        .expect(format!("Undeclared variable {}", variable).as_str());
-					generate_assignment(op, file, var_address);
+                    generate_expression(file, expr, &context.var_map, &context.constants);
+                    let var_address = context.var_map.get(variable);
+					if let Some(var_address) = var_address {
+						generate_assignment(op, file, var_address);
+					} else if let Some(_) = context.constants.get(variable) {
+						panic!("Cannot assign to a constant variable");
+					} else {
+						panic!("Undeclared variable {:?}", variable);
+					}
                 }
                 Statement::Let(variable, expr) => {
                     if let Some(expr) = expr {
-                        generate_expression(file, expr, &context.var_map);
+                        generate_expression(file, expr, &context.var_map, &context.constants);
                     }
 
 					context.stack_index -= 8;
@@ -344,7 +361,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     let end_label = format!("end_{}", branch_label);
 
                     writeln!(file, "    ;if statement").unwrap();
-                    generate_expression(file, condition, &context.var_map);
+                    generate_expression(file, condition, &context.var_map, &context.constants);
                     writeln!(file, "    cmp rax, 0").unwrap();
                     writeln!(file, "    je {}", else_label).unwrap();
                     generate_compound_statement(file, if_statement, &context);
@@ -365,7 +382,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
 
                     writeln!(file, "    ;while statement").unwrap();
                     writeln!(file, "{}:", start_label).unwrap();
-                    generate_expression(file, condition, &context.var_map);
+                    generate_expression(file, condition, &context.var_map, &context.constants);
                     writeln!(file, "    cmp rax, 0").unwrap();
                     writeln!(file, "    je {}", end_label).unwrap();
                     generate_compound_statement(file, statement, &context);
@@ -397,7 +414,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     writeln!(file, "    ;do while statement").unwrap();
                     writeln!(file, "{}:", start_label).unwrap();
                     generate_compound_statement(file, statement, &context);
-                    generate_expression(file, condition, &context.var_map);
+                    generate_expression(file, condition, &context.var_map, &context.constants);
                     writeln!(file, "    cmp rax, 0").unwrap();
                     writeln!(file, "    jne {}", start_label).unwrap();
                     writeln!(file, "{}:", end_label).unwrap();
@@ -411,13 +428,13 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     context.break_label = Some(end_label.clone());
 
                     writeln!(file, "    ;for statement").unwrap();
-                    generate_expression(file, init, &context.var_map);
+                    generate_expression(file, init, &context.var_map, &context.constants);
                     writeln!(file, "{}:", start_label).unwrap();
-                    generate_expression(file, condition, &context.var_map);
+                    generate_expression(file, condition, &context.var_map, &context.constants);
                     writeln!(file, "    cmp rax, 0").unwrap();
                     writeln!(file, "    je {}", end_label).unwrap();
                     generate_compound_statement(file, statement, &context);
-                    generate_expression(file, update, &context.var_map);
+                    generate_expression(file, update, &context.var_map, &context.constants);
                     writeln!(file, "    jmp {}", start_label).unwrap();
                     writeln!(file, "{}:", end_label).unwrap();
                 }
@@ -452,8 +469,8 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
 }
 
 /// Generates the assembly code for a function
-fn generate_function(file: &mut File, function: &Function) {
-    let mut context = Context::new();
+fn generate_function(file: &mut File, function: &Function, context: &Context) {
+    let mut context = Context::from_last_context(context);
 
     let Function::Function(name, params, statement) = function;
 
@@ -476,6 +493,11 @@ fn generate_function(file: &mut File, function: &Function) {
 	writeln!(file, "    ret				;return by default if no return statement was reached").unwrap();
 }
 
+fn generate_constant(file: &mut File, constant: &Constant) {
+	let Constant::Constant(name, constant) = constant;
+	writeln!(file, "    {} equ {}", name, constant).unwrap();
+}
+
 /// Generates the assembly code for the given AST
 pub fn generate(ast: &Ast, out_path: &str) {
     let path = path::Path::new(out_path);
@@ -483,7 +505,7 @@ pub fn generate(ast: &Ast, out_path: &str) {
 
     // Post-order traversal of the AST to generate x86_64 (+nasm pseudo-instructions)
 
-    let Program::Program(function_vector) = &ast.program;
+    let Program::Program(function_vector, const_vector) = &ast.program;
     writeln!(file, "[BITS 64]").unwrap();
     writeln!(file, "section .text").unwrap();
     writeln!(file, "").unwrap();
@@ -494,8 +516,19 @@ pub fn generate(ast: &Ast, out_path: &str) {
     writeln!(file, "    mov rax, 60").unwrap(); // Exit syscall
     writeln!(file, "    syscall").unwrap();
 
+	let mut context = Context::new();
+
+	for constant in const_vector.iter() {
+		generate_constant(&mut file, constant);
+		let Constant::Constant(name, _) = constant;
+		if let Some(_) = context.var_map.get(name) {
+			panic!("Variable {} already declared as a constant. Constants cannot be declared twice", name);
+		}
+		context.constants.insert(name.clone());
+	}
+
     for function in function_vector.iter() {
-        generate_function(&mut file, function);
+        generate_function(&mut file, function, &context);
     }
 
     writeln!(file, "").unwrap();
