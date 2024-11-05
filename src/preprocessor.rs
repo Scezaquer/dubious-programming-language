@@ -1,21 +1,41 @@
 use std::collections::HashMap;
 use regex::Regex;
 
-/// This module is responsible for preprocessing the input file
-/// Preprocessor directives are as follows:
-/// - #include <file>
-/// - #define <identifier> <replacement>
-/// - #ifdef <identifier>
-/// - #ifndef <identifier>
-/// - #endif
-/// - #error <message>
-/// - #warning <message>
-/// - #line <number> <file>
-/// - #print <message>
-/// - #undef <identifier>
-/// - #if <expression>
-/// - #elif <expression>
-/// - #else
+/// This module is responsible for preprocessing the input file.
+/// 
+/// # Preprocessor directives
+/// 
+/// ## `#include <file>`
+/// Includes the contents of another file at the current position.
+/// 
+/// ## `#define <identifier> <replacement>`
+/// Defines a macro that will be replaced throughout the code.
+/// Issues a warning if the identifier is already defined.
+/// 
+/// ## `#undef <identifier>`
+/// Removes a previously defined macro.
+/// Issues a warning if the identifier isn't defined.
+/// 
+/// ## `#ifdef <identifier>`
+/// Conditionally includes code if the identifier is defined.
+/// Can be paired with `#else` and must end with `#endif`.
+/// 
+/// ## `#ifndef <identifier>`
+/// Conditionally includes code if the identifier is not defined.
+/// Can be paired with `#else` and must end with `#endif`.
+/// 
+/// ## `#else`
+/// Alternative branch for `#ifdef` or `#ifndef`.
+/// Must be terminated with `#endif`.
+/// 
+/// ## `#endif`
+/// Terminates a conditional block started by `#ifdef` or `#ifndef`.
+/// 
+/// ## `#error <message>`
+/// Stops compilation and displays an error message.
+/// 
+/// ## `#print <message>`
+/// Displays a message during compilation.
 pub fn preprocessor(file: &str, filename: &str) -> String {
 	let mut defined_expressions:HashMap<String, String> = HashMap::new();
 
