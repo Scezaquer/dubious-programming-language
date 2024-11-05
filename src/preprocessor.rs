@@ -81,7 +81,6 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 					// Construct the full path by joining the current directory and included file
 					let full_path = current_dir.join(file);
 					
-					dbg!(&full_path);
 					// Read the file
 					let included_file = match std::fs::read_to_string(&full_path) {
 						Ok(file) => file,

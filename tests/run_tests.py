@@ -72,4 +72,4 @@ if __name__ == '__main__':
 
     missing_test_warning(tests)
 
-    print('All tests passed')
+    print(f'All {len(tests)} tests passed')

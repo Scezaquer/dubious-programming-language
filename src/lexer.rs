@@ -1,4 +1,5 @@
 use regex::Regex;
+use std::i64;
 
 /// All the operators that the lexer can recognize.
 ///
@@ -63,6 +64,8 @@ pub enum Token {
     PrimitiveType(String),
     FloatLiteral(f64),
     IntLiteral(i64),
+	BinLiteral(i64),
+	HexLiteral(i64),
     Operator(Operator),
     LParen,
     RParen,
@@ -126,6 +129,12 @@ pub fn lex(file: &str) -> Vec<Token> {
     // Integers are a sequence of digits
     let int_re = Regex::new(r"^\d+").unwrap();
 
+	// Binary literals are a sequence of 0s and 1s, prefixed by 0b
+	let bin_re = Regex::new(r"^0b[01]+").unwrap();
+
+	// Hex literals are a sequence of 0-9 and a-f/A-F, prefixed by 0x
+	let hex_re = Regex::new(r"^0x[0-9a-fA-F]+").unwrap();
+
     // (Short) operators are any of the following characters: + - * / % ^ & | ~ < > = ! . ,
     let operator_re = Regex::new(r"^[\+\-\*/%\^&~\|<>=!\.,]").unwrap();
 
@@ -177,7 +186,13 @@ pub fn lex(file: &str) -> Vec<Token> {
         } else if let Some(caps) = primitive_type_re.captures(rest) {
             tokens.push(Token::PrimitiveType(caps.get(0).unwrap().as_str().to_string()));
             pos += caps.get(0).unwrap().end();
-        } else if let Some(caps) = float_re.captures(rest) {
+        } else if let Some(caps) = bin_re.captures(rest) {
+			tokens.push(Token::BinLiteral(i64::from_str_radix(caps.get(0).unwrap().as_str().strip_prefix("0b").unwrap(), 2).unwrap()));
+			pos += caps.get(0).unwrap().end();
+		} else if let Some(caps) = hex_re.captures(rest) {
+			tokens.push(Token::HexLiteral(i64::from_str_radix(caps.get(0).unwrap().as_str().strip_prefix("0x").unwrap(), 16).unwrap()));
+			pos += caps.get(0).unwrap().end();
+		} else if let Some(caps) = float_re.captures(rest) {
             tokens.push(Token::FloatLiteral(caps.get(0).unwrap().as_str().parse().unwrap()));
             pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = int_re.captures(rest) {

@@ -26,17 +26,19 @@ pub enum Literal {
     Int(i64),
     Float(f64),
     Bool(bool),
+    Hex(i64),
+    Binary(i64),
 }
 
 /// Represents an atom in the AST.
-/// 
+///
 /// An atom is the smallest unit of an expression. It can be a constant, an expression, a variable, or a function call* (*unimplemented).
 #[derive(Debug)]
 pub enum Atom {
     Literal(Literal),
     Expression(Box<Expression>),
     Variable(String),
-	FunctionCall(String, Vec<Expression>),
+    FunctionCall(String, Vec<Expression>),
 }
 
 /// Represents a unary operator in the AST.
@@ -99,10 +101,10 @@ pub enum AssignmentOp {
 }
 
 /// Represents an operator precedence level in the AST.
-/// 
+///
 /// A precedence level is a group of operators that have the same precedence.
 /// Precedence levels are used to determine the order of operations in an expression.
-/// 
+///
 /// # Precedence levels
 /// 1. Member access (.)
 /// 2. Pre increment (++a) Pre decrement (--a) Unary plus (+a) Unary minus (-a) Logical not (!a) Bitwise not (~a) Dereference (*a) Address of (&a)
@@ -127,7 +129,7 @@ pub struct PrecedenceLevel {
 }
 
 /// Represents an expression in the AST.
-/// 
+///
 /// An expression is a combination of atoms and operators that evaluates to a value.
 /// Expressions can be atoms, unary operations, binary operations, or assignments.
 #[derive(Debug)]
@@ -209,7 +211,7 @@ fn get_un_operator_from_token(token: &Token) -> UnOp {
 }
 
 /// Represents a statement in the AST.
-/// 
+///
 /// A statement is a single instruction in the program.
 /// Statements can be assignments, let bindings, if statements, while loops, loops, do-while loops, for loops, return statements, expressions, compound statements, break statements, or continue statements.
 #[derive(Debug)]
@@ -239,7 +241,7 @@ pub enum Function {
 /// so they're not terribly useful as of now. They're basically static globals.
 #[derive(Debug)]
 pub enum Constant {
-	Constant(String, Literal),
+    Constant(String, Literal),
 }
 
 /// Represents a program in the AST.
@@ -260,6 +262,8 @@ impl std::fmt::Display for Literal {
             Literal::Int(i) => write!(f, "{}", i),
             Literal::Float(fl) => write!(f, "{}", fl),
             Literal::Bool(b) => write!(f, "{}", b),
+            Literal::Hex(h) => write!(f, "0x{:x}", h),
+            Literal::Binary(b) => write!(f, "0b{:b}", b),
         }
     }
 }
@@ -269,6 +273,8 @@ fn parse_literal(token: &Token) -> Literal {
     match token {
         Token::IntLiteral(i) => Literal::Int(*i),
         Token::FloatLiteral(f) => Literal::Float(*f),
+        Token::HexLiteral(h) => Literal::Hex(*h),
+        Token::BinLiteral(b) => Literal::Binary(*b),
         Token::Keyword(k) => {
             if k == "true" {
                 Literal::Bool(true)
@@ -297,30 +303,34 @@ fn parse_atom(mut tokens: &mut Iter<Token>) -> Atom {
                 panic!("Expected closing parenthesis, found: {:?}", tok);
             }
         }
-        Token::IntLiteral(_) | Token::FloatLiteral(_) | Token::Keyword(_) => {
+        Token::IntLiteral(_)
+        | Token::FloatLiteral(_)
+        | Token::BinLiteral(_)
+        | Token::HexLiteral(_)
+        | Token::Keyword(_) => {
             return Atom::Literal(parse_literal(tok));
         }
         Token::Identifier(s) => {
-			let next_tok = tokens.clone().next().unwrap();
-			if let Token::LParen = next_tok {
-				// Function call
-				tokens.next();
-				let mut args = Vec::new();
-				loop {
-					let next_tok = tokens.clone().next().unwrap();
-					if let Token::RParen = next_tok {
-						tokens.next();
-						break;
-					} else if let Token::Comma = next_tok {
-						tokens.next();
-					} else {
-						args.push(parse_expression(&mut tokens));
-					}
-				}
-				return Atom::FunctionCall(s.to_string(), args);
-			}
+            let next_tok = tokens.clone().next().unwrap();
+            if let Token::LParen = next_tok {
+                // Function call
+                tokens.next();
+                let mut args = Vec::new();
+                loop {
+                    let next_tok = tokens.clone().next().unwrap();
+                    if let Token::RParen = next_tok {
+                        tokens.next();
+                        break;
+                    } else if let Token::Comma = next_tok {
+                        tokens.next();
+                    } else {
+                        args.push(parse_expression(&mut tokens));
+                    }
+                }
+                return Atom::FunctionCall(s.to_string(), args);
+            }
 
-			// Variable
+            // Variable
             return Atom::Variable(s.to_string());
         }
         _ => panic!("Invalid atom token: {:?}", tok),
@@ -401,11 +411,11 @@ fn parse_expression_with_precedence(
 }
 
 /// Builds the precedence table for the parser.
-/// 
+///
 /// The precedence table is used to determine the order of operations in an expression.
 /// It is a list of precedence levels, where each level contains a list of binary operators, unary operators, and assignment operators.
 /// The levels are ordered from highest to lowest precedence.
-/// 
+///
 /// # Precedence levels
 /// 1. Member access (.)
 /// 2. Pre increment (++a) Pre decrement (--a) Unary plus (+a) Unary minus (-a) Logical not (!a) Bitwise not (~a) Dereference (*a) Address of (&a)
@@ -529,10 +539,10 @@ fn build_precedence_table() -> Vec<PrecedenceLevel> {
 }
 
 /// Parses an expression from a list of tokens.
-/// 
+///
 /// This function is a wrapper around parse_expression_with_precedence that uses the highest precedence level.
 /// It is used to parse the top-level expression.
-/// 
+///
 /// An expression is a combination of atoms and operators that evaluates to a value.
 fn parse_expression(mut tokens: &mut Iter<Token>) -> Expression {
     let precedence_table = build_precedence_table();
@@ -542,7 +552,7 @@ fn parse_expression(mut tokens: &mut Iter<Token>) -> Expression {
 }
 
 /// Parses a statement from a list of tokens.
-/// 
+///
 /// A statement is a single instruction in the program.
 /// Statements can be assignments, let bindings, if statements, while loops, loops, do-while loops, for loops, return statements, expressions, compound statements, break statements, or continue statements.
 fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
@@ -705,9 +715,9 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
                 | Token::Operator(Operator::BitwiseAndAssign)
                 | Token::Operator(Operator::BitwiseXorAssign)
                 | Token::Operator(Operator::BitwiseOrAssign) => {
-					let op = get_assign_operator_from_token(next_tok);
-					let exp = parse_expression(tokens);
-					statement = Statement::Assignment(id.to_string(), exp, op);
+                    let op = get_assign_operator_from_token(next_tok);
+                    let exp = parse_expression(tokens);
+                    statement = Statement::Assignment(id.to_string(), exp, op);
                 }
                 _ => {
                     panic!("Expected assignment operator, found: {:?}", next_tok);
@@ -758,45 +768,45 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
 }
 
 fn parse_const(tokens: &mut Iter<Token>) -> Constant {
-	// const id: type = exp;
+    // const id: type = exp;
 
-	let next_tok = tokens.next().unwrap();
+    let next_tok = tokens.next().unwrap();
 
-	if &Token::Keyword("const".to_string()) != next_tok {
-		panic!("Expected const keyword, found: {:?}", next_tok);
-	}
+    if &Token::Keyword("const".to_string()) != next_tok {
+        panic!("Expected const keyword, found: {:?}", next_tok);
+    }
 
-	let next_tok = tokens.next().unwrap();
-	let id = match next_tok {
-		Token::Identifier(id) => id.clone(),
-		_ => panic!("Expected identifier, found: {:?}", next_tok),
-	};
+    let next_tok = tokens.next().unwrap();
+    let id = match next_tok {
+        Token::Identifier(id) => id.clone(),
+        _ => panic!("Expected identifier, found: {:?}", next_tok),
+    };
 
-	let next_tok = tokens.next().unwrap();
-	if &Token::Colon != next_tok {
-		panic!("Expected colon, found: {:?}", next_tok);
-	};
+    let next_tok = tokens.next().unwrap();
+    if &Token::Colon != next_tok {
+        panic!("Expected colon, found: {:?}", next_tok);
+    };
 
-	let _ = tokens.next().unwrap(); // Skip type for now. // TODO: Implement types
+    let _ = tokens.next().unwrap(); // Skip type for now. // TODO: Implement types
 
-	let lit;
-	let next_tok = tokens.clone().next().unwrap();
-	if let Token::Operator(Operator::Assign) = next_tok {
-		tokens.next();
-		lit = parse_literal(tokens.next().unwrap());
-	} else {
-		panic!(
-			"Expected assignment operator, found: {:?} (constants must be assigned on declaration)",
-			next_tok
-		);
-	}
+    let lit;
+    let next_tok = tokens.clone().next().unwrap();
+    if let Token::Operator(Operator::Assign) = next_tok {
+        tokens.next();
+        lit = parse_literal(tokens.next().unwrap());
+    } else {
+        panic!(
+            "Expected assignment operator, found: {:?} (constants must be assigned on declaration)",
+            next_tok
+        );
+    }
 
-	let next_tok = tokens.next().unwrap();
-	if &Token::Semicolon != next_tok {
-		panic!("Expected semicolon, found: {:?}", next_tok);
-	}
+    let next_tok = tokens.next().unwrap();
+    if &Token::Semicolon != next_tok {
+        panic!("Expected semicolon, found: {:?}", next_tok);
+    }
 
-	return Constant::Constant(id.to_string(), lit);
+    return Constant::Constant(id.to_string(), lit);
 }
 
 /// Parses a function from a list of tokens.
@@ -831,17 +841,17 @@ fn parse_function(mut tokens: &mut Iter<Token>) -> Function {
         if let Token::RParen = tok {
             break;
         } else if let Token::Comma = tok {
-			continue;
-		} else if let Token::Identifier(id) = tok {
+            continue;
+        } else if let Token::Identifier(id) = tok {
             params.push(id.clone());
-			let tok = tokens.next().unwrap();
-			if !matches!(tok, Token::Colon) {
-				panic!("Expected colon, found: {:?}", tok);
-			}
-			let tok = tokens.next().unwrap();
-			if !matches!(tok, Token::PrimitiveType(_)) {
-				panic!("Expected type identifier, found: {:?}", tok);
-			}
+            let tok = tokens.next().unwrap();
+            if !matches!(tok, Token::Colon) {
+                panic!("Expected colon, found: {:?}", tok);
+            }
+            let tok = tokens.next().unwrap();
+            if !matches!(tok, Token::PrimitiveType(_)) {
+                panic!("Expected type identifier, found: {:?}", tok);
+            }
         } else {
             panic!(
                 "Expected identifier or closing parenthesis, found: {:?}",
@@ -864,23 +874,26 @@ fn parse_function(mut tokens: &mut Iter<Token>) -> Function {
 
 /// Parses an abstract syntax tree (AST) from a list of tokens.
 pub fn parse(tokens: &Vec<Token>) -> Ast {
-	let mut tokens = tokens.iter();
-	let mut functions = Vec::new();
-	let mut constants = Vec::new();
+    let mut tokens = tokens.iter();
+    let mut functions = Vec::new();
+    let mut constants = Vec::new();
 
-	// Parse functions until there are no more tokens
-	loop {
-		let next_tok = tokens.clone().next().unwrap();
-		match next_tok {
-			&Token::EOF => break,
-			&Token::Keyword(ref k) if k == "fn" => functions.push(parse_function(&mut tokens)),
-			&Token::Keyword(ref k) if k == "const" => constants.push(parse_const(&mut tokens)),
-			_ => panic!("Expected function or constant declaration, found: {:?}", next_tok),
-		}
-	}
+    // Parse functions until there are no more tokens
+    loop {
+        let next_tok = tokens.clone().next().unwrap();
+        match next_tok {
+            &Token::EOF => break,
+            &Token::Keyword(ref k) if k == "fn" => functions.push(parse_function(&mut tokens)),
+            &Token::Keyword(ref k) if k == "const" => constants.push(parse_const(&mut tokens)),
+            _ => panic!(
+                "Expected function or constant declaration, found: {:?}",
+                next_tok
+            ),
+        }
+    }
 
-	let ast = Ast {
-		program: Program::Program(functions, constants),
-	};
+    let ast = Ast {
+        program: Program::Program(functions, constants),
+    };
     return ast;
 }

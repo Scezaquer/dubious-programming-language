@@ -112,6 +112,20 @@
 		"output": 0
 	},
 	{
+		"name": "hex_literal",
+		"description": "Hexadecimal literal",
+		"filename": "basic_arithmetic/hex_literal.dpl",
+		"input": [],
+		"output": 175
+	},
+	{
+		"name": "bin_literal",
+		"description": "Binary literal",
+		"filename": "basic_arithmetic/bin_literal.dpl",
+		"input": [],
+		"output": 5
+	},
+	{
         "name": "assign2",
         "description": "Creates variable a and assigns 2 to it",
         "filename": "variables/assign2.dpl",
