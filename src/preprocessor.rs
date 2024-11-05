@@ -61,6 +61,7 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 					// Construct the full path by joining the current directory and included file
 					let full_path = current_dir.join(file);
 					
+					dbg!(&full_path);
 					// Read the file
 					let included_file = match std::fs::read_to_string(&full_path) {
 						Ok(file) => file,
@@ -68,7 +69,7 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 					};
 
 					// Preprocess the included file
-					let included_file = preprocessor(&included_file, file);
+					let included_file = preprocessor(&included_file, full_path.to_str().unwrap());
 					processed_file.push_str(&included_file);
 				},
 				"define" => {

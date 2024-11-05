@@ -44,7 +44,7 @@ fn generate_atom(file: &mut File, atom: &Atom, var_map: &HashMap<String, i64>, c
 			writeln!(file, "    call {}", name).unwrap();
 			writeln!(file, "    add rsp, {}	;pop arguments", args.len() * 8).unwrap();	// Pop arguments from stack
 		}
-        _ => unimplemented!(),
+        //_ => unimplemented!(),
     }
 }
 
@@ -452,7 +452,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                         panic!("Continue statement outside of loop");
                     }
                 }
-                _ => unimplemented!(),
+                //_ => unimplemented!(),
             }
         }
     } else {
