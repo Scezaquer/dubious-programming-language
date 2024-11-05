@@ -2,17 +2,12 @@
 
 Based on https://norasandler.com/2017/11/29/Write-a-Compiler.html
 
-- TODO: Finish all basic operators
-- TODO: %include
-- TODO: %define
-- TODO: Function calls
 - TODO: String literals
 - TODO: Structs and enums?
 - TODO: Checker
 - TODO: binary and hex literals
 - TODO: make generator write comments in asm file
 - TODO: register allocation
-- TODO: testing assignment operators
 - TODO: default function parameters ?
 - TODO: kwargs ?
 
