@@ -757,7 +757,7 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
     return statement;
 }
 
-fn parse_const(mut tokens: Iter<Token>) -> Constant {
+fn parse_const(tokens: &mut Iter<Token>) -> Constant {
 	// const id: type = exp;
 
 	let next_tok = tokens.next().unwrap();
@@ -874,7 +874,7 @@ pub fn parse(tokens: &Vec<Token>) -> Ast {
 		match next_tok {
 			&Token::EOF => break,
 			&Token::Keyword(ref k) if k == "fn" => functions.push(parse_function(&mut tokens)),
-			&Token::Keyword(ref k) if k == "const" => constants.push(parse_const(tokens.clone())),
+			&Token::Keyword(ref k) if k == "const" => constants.push(parse_const(&mut tokens)),
 			_ => panic!("Expected function or constant declaration, found: {:?}", next_tok),
 		}
 	}

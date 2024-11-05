@@ -217,6 +217,20 @@
 		"output": 1
 	},
 	{
+		"name": "const",
+		"description": "Test the const keyword",
+		"filename": "variables/const.dpl",
+		"input": [],
+		"output": 10
+	},
+	{
+		"name": "const_post_definition",
+		"description": "Test the const keyword after the constant is used",
+		"filename": "variables/const.dpl",
+		"input": [],
+		"output": 10
+	},
+	{
         "name": "else_if_chain",
         "description": "Chain of else ifs",
         "filename": "control_flow/else_if_chain.dpl",
