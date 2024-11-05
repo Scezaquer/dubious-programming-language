@@ -1,0 +1,10 @@
+#define test 2 + 3
+#ifndef test
+fn main() {
+	return 3;
+}
+#else
+fn main() {
+	return test;
+}
+#endif

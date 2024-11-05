@@ -226,9 +226,23 @@
 	{
 		"name": "const_post_definition",
 		"description": "Test the const keyword after the constant is used",
-		"filename": "variables/const.dpl",
+		"filename": "variables/const_post_definition.dpl",
 		"input": [],
 		"output": 10
+	},
+	{
+		"name": "multiple_constants",
+		"description": "Test multiple constants",
+		"filename": "variables/multiple_constants.dpl",
+		"input": [],
+		"output": 28
+	},
+	{
+		"name": "const_shadowing",
+		"description": "Test that redeclaring a local var on a smaller scope shadows the outer constant",
+		"filename": "variables/const_shadowing.dpl",
+		"input": [],
+		"output": 14
 	},
 	{
         "name": "else_if_chain",
@@ -348,5 +362,54 @@
 		"filename": "complicated_programs/fibonacci_iterative.dpl",
 		"input": [],
 		"output": 55
+	},
+	{
+		"name": "define",
+		"description": "Define a macro",
+		"filename": "preprocessor/define.dpl",
+		"input": [],
+		"output": 15
+	},
+	{
+		"name": "ifdef_else_false",
+		"description": "Ifdef with else, ifdef false",
+		"filename": "preprocessor/ifdef_else_false.dpl",
+		"input": [],
+		"output": 3
+	},
+	{
+		"name": "ifdef_else_true",
+		"description": "Ifdef with else, ifdef true",
+		"filename": "preprocessor/ifdef_else_true.dpl",
+		"input": [],
+		"output": 15
+	},
+	{
+		"name": "ifndef_else_false",
+		"description": "Ifndef with else, ifndef false",
+		"filename": "preprocessor/ifndef_else_false.dpl",
+		"input": [],
+		"output": 5
+	},
+	{
+		"name": "ifndef_else_true",
+		"description": "Ifndef with else, ifndef true",
+		"filename": "preprocessor/ifndef_else_true.dpl",
+		"input": [],
+		"output": 3
+	},
+	{
+		"name": "include",
+		"description": "Include a file",
+		"filename": "preprocessor/include.dpl",
+		"input": [],
+		"output": 4
+	},
+	{
+		"name": "undef",
+		"description": "Undefine a macro",
+		"filename": "preprocessor/undef.dpl",
+		"input": [],
+		"output": 15
 	}
 ]

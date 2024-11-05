@@ -1,0 +1,10 @@
+const a: int = 10;
+
+fn add_3(n: int){
+	let a: int = 3;
+	return n + a;
+}
+
+fn main() {
+	return a + add_3(1);
+}

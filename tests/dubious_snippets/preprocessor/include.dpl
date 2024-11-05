@@ -1,0 +1,5 @@
+#include <lib_add.dpl>
+
+fn main(){
+	return sub(add(1, 5), 2);
+}

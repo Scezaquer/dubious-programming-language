@@ -1,0 +1,8 @@
+#define test 15
+fn main() {
+	return test;
+}
+#undef test
+#ifdef test
+#error test shouldn't be defined anymore
+#endif

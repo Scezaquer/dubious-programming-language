@@ -1,0 +1,4 @@
+#define test 15
+fn main() {
+	return test;
+}

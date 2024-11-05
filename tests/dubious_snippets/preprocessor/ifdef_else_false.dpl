@@ -1,0 +1,9 @@
+#ifdef test
+fn main() {
+	return test;
+}
+#else
+fn main() {
+	return 3;
+}
+#endif

@@ -1,10 +1,10 @@
 #define test 15
-
-#ifndef test
-#print hmm yes
+#ifdef test
 fn main() {
 	return test;
 }
 #else
-#print hellow
+fn main() {
+	return 3;
+}
 #endif
