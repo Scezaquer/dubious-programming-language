@@ -126,6 +126,13 @@
 		"output": 5
 	},
 	{
+		"name": "bool_literal",
+		"description": "Boolean literal",
+		"filename": "basic_arithmetic/bool_literal.dpl",
+		"input": [],
+		"output": 1
+	},
+	{
         "name": "assign2",
         "description": "Creates variable a and assigns 2 to it",
         "filename": "variables/assign2.dpl",

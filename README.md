@@ -114,3 +114,5 @@ before they are declared. Constants may only be declared once, and must be initi
 they are declared. They are essentially just aliases for literals, so expressions cannot be assigned to them,
 only literals. If I implement expression pre-processing then maybe it'll become possible to have
 combinations of literals instead. Right now #define is more versatile.
+
+true/false booleans evaluate to 1 and 0 respectively.

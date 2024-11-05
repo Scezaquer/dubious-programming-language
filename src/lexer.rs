@@ -66,6 +66,7 @@ pub enum Token {
     IntLiteral(i64),
 	BinLiteral(i64),
 	HexLiteral(i64),
+	BoolLiteral(bool),
     Operator(Operator),
     LParen,
     RParen,
@@ -135,6 +136,8 @@ pub fn lex(file: &str) -> Vec<Token> {
 	// Hex literals are a sequence of 0-9 and a-f/A-F, prefixed by 0x
 	let hex_re = Regex::new(r"^0x[0-9a-fA-F]+").unwrap();
 
+	let bool_re = Regex::new(r"^(true|false)").unwrap();
+
     // (Short) operators are any of the following characters: + - * / % ^ & | ~ < > = ! . ,
     let operator_re = Regex::new(r"^[\+\-\*/%\^&~\|<>=!\.,]").unwrap();
 
@@ -198,7 +201,10 @@ pub fn lex(file: &str) -> Vec<Token> {
         } else if let Some(caps) = int_re.captures(rest) {
             tokens.push(Token::IntLiteral(caps.get(0).unwrap().as_str().parse().unwrap()));
             pos += caps.get(0).unwrap().end();
-        } else if let Some(caps) = large_operator_re.captures(rest) {
+        } else if let Some(caps) = bool_re.captures(rest) {
+			tokens.push(Token::BoolLiteral(caps.get(0).unwrap().as_str() == "true"));
+			pos += caps.get(0).unwrap().end();
+		} else if let Some(caps) = large_operator_re.captures(rest) {
             let op = match caps.get(0).unwrap().as_str() {
                 "==" => Operator::Equal,
                 "!=" => Operator::NotEqual,

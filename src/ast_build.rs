@@ -261,7 +261,7 @@ impl std::fmt::Display for Literal {
         match self {
             Literal::Int(i) => write!(f, "{}", i),
             Literal::Float(fl) => write!(f, "{}", fl),
-            Literal::Bool(b) => write!(f, "{}", b),
+            Literal::Bool(b) => if *b { write!(f, "1") } else { write!(f, "0") },
             Literal::Hex(h) => write!(f, "0x{:x}", h),
             Literal::Binary(b) => write!(f, "0b{:b}", b),
         }
@@ -275,16 +275,7 @@ fn parse_literal(token: &Token) -> Literal {
         Token::FloatLiteral(f) => Literal::Float(*f),
         Token::HexLiteral(h) => Literal::Hex(*h),
         Token::BinLiteral(b) => Literal::Binary(*b),
-        Token::Keyword(k) => {
-            if k == "true" {
-                Literal::Bool(true)
-            } else if k == "false" {
-                Literal::Bool(false)
-            } else {
-                // May be unnecessary if lexer is correct
-                panic!("Invalid constant keyword token: {:?}", token)
-            }
-        }
+        Token::BoolLiteral(b) => Literal::Bool(*b),
         _ => panic!("Invalid constant token: {:?}", token),
     }
 }
@@ -307,7 +298,7 @@ fn parse_atom(mut tokens: &mut Iter<Token>) -> Atom {
         | Token::FloatLiteral(_)
         | Token::BinLiteral(_)
         | Token::HexLiteral(_)
-        | Token::Keyword(_) => {
+        | Token::BoolLiteral(_) => {
             return Atom::Literal(parse_literal(tok));
         }
         Token::Identifier(s) => {

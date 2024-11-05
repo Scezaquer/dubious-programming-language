@@ -1,0 +1,5 @@
+fn main() {
+	if false return 0;
+	else if true return 1;
+	return 2;
+}
