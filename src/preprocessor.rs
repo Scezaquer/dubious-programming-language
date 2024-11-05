@@ -54,10 +54,17 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 						panic!("{} Line {}: Invalid #include file", filename, line);
 					}
 
+					// Get the directory of the current file
+					let current_dir = std::path::Path::new(filename).parent()
+						.unwrap_or(std::path::Path::new("."));
+					
+					// Construct the full path by joining the current directory and included file
+					let full_path = current_dir.join(file);
+					
 					// Read the file
-					let included_file = match std::fs::read_to_string(file){
+					let included_file = match std::fs::read_to_string(&full_path) {
 						Ok(file) => file,
-						Err(_) => panic!("{} Line {}: File not found: {}", filename, line, file)
+						Err(_) => panic!("{} Line {}: File not found: {}", filename, line, full_path.display())
 					};
 
 					// Preprocess the included file
