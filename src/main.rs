@@ -1,3 +1,5 @@
+/// The preprocessor: Handles preprocessor directives and removes comments.
+mod preprocessor;
 /// Lexer (tokenizer): Turns the input text file into a list of tokens.
 mod lexer;
 /// Parser: Turns the list of tokens into an abstract syntax tree (AST).
@@ -6,6 +8,7 @@ mod ast_pretty_print;
 /// Code generator: Turns the AST into x86_64 assembly code.
 mod code_generator;
 
+use preprocessor::preprocessor;
 use ast_build::parse;
 use code_generator::generate;
 use lexer::lex;
@@ -77,7 +80,9 @@ fn main() {
     let file = fs::read_to_string(&args.input_file).expect("Failed to read file");
     //let file = fs::read_to_string("return_2.dpl").expect("Failed to read file");
 
-    let tokens = lex(&file);
+	let preprocessed_file = preprocessor(&file, &args.input_file);
+
+    let tokens = lex(preprocessed_file.as_str());
 
     if args.tokens {
         dbg!(&tokens);

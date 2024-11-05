@@ -137,16 +137,17 @@ pub fn lex(file: &str) -> Vec<Token> {
 
     let whitespace_re = Regex::new(r"^\s+").unwrap();
 
-    let comments_re = Regex::new(r"^\/\/.*(?:\n|$)").unwrap();
-
-    let multiline_comments_re = Regex::new(r"^\/\*[\s\S]*?\*\/").unwrap();
+	let preprocessor_re = Regex::new(r"^\#(include|define|undef|ifdef|ifndef|if|elif|else|endif|error|print).*?(\n|$)").unwrap();
 
     let mut pos: usize= 0; // Current position in the file
 
     while pos < file.len() {
         let rest = &file[pos..];
-
-        if rest.starts_with("(") {
+		if let Some(caps) = preprocessor_re.captures(rest){
+			// Skip the preprocessor directive
+			pos += caps.get(0).unwrap().end();
+		}
+		else if rest.starts_with("(") {
             tokens.push(Token::LParen);
             pos += 1;
         } else if rest.starts_with(")") {
@@ -173,10 +174,6 @@ pub fn lex(file: &str) -> Vec<Token> {
         } else if rest.starts_with("]") {
             tokens.push(Token::RBracket);
             pos += 1;
-        } else if let Some(caps) = comments_re.captures(rest) {
-            pos += caps.get(0).unwrap().end();
-        } else if let Some(caps) = multiline_comments_re.captures(rest) {
-            pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = primitive_type_re.captures(rest) {
             tokens.push(Token::PrimitiveType(caps.get(0).unwrap().as_str().to_string()));
             pos += caps.get(0).unwrap().end();

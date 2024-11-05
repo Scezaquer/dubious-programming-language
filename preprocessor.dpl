@@ -1,0 +1,10 @@
+#define test 15
+
+#ifndef test
+#print hmm yes
+fn main() {
+	return test;
+}
+#else
+#print hellow
+#endif
