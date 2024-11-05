@@ -11,6 +11,11 @@ Based on https://norasandler.com/2017/11/29/Write-a-Compiler.html
 - TODO: default function parameters ?
 - TODO: kwargs ?
 - TODO: improve #include
+- TODO: pointers
+- TODO: stack arrays
+- TODO: heap memory stuff
+- TODO: std library
+- TODO: inline asm ?
 
 
 A simple compiler for the Dubious programming language (DPL).
@@ -108,4 +113,4 @@ Constants may be defined anywhere in the global scope and are valid everywhere i
 before they are declared. Constants may only be declared once, and must be initialized at the time
 they are declared. They are essentially just aliases for literals, so expressions cannot be assigned to them,
 only literals. If I implement expression pre-processing then maybe it'll become possible to have
-conbinations of literals instead.
+combinations of literals instead. Right now #define is more versatile.
