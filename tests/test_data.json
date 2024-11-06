@@ -432,5 +432,19 @@
 		"filename": "preprocessor/undef.dpl",
 		"input": [],
 		"output": 15
+	},
+	{
+		"name": "pointer",
+		"description": "Pointer",
+		"filename": "pointers/pointer.dpl",
+		"input": [],
+		"output": 5
+	},
+	{
+		"name": "triple_dereference",
+		"description": "Triple dereference",
+		"filename": "pointers/triple_dereference.dpl",
+		"input": [],
+		"output": 5
 	}
 ]

@@ -1,0 +1,4 @@
+fn main(){
+	let *a: *int = 5;
+	return *a;
+}
