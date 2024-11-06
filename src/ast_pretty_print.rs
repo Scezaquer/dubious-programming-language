@@ -1,5 +1,5 @@
 use crate::ast_build::{
-	AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Program, Statement, UnOp
+	AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Program, Statement, UnOp, AssignmentIdentifier
 };
 
 impl std::fmt::Display for Ast {
@@ -83,6 +83,15 @@ impl std::fmt::Display for Statement {
 	}
 }
 
+impl std::fmt::Display for AssignmentIdentifier {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			AssignmentIdentifier::Variable(var) => write!(f, "{}", var),
+			AssignmentIdentifier::Dereference(var) => write!(f, "*{}", var),
+		}
+	}
+}
+
 impl std::fmt::Display for Expression {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
@@ -135,7 +144,6 @@ impl std::fmt::Display for BinOp {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		let op_str = match self {
 			BinOp::MemberAccess => ".",
-			BinOp::Exponent => "**",
 			BinOp::Multiply => "*",
 			BinOp::Divide => "/",
 			BinOp::Modulus => "%",

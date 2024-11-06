@@ -20,7 +20,7 @@ use std::slice::Iter;
 // 14. Logical or (a || b)
 // 15. Assignment (a = b) Add assignment (a += b) Subtract assignment (a -= b) Multiply assignment (a *= b) Divide assignment (a /= b) Modulus assignment (a %= b) Left shift assignment (a <<= b) Right shift assignment (a >>= b) Bitwise and assignment (a &= b) Bitwise xor assignment (a ^= b) Bitwise or assignment (a |= b)
 
-/// Represents a constant value in the AST.
+/// Represents a literal value in the AST.
 #[derive(Debug)]
 pub enum Literal {
     Int(i64),
@@ -39,6 +39,23 @@ pub enum Atom {
     Expression(Box<Expression>),
     Variable(String),
     FunctionCall(String, Vec<Expression>),
+}
+
+#[derive(Debug)]
+pub enum AssignmentIdentifier {
+	Variable(String),
+	Dereference(Box<AssignmentIdentifier>),
+}
+
+#[derive(Debug)]
+pub enum Type {
+	Int,
+	Float,
+	Bool,
+	Void,
+	Pointer(Box<Type>),
+	Array(Box<Type>, i64),
+	Function(Box<Type>, Vec<Type>),
 }
 
 /// Represents a unary operator in the AST.
@@ -60,7 +77,6 @@ pub enum UnOp {
 #[derive(Debug, PartialEq)]
 pub enum BinOp {
     MemberAccess,
-    Exponent,
     Multiply,
     Divide,
     Modulus,
@@ -108,19 +124,18 @@ pub enum AssignmentOp {
 /// # Precedence levels
 /// 1. Member access (.)
 /// 2. Pre increment (++a) Pre decrement (--a) Unary plus (+a) Unary minus (-a) Logical not (!a) Bitwise not (~a) Dereference (*a) Address of (&a)
-/// 3. Exponentiation (a ** b)
-/// 4. Multiplication (a * b) Division (a / b) Modulus (a % b)
-/// 5. Addition (a + b) Subtraction (a - b)
-/// 6. Bitwise left shift (a << b) Bitwise right shift (a >> b)
-/// 7. Less than (a < b) Greater than (a > b) Less than or equal to (a <= b) Greater than or equal to (a >= b)
-/// 8. Equal to (a == b) Not equal to (a != b)
-/// 9. Bitwise and (a & b)
-/// 10. Bitwise xor (a ^ b)
-/// 11. Bitwise or (a | b)
-/// 12. Logical and (a && b)
-/// 13. Logical xor (a ^^ b)
-/// 14. Logical or (a || b)
-/// 15. Assignment (a = b) Add assignment (a += b) Subtract assignment (a -= b) Multiply assignment (a *= b) Divide assignment (a /= b) Modulus assignment (a %= b) Left shift assignment (a <<= b) Right shift assignment (a >>= b) Bitwise and assignment (a &= b) Bitwise xor assignment (a ^= b) Bitwise or assignment (a |= b)
+/// 3. Multiplication (a * b) Division (a / b) Modulus (a % b)
+/// 4. Addition (a + b) Subtraction (a - b)
+/// 5. Bitwise left shift (a << b) Bitwise right shift (a >> b)
+/// 6. Less than (a < b) Greater than (a > b) Less than or equal to (a <= b) Greater than or equal to (a >= b)
+/// 7. Equal to (a == b) Not equal to (a != b)
+/// 8. Bitwise and (a & b)
+/// 9. Bitwise xor (a ^ b)
+/// 10. Bitwise or (a | b)
+/// 11. Logical and (a && b)
+/// 12. Logical xor (a ^^ b)
+/// 13. Logical or (a || b)
+/// 14. Assignment (a = b) Add assignment (a += b) Subtract assignment (a -= b) Multiply assignment (a *= b) Divide assignment (a /= b) Modulus assignment (a %= b) Left shift assignment (a <<= b) Right shift assignment (a >>= b) Bitwise and assignment (a &= b) Bitwise xor assignment (a ^= b) Bitwise or assignment (a |= b)
 #[derive(Debug)]
 pub struct PrecedenceLevel {
     binary_ops: Vec<BinOp>,
@@ -137,7 +152,7 @@ pub enum Expression {
     Atom(Atom),
     UnaryOp(Box<Expression>, UnOp),
     BinaryOp(Box<Expression>, Box<Expression>, BinOp),
-    Assignment(String, Box<Expression>, AssignmentOp),
+    Assignment(AssignmentIdentifier, Box<Expression>, AssignmentOp),
 }
 
 /// Gets the binary operator corresponding to the token.
@@ -145,7 +160,6 @@ fn get_bin_operator_from_token(token: &Token) -> BinOp {
     match token {
         Token::Operator(op) => match op {
             Operator::MemberAccess => BinOp::MemberAccess,
-            Operator::Exponent => BinOp::Exponent,
             Operator::Multiply => BinOp::Multiply,
             Operator::Divide => BinOp::Divide,
             Operator::Modulus => BinOp::Modulus,
@@ -217,7 +231,7 @@ fn get_un_operator_from_token(token: &Token) -> UnOp {
 #[derive(Debug)]
 pub enum Statement {
     Assignment(String, Expression, AssignmentOp),
-    Let(String, Option<Expression>),
+    Let(AssignmentIdentifier, Option<Expression>),
     If(Expression, Box<Statement>, Option<Box<Statement>>),
     While(Expression, Box<Statement>),
     Loop(Box<Statement>),
@@ -328,6 +342,20 @@ fn parse_atom(mut tokens: &mut Iter<Token>) -> Atom {
     }
 }
 
+fn parse_assignment_identifier(mut tokens: &mut Iter<Token>) -> AssignmentIdentifier {
+	let tok = tokens.next().unwrap();
+
+	match tok {
+		Token::Operator(Operator::Multiply) => {
+			return AssignmentIdentifier::Dereference(Box::new(parse_assignment_identifier(&mut tokens)));
+		}
+		Token::Identifier(s) => {
+			return AssignmentIdentifier::Variable(s.to_string());
+		}
+		_ => panic!("Invalid assignment identifier token: {:?}", tok),
+	}
+}
+
 /// Recursively parses an expression, taking into account operator precedence.
 fn parse_expression_with_precedence(
     mut tokens: &mut Iter<Token>,
@@ -342,6 +370,13 @@ fn parse_expression_with_precedence(
     // Check if the current token is a unary operator for this precedence level
     let mut next = tokens.clone().next().unwrap();
     let mut expr;
+
+	// In case we are actually in an assignment expression the left hand side
+	// has some special rules, so it is parsed separately in parse_assignment_identifier.
+	// We start by assuming we are not in an assignment expression, and if it turns out
+	// we are, we will change the expr variable to an Assignment expression.
+	// In the meantime we keep a copy of the tokens iterator to be able to backtrack
+	let mut next_if_assignment = tokens.clone();
 
     if precedence_table[precedence_level]
         .unary_ops
@@ -379,14 +414,9 @@ fn parse_expression_with_precedence(
                 precedence_table,
             ); // Parse next term
 
-            if let Expression::Atom(Atom::Variable(var)) = expr {
-                expr = Expression::Assignment(var, Box::new(next_term), op);
-            } else {
-                panic!(
-                    "Invalid assignment target (can only assign to variables): {:?}",
-                    expr
-                );
-            }
+			// Re-parse the left hand side of the assignment expression
+			let assignment_identifier = parse_assignment_identifier(&mut next_if_assignment);
+			expr = Expression::Assignment(assignment_identifier, Box::new(next_term), op);
         } else {
             let next_term = parse_expression_with_precedence(
                 &mut tokens,
@@ -442,11 +472,6 @@ fn build_precedence_table() -> Vec<PrecedenceLevel> {
                 UnOp::Dereference,
                 UnOp::AddressOf,
             ],
-            assignment_ops: vec![],
-        },
-        PrecedenceLevel {
-            binary_ops: vec![BinOp::Exponent],
-            unary_ops: vec![],
             assignment_ops: vec![],
         },
         PrecedenceLevel {
@@ -529,6 +554,60 @@ fn build_precedence_table() -> Vec<PrecedenceLevel> {
     ]
 }
 
+fn parse_type(mut tokens: &mut Iter<Token>) -> Type {
+	let tok = tokens.next().unwrap();
+
+	match tok {
+		Token::PrimitiveType(k) => {
+			if k == "int" {
+				return Type::Int;
+			} else if k == "float" {
+				return Type::Float;
+			} else if k == "bool" {
+				return Type::Bool;
+			} else if k == "void" {
+				return Type::Void;
+			} else {
+				panic!("Invalid type keyword: {:?}", k);
+			}
+		}
+		Token::Operator(Operator::Multiply) => {
+			let inner_type = parse_type(&mut tokens);
+			return Type::Pointer(Box::new(inner_type));
+		}
+		Token::LBracket => {
+			let inner_type = parse_type(&mut tokens);
+			let size = match tokens.next().unwrap() {
+				Token::IntLiteral(i) => i,
+				_ => panic!("Expected integer literal for array size"),
+			};
+			let next_tok = tokens.next().unwrap();
+			if let Token::RBracket = next_tok {
+				return Type::Array(Box::new(inner_type), *size);
+			} else {
+				panic!("Expected closing bracket, found: {:?}", next_tok);
+			}
+		}
+		Token::LParen => {
+			let return_type = parse_type(&mut tokens);
+			let mut params = Vec::new();
+			loop {
+				let next_tok = tokens.clone().next().unwrap();
+				if let Token::RParen = next_tok {
+					tokens.next();
+					break;
+				} else if let Token::Comma = next_tok {
+					tokens.next();
+				} else {
+					params.push(parse_type(&mut tokens));
+				}
+			}
+			return Type::Function(Box::new(return_type), params);
+		}
+		_ => panic!("Invalid type token: {:?}", tok),
+	}
+}
+
 /// Parses an expression from a list of tokens.
 ///
 /// This function is a wrapper around parse_expression_with_precedence that uses the highest precedence level.
@@ -559,26 +638,22 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
             } else if k == "let" {
                 // let id: type = exp;
 
-                let next_tok = tokens.next().unwrap();
-                let id = match next_tok {
-                    Token::Identifier(id) => id.clone(),
-                    _ => panic!("Expected identifier, found: {:?}", next_tok),
-                };
+                let id = parse_assignment_identifier(tokens);
 
                 let next_tok = tokens.next().unwrap();
                 if &Token::Colon != next_tok {
                     panic!("Expected colon, found: {:?}", next_tok);
                 };
 
-                let _ = tokens.next().unwrap(); // Skip type for now. // TODO: Implement types
+				let _var_type = parse_type(tokens); // TODO: Do something with this
 
                 let next_tok = tokens.clone().next().unwrap();
                 if let Token::Operator(Operator::Assign) = next_tok {
                     tokens.next();
                     let exp = parse_expression(tokens);
-                    statement = Statement::Let(id.to_string(), Some(exp));
+                    statement = Statement::Let(id, Some(exp));
                 } else if let Token::Semicolon = next_tok {
-                    statement = Statement::Let(id.to_string(), None);
+                    statement = Statement::Let(id, None);
                 } else {
                     panic!(
                         "Expected semicolon or assignment operator, found: {:?}",
@@ -778,7 +853,7 @@ fn parse_const(tokens: &mut Iter<Token>) -> Constant {
         panic!("Expected colon, found: {:?}", next_tok);
     };
 
-    let _ = tokens.next().unwrap(); // Skip type for now. // TODO: Implement types
+	let _var_type = parse_type(tokens);	// TODO: Do something with this
 
     let lit;
     let next_tok = tokens.clone().next().unwrap();

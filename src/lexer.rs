@@ -16,7 +16,6 @@ pub enum Operator {
     Multiply,           // *
     Divide,             // /
     Modulus,            // %
-    Exponent,           // **
     BitwiseAnd,         // &
     BitwiseOr,          // |
     BitwiseXor,         // ^
@@ -141,8 +140,8 @@ pub fn lex(file: &str) -> Vec<Token> {
     // (Short) operators are any of the following characters: + - * / % ^ & | ~ < > = ! . ,
     let operator_re = Regex::new(r"^[\+\-\*/%\^&~\|<>=!\.,]").unwrap();
 
-    // Large operators are any of the following strings: == != <= >= && || ** ++ -- << >> += -= *= /= %= <<= >>= &= ^= |= ^^
-    let large_operator_re = Regex::new(r"^(==|!=|<=|>=|&&|\|\||\*\*|\+\+|--|<<=|>>=|<<|>>|\+=|-=|\*=|\/=|%=|&=|\^=|\|=|\^\^)").unwrap();
+    // Large operators are any of the following strings: == != <= >= && || ++ -- << >> += -= *= /= %= <<= >>= &= ^= |= ^^
+    let large_operator_re = Regex::new(r"^(==|!=|<=|>=|&&|\|\||\+\+|--|<<=|>>=|<<|>>|\+=|-=|\*=|\/=|%=|&=|\^=|\|=|\^\^)").unwrap();
 
     // Keywords are any of the following strings: if else while for return
     let keyword_re = Regex::new(r"^(if|else|do|while|for|loop|return|fn|let|break|continue|const)").unwrap();
@@ -212,7 +211,6 @@ pub fn lex(file: &str) -> Vec<Token> {
                 ">=" => Operator::GreaterOrEqualThan,
                 "&&" => Operator::LogicalAnd,
                 "||" => Operator::LogicalOr,
-                "**" => Operator::Exponent,
                 "++" => Operator::Increment,
                 "--" => Operator::Decrement,
                 "<<=" => Operator::LeftShiftAssign,

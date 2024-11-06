@@ -1,5 +1,5 @@
 use crate::ast_build::{
-    AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Program, Statement, UnOp
+    AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Program, Statement, UnOp
 };
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -49,56 +49,62 @@ fn generate_atom(file: &mut File, atom: &Atom, var_map: &HashMap<String, i64>, c
 }
 
 /// Generates the assembly code for an assignment operation
-fn generate_assignment(op: &AssignmentOp, file: &mut File, var_address: &i64) {
+fn generate_assignment(op: &AssignmentOp, file: &mut File, var_address: &i64, pointer_dereference: bool) {
+	let write_address;
+	if pointer_dereference {
+		write_address = format!("[rax]");
+	} else {
+		write_address = format!("[rbp{}{}]", if *var_address < 0 { "" } else { "+" }, var_address);
+	}
     match op {
         AssignmentOp::Assign => {
-            writeln!(file, "    mov [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
+            writeln!(file, "    mov {}, rax", write_address).unwrap();
         }
         AssignmentOp::AddAssign => {
-            writeln!(file, "    add [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
+            writeln!(file, "    add {}, rax", write_address).unwrap();
         }
         AssignmentOp::SubtractAssign => {
-            writeln!(file, "    sub [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
+            writeln!(file, "    sub {}, rax", write_address).unwrap();
         }
         AssignmentOp::MultiplyAssign => {
-			writeln!(file, "    mov rcx, [rbp{}{}]", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
+			writeln!(file, "    mov rcx, {}", write_address).unwrap();
 			writeln!(file, "    imul rax, rcx").unwrap();
-			writeln!(file, "    mov [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
+			writeln!(file, "    mov {}, rax", write_address).unwrap();
         }
         AssignmentOp::DivideAssign => {
 			writeln!(file, "    mov rcx, rax").unwrap();
-			writeln!(file, "    mov rax, [rbp{}{}]", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
+			writeln!(file, "    mov rax, {}", write_address).unwrap();
 			writeln!(file, "    cqo").unwrap();
 			writeln!(file, "    idiv rcx").unwrap();
-			writeln!(file, "    mov [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
+			writeln!(file, "    mov {}, rax", write_address).unwrap();
         }
         AssignmentOp::ModulusAssign => {
 			writeln!(file, "    mov rcx, rax").unwrap();
-			writeln!(file, "    mov rax, [rbp{}{}]", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
+			writeln!(file, "    mov rax, {}", write_address).unwrap();
 			writeln!(file, "    cqo").unwrap();
 			writeln!(file, "    idiv rcx").unwrap();
-			writeln!(file, "    mov [rbp{}{}], rdx", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
+			writeln!(file, "    mov {}, rdx", write_address).unwrap();
         }
         AssignmentOp::LeftShiftAssign => {
 			writeln!(file, "    mov rcx, rax").unwrap();
-			writeln!(file, "    mov rax, [rbp{}{}]", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
+			writeln!(file, "    mov rax, {}", write_address).unwrap();
 			writeln!(file, "    shl rax, cl").unwrap();
-			writeln!(file, "    mov [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
+			writeln!(file, "    mov {}, rax", write_address).unwrap();
         }
         AssignmentOp::RightShiftAssign => {
 			writeln!(file, "    mov rcx, rax").unwrap();
-			writeln!(file, "    mov rax, [rbp{}{}]", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
+			writeln!(file, "    mov rax, {}", write_address).unwrap();
 			writeln!(file, "    shr rax, cl").unwrap();
-			writeln!(file, "    mov [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
+			writeln!(file, "    mov {}, rax", write_address).unwrap();
         }
         AssignmentOp::BitwiseAndAssign => {
-            writeln!(file, "    and [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
+            writeln!(file, "    and {}, rax", write_address).unwrap();
         }
         AssignmentOp::BitwiseXorAssign => {
-            writeln!(file, "    xor [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
+            writeln!(file, "    xor {}, rax", write_address).unwrap();
         }
         AssignmentOp::BitwiseOrAssign => {
-            writeln!(file, "    or [rbp{}{}], rax", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
+            writeln!(file, "    or {}, rax", write_address).unwrap();
         }
         _ => unimplemented!(),
     }
@@ -165,15 +171,6 @@ fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashM
                     writeln!(file, "    idiv rcx").unwrap();
                     writeln!(file, "    mov rax, rdx").unwrap();
                 }
-                BinOp::Exponent => {
-                    writeln!(file, "    mov rbx, rax").unwrap();
-                    writeln!(file, "    mov rcx, rax").unwrap();
-                    writeln!(file, "    mov rdx, rcx").unwrap();
-                    writeln!(file, "    mov rax, rbx").unwrap();
-                    writeln!(file, "    mov rsi, rcx").unwrap();
-                    writeln!(file, "    mov rdi, rdx").unwrap();
-                    writeln!(file, "    call pow").unwrap(); //TODO
-                }
                 BinOp::LessThan => {
                     writeln!(file, "    cmp rax, rcx").unwrap();
                     writeln!(file, "    setl al").unwrap();
@@ -232,17 +229,33 @@ fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashM
             }
         }
         Expression::Assignment(variable, expr, op) => {
-            generate_expression(file, expr, var_map, constants);
-            let var_address = var_map.get(variable);
-			if let Some(var_address) = var_address {
-				generate_assignment(op, file, var_address);
-				return;
+			generate_expression(file, expr, var_map, constants);
+			
+			let mut number_of_dereferences = 0;
+			let mut variable = variable;
+			while let AssignmentIdentifier::Dereference(new_expr) = variable {
+				variable = new_expr;
+				number_of_dereferences += 1;
 			}
 
-			if let Some(_) = constants.get(variable) {
-				panic!("Cannot assign to a constant variable");
+			if let AssignmentIdentifier::Variable(variable) = variable {
+				let var_address = var_map.get(variable);
+				let dereference = number_of_dereferences > 0;
+				while number_of_dereferences > 0 {
+					writeln!(file, "    mov rax, [rax]").unwrap();
+					number_of_dereferences -= 1;
+				}
+
+				if let Some(var_address) = var_address {
+					generate_assignment(op, file, var_address, dereference);
+					return;
+				}
+
+				if let Some(_) = constants.get(variable) {
+					panic!("Cannot assign to a constant variable");
+				}
+				panic!("Undeclared variable {:?}", variable);
 			}
-            panic!("Undeclared variable {:?}", variable);
         }
     }
 }
@@ -261,6 +274,8 @@ struct Context {
     continue_label: Option<String>,
 	/// Label a break statement should jump to
     break_label: Option<String>,
+	/// Length of the context (in number of 64 bit words)
+	len: usize,
 }
 
 impl Context {
@@ -272,6 +287,7 @@ impl Context {
             local_variables: HashSet::new(),
             continue_label: None,
             break_label: None,
+			len: 0,
         }
     }
 
@@ -286,17 +302,15 @@ impl Context {
             local_variables: HashSet::new(),
             continue_label: context.continue_label.clone(),
             break_label: context.break_label.clone(),
+			len: 0
         }
-    }
-
-    fn len(&self) -> usize {
-        self.local_variables.len()
     }
 
 	/// Insert a variable into the context
     fn insert(&mut self, key: String, value: i64) {
         self.var_map.insert(key.clone(), value);
         self.local_variables.insert(key);
+		self.len += 1;
     }
 }
 
@@ -316,7 +330,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     writeln!(
                         file,
                         "    add rsp, {}		;pop local variables before return",
-                        context.len() * 8
+                        context.len * 8
                     )
                     .unwrap();
                     writeln!(file, "    pop rbx		;restore rbx for caller function").unwrap();
@@ -330,7 +344,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     generate_expression(file, expr, &context.var_map, &context.constants);
                     let var_address = context.var_map.get(variable);
 					if let Some(var_address) = var_address {
-						generate_assignment(op, file, var_address);
+						generate_assignment(op, file, var_address, false); // TODO: Why do I have both statements and expressions for assignment?
 					} else if let Some(_) = context.constants.get(variable) {
 						panic!("Cannot assign to a constant variable");
 					} else {
@@ -342,14 +356,31 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                         generate_expression(file, expr, &context.var_map, &context.constants);
                     }
 
-					context.stack_index -= 8;
-                    context.insert(variable.clone(), context.stack_index);
+					let mut number_of_dereferences = 0;
+					let mut variable = variable;
+					while let AssignmentIdentifier::Dereference(new_expr) = variable {
+						variable = new_expr;
+						number_of_dereferences += 1;
+					}
 
-                    if let Some(_) = expr {
-                        writeln!(file, "    push rax").unwrap();
-                    } else {
-                        writeln!(file, "    push 0").unwrap();	// Undefined variables default to 0
-                    }
+					if let AssignmentIdentifier::Variable(variable) = variable {
+						if let Some(_) = expr {
+							writeln!(file, "    push rax").unwrap();
+						} else {
+							writeln!(file, "    push 0").unwrap();	// Undefined variables default to 0
+						}
+						context.stack_index -= 8;
+
+						while number_of_dereferences > 0 {
+							writeln!(file, "    mov rax, rsp").unwrap();
+							writeln!(file, "    push rax").unwrap();
+							number_of_dereferences -= 1;
+							context.stack_index -= 8;
+							context.len += 1;
+						}
+
+						context.insert(variable.clone(), context.stack_index);
+					}
                 }
                 Statement::Compound(_) => {
                     generate_compound_statement(file, statement, &context);

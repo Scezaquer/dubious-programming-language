@@ -5,22 +5,22 @@ use regex::Regex;
 /// 
 /// # Preprocessor directives
 /// 
-/// ## `#include <file>`
+/// ## `#include <[FILE]>`
 /// Includes the contents of another file at the current position.
 /// 
 /// ## `#define <identifier> <replacement>`
 /// Defines a macro that will be replaced throughout the code.
 /// Issues a warning if the identifier is already defined.
 /// 
-/// ## `#undef <identifier>`
+/// ## `#undef [IDENTIFIER]`
 /// Removes a previously defined macro.
 /// Issues a warning if the identifier isn't defined.
 /// 
-/// ## `#ifdef <identifier>`
+/// ## `#ifdef [IDENTIFIER]`
 /// Conditionally includes code if the identifier is defined.
 /// Can be paired with `#else` and must end with `#endif`.
 /// 
-/// ## `#ifndef <identifier>`
+/// ## `#ifndef [IDENTIFIER]`
 /// Conditionally includes code if the identifier is not defined.
 /// Can be paired with `#else` and must end with `#endif`.
 /// 
@@ -31,10 +31,10 @@ use regex::Regex;
 /// ## `#endif`
 /// Terminates a conditional block started by `#ifdef` or `#ifndef`.
 /// 
-/// ## `#error <message>`
+/// ## `#error [MESSAGE]`
 /// Stops compilation and displays an error message.
 /// 
-/// ## `#print <message>`
+/// ## `#print [MESSAGE]`
 /// Displays a message during compilation.
 pub fn preprocessor(file: &str, filename: &str) -> String {
 	let mut defined_expressions:HashMap<String, String> = HashMap::new();
@@ -58,7 +58,7 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 			let directive = caps.get(1).unwrap().as_str();
 			match directive{
 				"include" => {
-					// #include <file>
+					// #include <[FILE]>
 					// Include the contents of the file
 					// If the file is not found, print an error message
 
@@ -92,7 +92,7 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 					processed_file.push_str(&included_file);
 				},
 				"define" => {
-					// #define <identifier> <replacement>
+					// #define [IDENTIFIER] [REPLACEMENT]
 					// Define a macro
 					// If the identifier is already defined, print a warning message
 					
@@ -130,7 +130,7 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 					line += 1;
 				},
 				"undef" => {
-					// #undef <identifier>
+					// #undef [IDENTIFIER]
 					// Undefine a macro
 					// If the identifier is not defined, print a warning message
 
@@ -157,7 +157,7 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 					line += 1;
 				},
 				"ifdef" => {
-					// #ifdef <identifier>
+					// #ifdef [IDENTIFIER]
 					// If the identifier is defined, include the code until #endif
 					// Otherwise, skip the code until #endif or #else
 					// Note: These can't be nested
@@ -191,7 +191,7 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 					}
 				},
 				"ifndef" => {
-					// #ifndef <identifier>
+					// #ifndef [IDENTIFIER]
 					// If the identifier is not defined, include the code until #endif
 					// Otherwise, skip the code until #endif or #else
 
@@ -229,7 +229,7 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 					// Note: These can't be nested
 
 					let mut rest = &file[pos..];
-					while !rest.starts_with("#endif"){
+					while !rest.starts_with("#endif") && !rest.is_empty(){
 						pos += 1;
 						if rest.starts_with("\n"){
 							line += 1;
@@ -244,7 +244,7 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 					pos += caps.get(0).unwrap().end();
 				},
 				"error" => {
-					// #error <message>
+					// #error [MESSAGE]
 					// Print an error message and stop the compilation
 
 					// Get the message
@@ -261,7 +261,7 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 					panic!("{} Line {}: {}", filename, line, message.trim_end());
 				},
 				"print" => {
-					// #print <message>
+					// #print [MESSAGE]
 					// Print a message at compile time
 
 					// Get the message
