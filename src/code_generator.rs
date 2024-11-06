@@ -340,17 +340,6 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                 Statement::Expression(expression) => {
                     generate_expression(file, expression, &context.var_map, &context.constants);
                 }
-                Statement::Assignment(variable, expr, op) => {
-                    generate_expression(file, expr, &context.var_map, &context.constants);
-                    let var_address = context.var_map.get(variable);
-					if let Some(var_address) = var_address {
-						generate_assignment(op, file, var_address, false); // TODO: Why do I have both statements and expressions for assignment?
-					} else if let Some(_) = context.constants.get(variable) {
-						panic!("Cannot assign to a constant variable");
-					} else {
-						panic!("Undeclared variable {:?}", variable);
-					}
-                }
                 Statement::Let(variable, expr) => {
                     if let Some(expr) = expr {
                         generate_expression(file, expr, &context.var_map, &context.constants);

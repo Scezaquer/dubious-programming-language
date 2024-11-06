@@ -230,7 +230,6 @@ fn get_un_operator_from_token(token: &Token) -> UnOp {
 /// Statements can be assignments, let bindings, if statements, while loops, loops, do-while loops, for loops, return statements, expressions, compound statements, break statements, or continue statements.
 #[derive(Debug)]
 pub enum Statement {
-    Assignment(String, Expression, AssignmentOp),
     Let(AssignmentIdentifier, Option<Expression>),
     If(Expression, Box<Statement>, Option<Box<Statement>>),
     While(Expression, Box<Statement>),
@@ -367,16 +366,16 @@ fn parse_expression_with_precedence(
         return Expression::Atom(parse_atom(&mut tokens));
     }
 
-    // Check if the current token is a unary operator for this precedence level
-    let mut next = tokens.clone().next().unwrap();
-    let mut expr;
-
 	// In case we are actually in an assignment expression the left hand side
 	// has some special rules, so it is parsed separately in parse_assignment_identifier.
 	// We start by assuming we are not in an assignment expression, and if it turns out
 	// we are, we will change the expr variable to an Assignment expression.
 	// In the meantime we keep a copy of the tokens iterator to be able to backtrack
 	let mut next_if_assignment = tokens.clone();
+
+    // Check if the current token is a unary operator for this precedence level
+    let mut next = tokens.clone().next().unwrap();
+    let mut expr;
 
     if precedence_table[precedence_level]
         .unary_ops
@@ -626,11 +625,12 @@ fn parse_expression(mut tokens: &mut Iter<Token>) -> Expression {
 /// A statement is a single instruction in the program.
 /// Statements can be assignments, let bindings, if statements, while loops, loops, do-while loops, for loops, return statements, expressions, compound statements, break statements, or continue statements.
 fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
-    let tok = tokens.next().unwrap();
+    let tok = tokens.clone().next().unwrap();
     let statement;
 
     match tok {
         Token::Keyword(k) => {
+			tokens.next();
             if k == "return" {
                 // return exp;
                 let exp = parse_expression(tokens);
@@ -762,35 +762,8 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
                 panic!("Invalid keyword token: {:?}", tok);
             }
         }
-        Token::Identifier(_) => {
-            let id = match tok {
-                Token::Identifier(id) => id,
-                _ => panic!("Invalid identifier token: {:?}", tok),
-            };
-
-            let next_tok = tokens.next().unwrap();
-            match next_tok {
-                Token::Operator(Operator::Assign)
-                | Token::Operator(Operator::AddAssign)
-                | Token::Operator(Operator::SubtractAssign)
-                | Token::Operator(Operator::MultiplyAssign)
-                | Token::Operator(Operator::DivideAssign)
-                | Token::Operator(Operator::ModulusAssign)
-                | Token::Operator(Operator::LeftShiftAssign)
-                | Token::Operator(Operator::RightShiftAssign)
-                | Token::Operator(Operator::BitwiseAndAssign)
-                | Token::Operator(Operator::BitwiseXorAssign)
-                | Token::Operator(Operator::BitwiseOrAssign) => {
-                    let op = get_assign_operator_from_token(next_tok);
-                    let exp = parse_expression(tokens);
-                    statement = Statement::Assignment(id.to_string(), exp, op);
-                }
-                _ => {
-                    panic!("Expected assignment operator, found: {:?}", next_tok);
-                }
-            }
-        }
         &Token::LBrace => {
+			tokens.next();
             let mut statements = Vec::new();
 
             loop {
