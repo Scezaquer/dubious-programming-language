@@ -361,8 +361,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
 						context.stack_index -= 8;
 
 						while number_of_dereferences > 0 {
-							writeln!(file, "    mov rax, rsp").unwrap();
-							writeln!(file, "    push rax").unwrap();
+							writeln!(file, "    push rsp").unwrap();
 							number_of_dereferences -= 1;
 							context.stack_index -= 8;
 							context.len += 1;
