@@ -186,7 +186,6 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
     while pos < file.len() {
         let rest = &file[pos..];
 		let tok;
-		dbg!(rest);
 		if let Some(caps) = preprocessor_re.captures(rest){
 			// Skip the preprocessor directive
 			pos += caps.get(0).unwrap().end();
