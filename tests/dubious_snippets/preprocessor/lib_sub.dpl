@@ -1,3 +1,4 @@
 fn sub(a: int, b: int){
 	return a - b;
+	let ;
 }

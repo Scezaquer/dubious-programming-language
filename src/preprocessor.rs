@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use regex::Regex;
 
 /// This module is responsible for preprocessing the input file.
@@ -38,6 +38,9 @@ use regex::Regex;
 /// Displays a message during compilation.
 pub fn preprocessor(file: &str, filename: &str) -> String {
 	let mut defined_expressions:HashMap<String, String> = HashMap::new();
+	let mut included_files:HashSet<String> = HashSet::new();
+
+	included_files.insert(filename.to_string());
 
 	let preprocessor_re = Regex::new(r"^\#(include|define|undef|ifdef|ifndef|else|endif|error|print)").unwrap();
 
@@ -52,6 +55,8 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 
 	let mut pos = 0;
 	let mut line = 1;
+
+	processed_file.push_str(format!("// <{}>\n", filename).as_str());
 	while pos < file.len(){
 		let rest = &file[pos..];
 		if let Some(caps) = preprocessor_re.captures(&file[pos..]){
@@ -81,6 +86,11 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 					// Construct the full path by joining the current directory and included file
 					let full_path = current_dir.join(file);
 					
+					if included_files.contains(full_path.to_str().unwrap()){
+						println!("{} Line {} Warning: File '{}' is already included", filename, line, full_path.display());
+						continue;
+					}
+
 					// Read the file
 					let included_file = match std::fs::read_to_string(&full_path) {
 						Ok(file) => file,
@@ -89,7 +99,11 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 
 					// Preprocess the included file
 					let included_file = preprocessor(&included_file, full_path.to_str().unwrap());
+
+					// Add a comment to indicate the start of the included file to track the source of errors
+					processed_file.push_str(format!("// <{}>\n", full_path.display()).as_str());
 					processed_file.push_str(&included_file);
+					processed_file.push_str(format!("// </{}>\n", filename).as_str());
 				},
 				"define" => {
 					// #define [IDENTIFIER] [REPLACEMENT]
@@ -288,9 +302,13 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 		} else if let Some(caps) = comments_re.captures(rest) {
 			pos += caps.get(0).unwrap().end();
 			line += 1;
+			processed_file.push_str(&"\n");
 		} else if let Some(caps) = multiline_comments_re.captures(rest) {
 			pos += caps.get(0).unwrap().end();
-			line += caps.get(0).unwrap().as_str().matches('\n').count();
+			let comment_length = caps.get(0).unwrap().as_str().matches('\n').count();
+			line += comment_length;
+			processed_file.push_str(&"\n".repeat(comment_length));
+
 		} else if let Some(caps) = identifier_re.captures(rest) {
 			let identifier = caps.get(0).unwrap().as_str();
 			if defined_expressions.contains_key(identifier){

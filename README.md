@@ -18,6 +18,7 @@ Based on https://norasandler.com/2017/11/29/Write-a-Compiler.html
 - TODO: inline asm ?
 - TODO: nasm fails silently. ld too probably. Should instead print a message with the error if that happens
 - TODO: vscode syntax highlighting
+- TODO: Should I make the char type, but make it 64 bits like everything else so that it can actually contain 8 characters at once?
 
 A simple compiler for the Dubious programming language (DPL).
 
@@ -116,3 +117,9 @@ only literals. If I implement expression pre-processing then maybe it'll become 
 combinations of literals instead. Right now #define is more versatile.
 
 true/false booleans evaluate to 1 and 0 respectively.
+
+The compiler is pretty wasteful in terms of space, making everything 64 bits alined even when that's excessive,
+but on modern hardware that should not matter at all, and it makes my life easier.
+Maybe i'll need some byte-level fine grain control on memory at some point tho?
+I can work around it by combining some binary operations to get that but it's a little
+impractical (and requires more cpu cycles of course, but at this point, does it even matter). I'll see.

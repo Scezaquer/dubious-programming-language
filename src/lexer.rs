@@ -80,6 +80,31 @@ pub enum Token {
     EOF,
 }
 
+/// A token with extra debug information to print more useful error messages.
+#[derive(Debug)]
+#[derive(PartialEq, Clone)]
+pub struct TokenWithDebugInfo {
+	pub internal_tok: Token,
+	pub line: usize,
+	pub file: String
+}
+
+impl TokenWithDebugInfo {
+	pub fn new(internal_tok: Token, line: usize, file: String) -> TokenWithDebugInfo {
+		TokenWithDebugInfo {
+			internal_tok,
+			line,
+			file
+		}
+	}
+}
+
+impl PartialEq<TokenWithDebugInfo> for Token {
+	fn eq(&self, other: &TokenWithDebugInfo) -> bool {
+		self == &other.internal_tok
+	}
+}
+
 /// Lexes the input file and returns a list of tokens.
 /// 
 /// The lex function takes a string representing the contents of a file
@@ -112,8 +137,8 @@ pub enum Token {
 /// 
 /// The lex function has a time complexity of O(n), where n is the length of the input file.
 /// The lex function has a space complexity of O(n), where n is the length of the input file.
-pub fn lex(file: &str) -> Vec<Token> {
-    let mut tokens = Vec::new();
+pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
+    let mut tokens : Vec<TokenWithDebugInfo> = Vec::new();
 
     // Identifiers can start with a letter or an underscore, followed by any
     // number of letters, numbers, or underscores
@@ -146,62 +171,86 @@ pub fn lex(file: &str) -> Vec<Token> {
     // Keywords are any of the following strings: if else while for return
     let keyword_re = Regex::new(r"^(if|else|do|while|for|loop|return|fn|let|break|continue|const)").unwrap();
 
-    let whitespace_re = Regex::new(r"^\s+").unwrap();
+	let whitespace_re = Regex::new(r"^[^\S\n]+").unwrap();
 
 	let preprocessor_re = Regex::new(r"^\#(include|define|undef|ifdef|ifndef|if|elif|else|endif|error|print).*?(\n|$)").unwrap();
 
-    let mut pos: usize= 0; // Current position in the file
+	// Since the preprocessor will have removed actual comments, it's safe to assume that
+	// any line starting with // was something the preprocesser added
+	let imported_code_re = Regex::new(r"^//\s<.*>\n").unwrap();
+	let mut current_file = String::new();
+
+    let mut pos: usize = 0; // Current position in the file
+	let mut line_hashmap: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
 
     while pos < file.len() {
         let rest = &file[pos..];
+		let tok;
+		dbg!(rest);
 		if let Some(caps) = preprocessor_re.captures(rest){
 			// Skip the preprocessor directive
 			pos += caps.get(0).unwrap().end();
-		}
-		else if rest.starts_with("(") {
-            tokens.push(Token::LParen);
+			continue;
+		} else if let Some(caps) = imported_code_re.captures(rest){
+			current_file = caps.get(0).unwrap().as_str()
+				.trim_start_matches("// <")
+				.trim_end_matches(">\n")
+				.to_string();
+			if !line_hashmap.contains_key(&current_file){
+				line_hashmap.insert(current_file.clone(), 1);
+			}
+			pos += caps.get(0).unwrap().end();
+			continue;
+		} else if rest.starts_with("\n") {
+			if let Some(file) = line_hashmap.get_mut(&current_file){
+				*file += 1;
+			}
+			pos += 1;
+			continue;
+		} else if rest.starts_with("(") {
+            tok = Token::LParen;
             pos += 1;
         } else if rest.starts_with(")") {
-            tokens.push(Token::RParen);
+            tok = Token::RParen;
             pos += 1;
         } else if rest.starts_with(",") {
-            tokens.push(Token::Comma);
+            tok = Token::Comma;
             pos += 1;
         } else if rest.starts_with(";") {
-            tokens.push(Token::Semicolon);
+            tok = Token::Semicolon;
             pos += 1;
         } else if rest.starts_with(":") {
-            tokens.push(Token::Colon);
+            tok = Token::Colon;
             pos += 1;
         } else if rest.starts_with("{") {
-            tokens.push(Token::LBrace);
+            tok = Token::LBrace;
             pos += 1;
         } else if rest.starts_with("}") {
-            tokens.push(Token::RBrace);
+            tok = Token::RBrace;
             pos += 1;
         } else if rest.starts_with("[") {
-            tokens.push(Token::LBracket);
+            tok = Token::LBracket;
             pos += 1;
         } else if rest.starts_with("]") {
-            tokens.push(Token::RBracket);
+            tok = Token::RBracket;
             pos += 1;
         } else if let Some(caps) = primitive_type_re.captures(rest) {
-            tokens.push(Token::PrimitiveType(caps.get(0).unwrap().as_str().to_string()));
+            tok = Token::PrimitiveType(caps.get(0).unwrap().as_str().to_string());
             pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = bin_re.captures(rest) {
-			tokens.push(Token::BinLiteral(i64::from_str_radix(caps.get(0).unwrap().as_str().strip_prefix("0b").unwrap(), 2).unwrap()));
+			tok = Token::BinLiteral(i64::from_str_radix(caps.get(0).unwrap().as_str().strip_prefix("0b").unwrap(), 2).unwrap());
 			pos += caps.get(0).unwrap().end();
 		} else if let Some(caps) = hex_re.captures(rest) {
-			tokens.push(Token::HexLiteral(i64::from_str_radix(caps.get(0).unwrap().as_str().strip_prefix("0x").unwrap(), 16).unwrap()));
+			tok = Token::HexLiteral(i64::from_str_radix(caps.get(0).unwrap().as_str().strip_prefix("0x").unwrap(), 16).unwrap());
 			pos += caps.get(0).unwrap().end();
 		} else if let Some(caps) = float_re.captures(rest) {
-            tokens.push(Token::FloatLiteral(caps.get(0).unwrap().as_str().parse().unwrap()));
+            tok = Token::FloatLiteral(caps.get(0).unwrap().as_str().parse().unwrap());
             pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = int_re.captures(rest) {
-            tokens.push(Token::IntLiteral(caps.get(0).unwrap().as_str().parse().unwrap()));
+            tok = Token::IntLiteral(caps.get(0).unwrap().as_str().parse().unwrap());
             pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = bool_re.captures(rest) {
-			tokens.push(Token::BoolLiteral(caps.get(0).unwrap().as_str() == "true"));
+			tok = Token::BoolLiteral(caps.get(0).unwrap().as_str() == "true");
 			pos += caps.get(0).unwrap().end();
 		} else if let Some(caps) = large_operator_re.captures(rest) {
             let op = match caps.get(0).unwrap().as_str() {
@@ -228,7 +277,7 @@ pub fn lex(file: &str) -> Vec<Token> {
                 "^^" => Operator::LogicalXor,
                 _ => unreachable!(),
             };
-            tokens.push(Token::Operator(op));
+            tok = Token::Operator(op);
             pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = operator_re.captures(rest) {
             let op = match caps.get(0).unwrap().as_str() {
@@ -249,22 +298,25 @@ pub fn lex(file: &str) -> Vec<Token> {
 				"," => Operator::Comma,
                 _ => unreachable!(),
             };
-            tokens.push(Token::Operator(op));
+            tok = Token::Operator(op);
             pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = keyword_re.captures(rest) {
-            tokens.push(Token::Keyword(caps.get(0).unwrap().as_str().to_string()));
+            tok = Token::Keyword(caps.get(0).unwrap().as_str().to_string());
             pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = identifier_re.captures(rest) {
-            tokens.push(Token::Identifier(caps.get(0).unwrap().as_str().to_string()));
+            tok = Token::Identifier(caps.get(0).unwrap().as_str().to_string());
             pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = whitespace_re.captures(rest) {
             pos += caps.get(0).unwrap().end();
+			continue;
         } else {
             panic!("Unexpected character: {}", rest.chars().next().unwrap());
         }
+
+		tokens.push(TokenWithDebugInfo::new(tok, line_hashmap[&current_file], current_file.clone()));
     }
 
-    tokens.push(Token::EOF);
+    tokens.push(TokenWithDebugInfo::new(Token::EOF, line_hashmap[&current_file], current_file.clone()));
 
     return tokens;
 }

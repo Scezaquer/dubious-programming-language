@@ -345,6 +345,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                         generate_expression(file, expr, &context.var_map, &context.constants);
                     }
 
+					// Dereference the variable if it is a pointer
 					let mut number_of_dereferences = 0;
 					let mut variable = variable;
 					while let AssignmentIdentifier::Dereference(new_expr) = variable {

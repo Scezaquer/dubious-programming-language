@@ -1,5 +1,6 @@
 use crate::lexer::Operator;
 use crate::lexer::Token;
+use crate::lexer::TokenWithDebugInfo;
 use core::panic;
 use std::slice::Iter;
 
@@ -156,9 +157,9 @@ pub enum Expression {
 }
 
 /// Gets the binary operator corresponding to the token.
-fn get_bin_operator_from_token(token: &Token) -> BinOp {
+fn get_bin_operator_from_token(token: &TokenWithDebugInfo) -> BinOp {
     match token {
-        Token::Operator(op) => match op {
+        TokenWithDebugInfo { internal_tok: Token::Operator(op), .. } => match op {
             Operator::MemberAccess => BinOp::MemberAccess,
             Operator::Multiply => BinOp::Multiply,
             Operator::Divide => BinOp::Divide,
@@ -186,9 +187,9 @@ fn get_bin_operator_from_token(token: &Token) -> BinOp {
 }
 
 /// Gets the assignment operator corresponding to the token.
-fn get_assign_operator_from_token(token: &Token) -> AssignmentOp {
+fn get_assign_operator_from_token(token: &TokenWithDebugInfo) -> AssignmentOp {
     match token {
-        Token::Operator(op) => match op {
+        TokenWithDebugInfo { internal_tok: Token::Operator(op), .. } => match op {
             Operator::Assign => AssignmentOp::Assign,
             Operator::AddAssign => AssignmentOp::AddAssign,
             Operator::SubtractAssign => AssignmentOp::SubtractAssign,
@@ -207,9 +208,9 @@ fn get_assign_operator_from_token(token: &Token) -> AssignmentOp {
 }
 
 /// Gets the unary operator corresponding to the token.
-fn get_un_operator_from_token(token: &Token) -> UnOp {
+fn get_un_operator_from_token(token: &TokenWithDebugInfo) -> UnOp {
     match token {
-        Token::Operator(op) => match op {
+        TokenWithDebugInfo { internal_tok: Token::Operator(op), .. } => match op {
             Operator::Increment => UnOp::PreIncrement,
             Operator::Decrement => UnOp::PreDecrement,
             Operator::Add => UnOp::UnaryPlus,
@@ -218,7 +219,7 @@ fn get_un_operator_from_token(token: &Token) -> UnOp {
             Operator::BitwiseNot => UnOp::BitwiseNot,
             Operator::Multiply => UnOp::Dereference,
             Operator::BitwiseAnd => UnOp::AddressOf,
-            _ => panic!("Invalid unary operator token: {:?}", token),
+            _ => error_unexpected_token("valid unary operator", token),
         },
         _ => UnOp::NotAUnaryOp,
     }
@@ -281,51 +282,59 @@ impl std::fmt::Display for Literal {
     }
 }
 
+fn error(msg: &str, token: &TokenWithDebugInfo) -> ! {
+	panic!("{} Line {}: {}", token.file, token.line, msg);
+}
+
+fn error_unexpected_token(expected: &str, token: &TokenWithDebugInfo) -> ! {
+	error(&format!("Expected {}, found: {:?}", expected, token.internal_tok), token);
+}
+
 /// Parses a constant from a token.
-fn parse_literal(token: &Token) -> Literal {
+fn parse_literal(token: &TokenWithDebugInfo) -> Literal {
     match token {
-        Token::IntLiteral(i) => Literal::Int(*i),
-        Token::FloatLiteral(f) => Literal::Float(*f),
-        Token::HexLiteral(h) => Literal::Hex(*h),
-        Token::BinLiteral(b) => Literal::Binary(*b),
-        Token::BoolLiteral(b) => Literal::Bool(*b),
-        _ => panic!("Invalid constant token: {:?}", token),
+        TokenWithDebugInfo { internal_tok: Token::IntLiteral(i), .. } => Literal::Int(*i),
+        TokenWithDebugInfo { internal_tok: Token::FloatLiteral(f), .. } => Literal::Float(*f),
+        TokenWithDebugInfo { internal_tok: Token::HexLiteral(h), .. } => Literal::Hex(*h),
+        TokenWithDebugInfo { internal_tok: Token::BinLiteral(b), .. } => Literal::Binary(*b),
+        TokenWithDebugInfo { internal_tok: Token::BoolLiteral(b), .. } => Literal::Bool(*b),
+        _ => error_unexpected_token("constant", token),
     }
 }
 
 /// Parses an atom from a list of tokens.
-fn parse_atom(mut tokens: &mut Iter<Token>) -> Atom {
+fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
     let tok = tokens.next().unwrap();
 
     match tok {
-        Token::LParen => {
+        TokenWithDebugInfo { internal_tok: Token::LParen, .. } => {
             let inner_exp = parse_expression(&mut tokens);
 
-            if let Token::RParen = tokens.next().unwrap() {
+            if let TokenWithDebugInfo { internal_tok: Token::RParen, .. } = tokens.next().unwrap() {
                 return Atom::Expression(Box::new(inner_exp));
             } else {
-                panic!("Expected closing parenthesis, found: {:?}", tok);
+				error_unexpected_token("closing parenthesis", tok);
             }
         }
-        Token::IntLiteral(_)
-        | Token::FloatLiteral(_)
-        | Token::BinLiteral(_)
-        | Token::HexLiteral(_)
-        | Token::BoolLiteral(_) => {
+        TokenWithDebugInfo { internal_tok: Token::IntLiteral(_), .. }
+        | TokenWithDebugInfo { internal_tok: Token::FloatLiteral(_), .. }
+        | TokenWithDebugInfo { internal_tok: Token::BinLiteral(_), .. }
+        | TokenWithDebugInfo { internal_tok: Token::HexLiteral(_), .. }
+        | TokenWithDebugInfo { internal_tok: Token::BoolLiteral(_), .. } => {
             return Atom::Literal(parse_literal(tok));
         }
-        Token::Identifier(s) => {
+        TokenWithDebugInfo { internal_tok: Token::Identifier(s), .. } => {
             let next_tok = tokens.clone().next().unwrap();
-            if let Token::LParen = next_tok {
+            if let TokenWithDebugInfo { internal_tok: Token::LParen, .. } = next_tok {
                 // Function call
                 tokens.next();
                 let mut args = Vec::new();
                 loop {
                     let next_tok = tokens.clone().next().unwrap();
-                    if let Token::RParen = next_tok {
+                    if let TokenWithDebugInfo { internal_tok: Token::RParen, .. } = next_tok {
                         tokens.next();
                         break;
-                    } else if let Token::Comma = next_tok {
+                    } else if let TokenWithDebugInfo { internal_tok: Token::Comma, .. } = next_tok {
                         tokens.next();
                     } else {
                         args.push(parse_expression(&mut tokens));
@@ -337,27 +346,27 @@ fn parse_atom(mut tokens: &mut Iter<Token>) -> Atom {
             // Variable
             return Atom::Variable(s.to_string());
         }
-        _ => panic!("Invalid atom token: {:?}", tok),
+        _ => error_unexpected_token("valid atom token", tok)
     }
 }
 
-fn parse_assignment_identifier(mut tokens: &mut Iter<Token>) -> AssignmentIdentifier {
+fn parse_assignment_identifier(mut tokens: &mut Iter<TokenWithDebugInfo>) -> AssignmentIdentifier {
 	let tok = tokens.next().unwrap();
 
 	match tok {
-		Token::Operator(Operator::Multiply) => {
+		TokenWithDebugInfo { internal_tok: Token::Operator(Operator::Multiply), .. } => {
 			return AssignmentIdentifier::Dereference(Box::new(parse_assignment_identifier(&mut tokens)));
 		}
-		Token::Identifier(s) => {
+		TokenWithDebugInfo { internal_tok: Token::Identifier(s), .. } => {
 			return AssignmentIdentifier::Variable(s.to_string());
 		}
-		_ => panic!("Invalid assignment identifier token: {:?}", tok),
+		_ => error_unexpected_token("valid assignment identifier", tok)
 	}
 }
 
 /// Recursively parses an expression, taking into account operator precedence.
 fn parse_expression_with_precedence(
-    mut tokens: &mut Iter<Token>,
+    mut tokens: &mut Iter<TokenWithDebugInfo>,
     precedence_level: usize,
     precedence_table: &Vec<PrecedenceLevel>,
 ) -> Expression {
@@ -553,11 +562,11 @@ fn build_precedence_table() -> Vec<PrecedenceLevel> {
     ]
 }
 
-fn parse_type(mut tokens: &mut Iter<Token>) -> Type {
+fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Type {
 	let tok = tokens.next().unwrap();
 
 	match tok {
-		Token::PrimitiveType(k) => {
+		TokenWithDebugInfo { internal_tok: Token::PrimitiveType(k), .. } => {
 			if k == "int" {
 				return Type::Int;
 			} else if k == "float" {
@@ -567,35 +576,35 @@ fn parse_type(mut tokens: &mut Iter<Token>) -> Type {
 			} else if k == "void" {
 				return Type::Void;
 			} else {
-				panic!("Invalid type keyword: {:?}", k);
+				error_unexpected_token("valid type keyword", tok);
 			}
 		}
-		Token::Operator(Operator::Multiply) => {
+		TokenWithDebugInfo { internal_tok: Token::Operator(Operator::Multiply), .. } => {
 			let inner_type = parse_type(&mut tokens);
 			return Type::Pointer(Box::new(inner_type));
 		}
-		Token::LBracket => {
+		TokenWithDebugInfo { internal_tok: Token::LBracket, .. } => {
 			let inner_type = parse_type(&mut tokens);
 			let size = match tokens.next().unwrap() {
-				Token::IntLiteral(i) => i,
-				_ => panic!("Expected integer literal for array size"),
+				TokenWithDebugInfo { internal_tok: Token::IntLiteral(i), .. } => i,
+				_ => error("Expected integer literal for array size", tok)
 			};
 			let next_tok = tokens.next().unwrap();
-			if let Token::RBracket = next_tok {
+			if let TokenWithDebugInfo { internal_tok: Token::RBracket, .. } = next_tok {
 				return Type::Array(Box::new(inner_type), *size);
 			} else {
-				panic!("Expected closing bracket, found: {:?}", next_tok);
+				error_unexpected_token("closing bracket", next_tok);
 			}
 		}
-		Token::LParen => {
+		TokenWithDebugInfo { internal_tok: Token::LParen, .. } => {
 			let return_type = parse_type(&mut tokens);
 			let mut params = Vec::new();
 			loop {
 				let next_tok = tokens.clone().next().unwrap();
-				if let Token::RParen = next_tok {
+				if let TokenWithDebugInfo { internal_tok: Token::RParen, .. } = next_tok {
 					tokens.next();
 					break;
-				} else if let Token::Comma = next_tok {
+				} else if let TokenWithDebugInfo { internal_tok: Token::Comma, .. } = next_tok {
 					tokens.next();
 				} else {
 					params.push(parse_type(&mut tokens));
@@ -603,7 +612,7 @@ fn parse_type(mut tokens: &mut Iter<Token>) -> Type {
 			}
 			return Type::Function(Box::new(return_type), params);
 		}
-		_ => panic!("Invalid type token: {:?}", tok),
+		_ => error_unexpected_token("valid type token", tok)
 	}
 }
 
@@ -613,7 +622,7 @@ fn parse_type(mut tokens: &mut Iter<Token>) -> Type {
 /// It is used to parse the top-level expression.
 ///
 /// An expression is a combination of atoms and operators that evaluates to a value.
-fn parse_expression(mut tokens: &mut Iter<Token>) -> Expression {
+fn parse_expression(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Expression {
     let precedence_table = build_precedence_table();
     let max_precedence = precedence_table.len() - 1;
 
@@ -624,12 +633,12 @@ fn parse_expression(mut tokens: &mut Iter<Token>) -> Expression {
 ///
 /// A statement is a single instruction in the program.
 /// Statements can be assignments, let bindings, if statements, while loops, loops, do-while loops, for loops, return statements, expressions, compound statements, break statements, or continue statements.
-fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
+fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
     let tok = tokens.clone().next().unwrap();
     let statement;
 
     match tok {
-        Token::Keyword(k) => {
+        TokenWithDebugInfo { internal_tok: Token::Keyword(k), .. } => {
 			tokens.next();
             if k == "return" {
                 // return exp;
@@ -642,23 +651,20 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
 
                 let next_tok = tokens.next().unwrap();
                 if &Token::Colon != next_tok {
-                    panic!("Expected colon, found: {:?}", next_tok);
+					error_unexpected_token("colon", next_tok);
                 };
 
 				let _var_type = parse_type(tokens); // TODO: Do something with this
 
                 let next_tok = tokens.clone().next().unwrap();
-                if let Token::Operator(Operator::Assign) = next_tok {
+                if let TokenWithDebugInfo { internal_tok: Token::Operator(Operator::Assign), .. } = next_tok {
                     tokens.next();
                     let exp = parse_expression(tokens);
                     statement = Statement::Let(id, Some(exp));
-                } else if let Token::Semicolon = next_tok {
+                } else if let TokenWithDebugInfo { internal_tok: Token::Semicolon, .. } = next_tok {
                     statement = Statement::Let(id, None);
                 } else {
-                    panic!(
-                        "Expected semicolon or assignment operator, found: {:?}",
-                        next_tok
-                    );
+					error_unexpected_token("semicolon or assignment operator", next_tok);
                 }
             } else if k == "if" {
                 // if (exp) statement [else statement]
@@ -670,7 +676,7 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
                 }
 
                 let next_tok = tokens.clone().next().unwrap();
-                if let Token::Keyword(k) = next_tok {
+                if let TokenWithDebugInfo { internal_tok: Token::Keyword(k), .. } = next_tok {
                     if k == "else" {
                         tokens.next();
                         let mut else_stmt = parse_statement(tokens);
@@ -710,23 +716,23 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
             } else if k == "for" {
                 // for (exp; exp; exp) statement
                 let next_tok = tokens.next().unwrap(); // Skip opening parenthesis
-                if !matches!(next_tok, Token::LParen) {
-                    panic!("Expected opening parenthesis, found: {:?}", next_tok);
+                if !matches!(next_tok, TokenWithDebugInfo { internal_tok: Token::LParen, .. }) {
+					error_unexpected_token("opening parenthesis", next_tok);
                 }
                 let init = parse_expression(tokens);
                 let next_tok = tokens.next().unwrap(); // Skip semicolon
-                if !matches!(next_tok, Token::Semicolon) {
-                    panic!("Expected semicolon, found: {:?}", next_tok);
+                if !matches!(next_tok, TokenWithDebugInfo { internal_tok: Token::Semicolon, .. }) {
+					error_unexpected_token("semicolon", next_tok);
                 }
                 let cond = parse_expression(tokens);
                 let next_tok = tokens.next().unwrap(); // Skip semicolon
-                if !matches!(next_tok, Token::Semicolon) {
-                    panic!("Expected semicolon, found: {:?}", next_tok);
+                if !matches!(next_tok, TokenWithDebugInfo { internal_tok: Token::Semicolon, .. }) {
+					error_unexpected_token("semicolon", next_tok);
                 }
                 let step = parse_expression(tokens);
                 let next_tok = tokens.next().unwrap(); // Skip closing parenthesis
-                if !matches!(next_tok, Token::RParen) {
-                    panic!("Expected closing parenthesis, found: {:?}", next_tok);
+                if !matches!(next_tok, TokenWithDebugInfo { internal_tok: Token::RParen, .. }) {
+					error_unexpected_token("closing parenthesis", next_tok);
                 }
                 let mut for_stmt = parse_statement(tokens);
 
@@ -744,32 +750,32 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
                 }
 
                 let next_tok = tokens.next().unwrap();
-                if let Token::Keyword(k) = next_tok {
+                if let TokenWithDebugInfo { internal_tok: Token::Keyword(k), .. } = next_tok {
                     if k == "while" {
                         let exp = parse_expression(tokens);
                         statement = Statement::Dowhile(exp, Box::new(do_stmt));
                     } else {
-                        panic!("Expected while keyword, found: {:?}", next_tok);
+						error_unexpected_token("while keyword", next_tok);
                     }
                 } else {
-                    panic!("Expected while keyword, found: {:?}", next_tok);
+					error_unexpected_token("while keyword", next_tok);
                 }
             } else if k == "break" {
                 statement = Statement::Break;
             } else if k == "continue" {
                 statement = Statement::Continue;
             } else {
-                panic!("Invalid keyword token: {:?}", tok);
+				error_unexpected_token("valid keyword token", tok);
             }
         }
-        &Token::LBrace => {
+        TokenWithDebugInfo { internal_tok: Token::LBrace, .. } => {
 			tokens.next();
             let mut statements = Vec::new();
 
             loop {
                 let next = tokens.clone().next().unwrap();
 
-                if let &Token::RBrace = next {
+                if let TokenWithDebugInfo { internal_tok: Token::RBrace, .. } = next {
                     tokens.next();
                     break;
                 } else {
@@ -799,103 +805,93 @@ fn parse_statement(tokens: &mut Iter<Token>) -> Statement {
     }
 
     let tok = tokens.next().unwrap();
-    if tok != &Token::Semicolon {
-        panic!("Expected semicolon, found: {:?}", tok);
+    if !matches!(tok, TokenWithDebugInfo { internal_tok: Token::Semicolon, .. }) {
+		error_unexpected_token("semicolon", tok);
     }
 
     return statement;
 }
 
-fn parse_const(tokens: &mut Iter<Token>) -> Constant {
+fn parse_const(tokens: &mut Iter<TokenWithDebugInfo>) -> Constant {
     // const id: type = exp;
 
     let next_tok = tokens.next().unwrap();
 
     if &Token::Keyword("const".to_string()) != next_tok {
-        panic!("Expected const keyword, found: {:?}", next_tok);
+		error_unexpected_token("const keyword", next_tok);
     }
 
     let next_tok = tokens.next().unwrap();
     let id = match next_tok {
-        Token::Identifier(id) => id.clone(),
-        _ => panic!("Expected identifier, found: {:?}", next_tok),
+        TokenWithDebugInfo { internal_tok: Token::Identifier(id), .. } => id.clone(),
+        _ => error_unexpected_token("identifier", next_tok),
     };
 
     let next_tok = tokens.next().unwrap();
     if &Token::Colon != next_tok {
-        panic!("Expected colon, found: {:?}", next_tok);
+		error_unexpected_token("colon", next_tok);
     };
 
 	let _var_type = parse_type(tokens);	// TODO: Do something with this
 
     let lit;
     let next_tok = tokens.clone().next().unwrap();
-    if let Token::Operator(Operator::Assign) = next_tok {
+    if let TokenWithDebugInfo { internal_tok: Token::Operator(Operator::Assign), .. } = next_tok {
         tokens.next();
         lit = parse_literal(tokens.next().unwrap());
     } else {
-        panic!(
-            "Expected assignment operator, found: {:?} (constants must be assigned on declaration)",
-            next_tok
-        );
+		error_unexpected_token("assignment operator (constants must be assigned on declaration)", next_tok);
     }
 
     let next_tok = tokens.next().unwrap();
     if &Token::Semicolon != next_tok {
-        panic!("Expected semicolon, found: {:?}", next_tok);
+		error_unexpected_token("semicolon", next_tok);
     }
 
     return Constant::Constant(id.to_string(), lit);
 }
 
 /// Parses a function from a list of tokens.
-fn parse_function(mut tokens: &mut Iter<Token>) -> Function {
+fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
     let tok = tokens.next().unwrap();
 
-    let k = match tok {
-        Token::Keyword(k) => k,
-        _ => panic!("Expected keyword, found: {:?}", tok),
+    match tok {
+		TokenWithDebugInfo { internal_tok: Token::Keyword(ref k), .. } => if k != "fn" { error_unexpected_token("fn keyword", tok) },
+        TokenWithDebugInfo { .. } => error_unexpected_token("fn keyword", tok),
     };
-
-    if k != "fn" {
-        panic!("Expected function keyword, found: {:?}", tok);
-    }
 
     let tok = tokens.next().unwrap();
     let id = match tok {
-        Token::Identifier(id) => id.clone(),
-        _ => panic!("Expected identifier, found: {:?}", tok),
+        TokenWithDebugInfo { internal_tok: Token::Identifier(id), .. } => id.clone(),
+        TokenWithDebugInfo { .. } => error_unexpected_token("identifier", tok)
     };
 
     let tok = tokens.next().unwrap();
-    if &Token::LParen != tok {
-        panic!("Expected opening parenthesis, found: {:?}", tok);
-    }
+    if !matches!(tok, TokenWithDebugInfo { internal_tok: Token::LParen, .. }) {
+        error_unexpected_token("opening parenthesis", tok);
+    };
 
     let mut params = Vec::new();
 
     loop {
         let tok = tokens.next().unwrap();
 
-        if let Token::RParen = tok {
+        if let TokenWithDebugInfo { internal_tok: Token::RParen, .. } = tok {
             break;
-        } else if let Token::Comma = tok {
+        } else if let TokenWithDebugInfo { internal_tok: Token::Comma, .. } = tok {
             continue;
-        } else if let Token::Identifier(id) = tok {
+        } else if let TokenWithDebugInfo { internal_tok: Token::Identifier(id), .. } = tok {
             params.push(id.clone());
             let tok = tokens.next().unwrap();
-            if !matches!(tok, Token::Colon) {
-                panic!("Expected colon, found: {:?}", tok);
+            if !matches!(tok, TokenWithDebugInfo { internal_tok: Token::Colon, .. }) {
+                error_unexpected_token("colon", tok);
             }
             let tok = tokens.next().unwrap();
-            if !matches!(tok, Token::PrimitiveType(_)) {
-                panic!("Expected type identifier, found: {:?}", tok);
+            if !matches!(tok, TokenWithDebugInfo { internal_tok: Token::PrimitiveType(_), .. }) {
+                error_unexpected_token("type identifier", tok);
             }
         } else {
-            panic!(
-                "Expected identifier or closing parenthesis, found: {:?}",
-                tok
-            );
+			error_unexpected_token("identifier or closing parenthesis", tok);
         }
     }
 
@@ -912,7 +908,7 @@ fn parse_function(mut tokens: &mut Iter<Token>) -> Function {
 }
 
 /// Parses an abstract syntax tree (AST) from a list of tokens.
-pub fn parse(tokens: &Vec<Token>) -> Ast {
+pub fn parse(tokens: &Vec<TokenWithDebugInfo>) -> Ast {
     let mut tokens = tokens.iter();
     let mut functions = Vec::new();
     let mut constants = Vec::new();
@@ -921,13 +917,10 @@ pub fn parse(tokens: &Vec<Token>) -> Ast {
     loop {
         let next_tok = tokens.clone().next().unwrap();
         match next_tok {
-            &Token::EOF => break,
-            &Token::Keyword(ref k) if k == "fn" => functions.push(parse_function(&mut tokens)),
-            &Token::Keyword(ref k) if k == "const" => constants.push(parse_const(&mut tokens)),
-            _ => panic!(
-                "Expected function or constant declaration, found: {:?}",
-                next_tok
-            ),
+            TokenWithDebugInfo { internal_tok: Token::EOF, .. } => break,
+            TokenWithDebugInfo { internal_tok: Token::Keyword(ref k), .. } if k == "fn" => functions.push(parse_function(&mut tokens)),
+            TokenWithDebugInfo { internal_tok: Token::Keyword(ref k), .. } if k == "const" => constants.push(parse_const(&mut tokens)),
+            TokenWithDebugInfo { .. } => error_unexpected_token("function or constant declaration", next_tok),
         }
     }
 
