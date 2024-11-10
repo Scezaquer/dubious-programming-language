@@ -2,7 +2,7 @@
 
 Based on https://norasandler.com/2017/11/29/Write-a-Compiler.html
 
-- TODO: Helpful compiler error messages
+- TODO: Helpful compiler error messages at the code generation stage (make &lt;T>TokenWithDebugInfo generic?)
 - TODO: String literals
 - TODO: Structs and enums?
 - TODO: Checker
@@ -108,10 +108,8 @@ for (0;1;0){
 ```
 Is, and is equivalent to `for (;;)` in C
 
-Undefined variables default to 0.
-
-Constants may be defined anywhere in the global scope and are valid everywhere in the file, even
-before they are declared. Constants may only be declared once, and must be initialized at the time
+Constants may be defined anywhere in the global scope and are valid everywhere in the project, even
+before they are declared or in different files. Constants may only be declared once, and must be initialized at the time
 they are declared. They are essentially just aliases for literals, so expressions cannot be assigned to them,
 only literals. If I implement expression pre-processing then maybe it'll become possible to have
 combinations of literals instead. Right now #define is more versatile.
@@ -123,3 +121,53 @@ but on modern hardware that should not matter at all, and it makes my life easie
 Maybe i'll need some byte-level fine grain control on memory at some point tho?
 I can work around it by combining some binary operations to get that but it's a little
 impractical (and requires more cpu cycles of course, but at this point, does it even matter). I'll see.
+
+TODO: N dimensional arrays (on stack):
+
+```
+let arr[3]: list[int] = [0, 1, 2];
+let arr2d[3, 4]: list[int] = [[0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3]];
+let arr2d[3, 4]: list[int] = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]; // TODO: Do I make this legal? Is it equivalent to the array above? Probably shouldn't because it opens a whole can of worms with mismatched dimensions, like assigning a [4, 3] array to a [3, 4] array pointer which could lead to some sneaky bugs. Probably best to enfore strict dim match.
+
+let arr2d[2, 2]: list[int] = [[0], [1, 2]];	// Uninitialized entries default to 0, so this is equivalent to [[0, 0], [1, 2]]
+arr2d[3]; // returns 1: Treat arrays as flat when indexed like this
+arr2d[1, 0]; // returns 1 as well
+
+arr2d[3, 4] = 3; // TODO: Special syntax that initializes all entries to 3
+```
+
+The compiler should treat all arrays as flat and substitute dimensional indexing by it's equivalent flat indexing,
+so that the dimensions of the array don't have to be saved at runtime, only a value containing the size (in words).
+
+In memory, there should be a variable on the stack containing the length of the array, and additional variables with the array's dimensions if needed. Then elements of the array one after the other in a continuous block of memory on the stack.
+
+At runtime, check before accessing an array's element that it's within the array's length,
+otherwise throw some error (need an error routine? Otherwise just do something that segfaults
+but that's pretty dirty). It's technically an extra instruction (and a branch so extra bad)
+but useful safety to have, should save me from a bunch of bugs. NOTE: Branch prediction: Modern
+CPUs generally predict forward conditional jumps as "unlikely" and backward conditional jumps as
+"likely," which is a natural heuristic based on typical loop behavior.
+
+make sure n >= 1 in `let arr[n] = ...` ?
+
+only allow array literals in let statements? meaning considering them as separate from expressions
+If I don't but still implement the "uninitialized entries default to 0" thing then
+the same expression could mean 2 different things in 2 different contexts. Unless
+I enforce all arrays being rectangular? I guess I could make a more flexible data
+structure later for cases where not all entries in a list are arrays of the same size.
+Alternatively arrays of pointers would be fine.
+
+should arr2d[2, 2] be list[int] or list[list[int]]? I think list[int] since
+it's just syntactic sugar for that. Technically arr2d is a pointer to the
+beginning of the list, while list[list[int]] would be a pointer to a list which
+itself contains pointers to int lists.
+
+I explicitely don't allow C nonsense like arr[3] being equivalent to 3[arr].
+Array indexation must be of the form `identifier[index]`
+
+TODO: test array implementation thoroughly. 
+- Test 0 autofill
+- Test up to high dim, both indexing ways
+- Test/implement assignment to array
+- Test using expressions as array elements, array indices, array dimensions
+- Assigning an array of the wrong dim should crash

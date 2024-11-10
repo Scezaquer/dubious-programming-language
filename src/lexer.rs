@@ -144,8 +144,8 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
     // number of letters, numbers, or underscores
     let identifier_re = Regex::new(r"^[a-zA-Z_][a-zA-Z0-9_]*").unwrap();
 
-    // Primitive types are any of the following strings: int float char void
-    let primitive_type_re = Regex::new(r"^(int|float|char|void)").unwrap();
+    // Primitive types are any of the following strings: int float char void array
+    let primitive_type_re = Regex::new(r"^(int|float|char|void|array)").unwrap();
 
     // Floats are a sequence of digits, followed by a decimal point
     // and more digits

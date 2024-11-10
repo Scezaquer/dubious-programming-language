@@ -87,6 +87,7 @@ impl std::fmt::Display for AssignmentIdentifier {
 		match self {
 			AssignmentIdentifier::Variable(var) => write!(f, "{}", var),
 			AssignmentIdentifier::Dereference(var) => write!(f, "*{}", var),
+			AssignmentIdentifier::Array(var, index) => write!(f, "{}[{:?}]", var, index),
 		}
 	}
 }
@@ -117,6 +118,17 @@ impl std::fmt::Display for Atom {
 					}
 				}
 				write!(f, ")")
+			},
+			Atom::ArrayAccess(var, index) => write!(f, "{}[{:?}]", var, index),
+			Atom::Array(elements, _) => {
+				write!(f, "[")?;
+				for (i, element) in elements.iter().enumerate() {
+					write!(f, "{}", element)?;
+					if i < elements.len() - 1 {
+						write!(f, ", ")?;
+					}
+				}
+				write!(f, "]")
 			}
 		}
 	}

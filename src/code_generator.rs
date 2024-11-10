@@ -16,34 +16,102 @@ static LOOP_LABEL: AtomicUsize = AtomicUsize::new(0);
 // TODO: test all of these one by one (pain)
 
 /// Generates the assembly code for an atom
-fn generate_atom(file: &mut File, atom: &Atom, var_map: &HashMap<String, i64>, constants: &HashSet<String>) {
+fn generate_atom(file: &mut File, atom: &Atom, context: &mut Context) {
     match atom {
         Atom::Literal(constant) => {
             // NOTE: change the std::fmt::Display trait for Constant in build_ast.rs in case it doesn't print the asm correctly
             writeln!(file, "    mov rax, {}", constant).unwrap(); // TODO: Doesn't work for floats
         }
         Atom::Variable(variable) => {
-            let var_address = var_map.get(variable);
+            let var_address = context.var_map.get(variable);
 			if let Some(var_address) = var_address {
 				writeln!(file, "    mov rax, [rbp{}{}]", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
 				return;
 			}
 			
-			let constant = constants.get(variable).expect(format!("Undeclared variable {}", variable).as_str());
+			let constant = context.constants.get(variable).expect(format!("Undeclared variable {}", variable).as_str());
 			writeln!(file, "    mov rax, {}", constant).unwrap();
         }
         Atom::Expression(expression) => {
-            generate_expression(file, expression, var_map, constants);
+            generate_expression(file, expression, context);
         }
 		Atom::FunctionCall(name, args) => {
 			writeln!(file, "	;push function arguments to the stack in reverse order").unwrap();
 			for arg in args.iter().rev() {		// Push arguments in reverse order (C convention)
-				generate_expression(file, arg, var_map, constants);
+				generate_expression(file, arg, context);
 				writeln!(file, "    push rax").unwrap();
 			}
 			writeln!(file, "    call {}", name).unwrap();
 			writeln!(file, "    add rsp, {}	;pop arguments", args.len() * 8).unwrap();	// Pop arguments from stack
 		}
+		Atom::ArrayAccess(variable, indices) => {
+			let var_address = context.var_map.get(variable).expect(format!("Undeclared variable {}", variable).as_str()).clone();
+
+			// TODO: Insert runtime checks for array bounds
+			// Don't forget multi-dimensional array bounds:
+			// if i >= dim1 || j >= dim2 || k >= dim3 || ... { panic!() }
+			// if i < 0 || j < 0 || k < 0 || ... { panic!() }
+			// Yes, this will make the code slower, but it's better than undefined behavior
+
+			if indices.len() == 1 {
+				generate_expression(file, &indices[0], context);
+				writeln!(file, "    mov rcx, rax").unwrap();
+				writeln!(file, "    mov rax, rbp").unwrap();
+				if var_address < 0 {
+					writeln!(file, "	sub rax, {}", var_address.abs()).unwrap();
+				} else {
+					writeln!(file, "	add rax, {}", var_address).unwrap();
+				}
+				// At this stage, the value at address rax is a pointer to the beginning of the array
+				writeln!(file, "	mov rax, [rax]").unwrap();
+				writeln!(file, "    mov rax, [rax + rcx * 8]").unwrap();
+				return;
+			} else if indices.len() == *context.dimensions.get(variable).expect(format!("Undeclared array {}", variable).as_str()) {
+				// Indexing a multi-dimensional array
+				// Calculate the address of the element arr[i, j, k, ...] = arr + ((i * dim1 + j) * dim2 + k) * dim3 + ...
+				// Use rcx as accumulator
+				writeln!(file, "    mov rcx, 0").unwrap();
+				let mut current_dim = 0;
+				for index in indices.iter() {
+					generate_expression(file, index, context);
+					// get the dimension from the stack into rdx
+					let dim = context.var_map.get(&format!("{}:dim{}", variable, current_dim)).expect(format!("Undeclared array {}", variable).as_str());
+					writeln!(file, "    mov rdx, [rbp{}{}]", if var_address < 0 { "" } else { "+" }, dim).unwrap();
+					
+					// rcx = rcx * dim + rax
+					writeln!(file, "    imul rcx, rdx").unwrap();
+					writeln!(file, "    add rcx, rax").unwrap();
+					current_dim += 1;
+				}
+				// Move the base address of the array to rax
+				writeln!(file, "	;Move the base address of the array to rax").unwrap();
+				writeln!(file, "    mov rax, rbp").unwrap();
+				if var_address < 0 {
+					writeln!(file, "	sub rax, {}", var_address.abs()).unwrap();
+				} else {
+					writeln!(file, "	add rax, {}", var_address).unwrap();
+				}
+				// At this stage, the value at address rax is a pointer to the beginning of the array
+				writeln!(file, "	mov rax, [rax]").unwrap();
+				writeln!(file, "    mov rax, [rax + rcx * 8]").unwrap();
+			} else {
+				panic!("Incorrect number of indices for array access: expected {}, got {}", context.dimensions.get(variable).expect(format!("Undeclared array {}", variable).as_str()), indices.len());
+			}
+		}
+		Atom::Array(expressions, _) => {
+				// TODO: Push array's dimensions on the stack upon creation, refer 
+				// back to them when accessing the array
+
+				// Push expressions on stack in reverse order
+				for expr in expressions.iter().rev() {
+					generate_expression(file, expr, context);
+					writeln!(file, "    push rax").unwrap();
+					context.stack_index -= 8;
+					context.len += 1;
+				}
+				// Move the address of the array to rax
+				writeln!(file, "    mov rax, rsp	; Move the address of the array to rax").unwrap();
+			}
         //_ => unimplemented!(),
     }
 }
@@ -111,13 +179,13 @@ fn generate_assignment(op: &AssignmentOp, file: &mut File, var_address: &i64, po
 }
 
 /// Generates the assembly code for an expression
-fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashMap<String, i64>, constants: &HashSet<String>) {
+fn generate_expression(file: &mut File, expression: &Expression, context: &mut Context) {
     match expression {
         Expression::Atom(atom) => {
-            generate_atom(file, atom, var_map, constants);
+            generate_atom(file, atom, context);
         }
         Expression::UnaryOp(expr, unop) => {
-            generate_expression(file, expr, var_map, constants);
+            generate_expression(file, expr, context);
             match unop {
                 UnOp::UnaryMinus => {
                     writeln!(file, "    neg rax").unwrap();
@@ -147,9 +215,9 @@ fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashM
             }
         }
         Expression::BinaryOp(left, right, bin_op) => {
-            generate_expression(file, left, var_map, constants);
+            generate_expression(file, left, context);
             writeln!(file, "    push rax").unwrap();
-            generate_expression(file, right, var_map, constants);
+            generate_expression(file, right, context);
             writeln!(file, "    pop rcx").unwrap();
             writeln!(file, "    xchg rax, rcx").unwrap();
             match bin_op {
@@ -229,7 +297,7 @@ fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashM
             }
         }
         Expression::Assignment(variable, expr, op) => {
-			generate_expression(file, expr, var_map, constants);
+			generate_expression(file, expr, context);
 			
 			let mut number_of_dereferences = 0;
 			let mut variable = variable;
@@ -239,7 +307,7 @@ fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashM
 			}
 
 			if let AssignmentIdentifier::Variable(variable) = variable {
-				let var_address = var_map.get(variable);
+				let var_address = context.var_map.get(variable);
 				let dereference = number_of_dereferences > 0;
 				while number_of_dereferences > 0 {
 					writeln!(file, "    mov rax, [rax]").unwrap();
@@ -251,7 +319,7 @@ fn generate_expression(file: &mut File, expression: &Expression, var_map: &HashM
 					return;
 				}
 
-				if let Some(_) = constants.get(variable) {
+				if let Some(_) = context.constants.get(variable) {
 					panic!("Cannot assign to a constant variable");
 				}
 				panic!("Undeclared variable {:?}", variable);
@@ -276,6 +344,8 @@ struct Context {
     break_label: Option<String>,
 	/// Length of the context (in number of 64 bit words)
 	len: usize,
+	/// Arrays number of dimensions
+	dimensions: HashMap<String, usize>,
 }
 
 impl Context {
@@ -288,6 +358,7 @@ impl Context {
             continue_label: None,
             break_label: None,
 			len: 0,
+			dimensions: HashMap::new(),
         }
     }
 
@@ -302,7 +373,8 @@ impl Context {
             local_variables: HashSet::new(),
             continue_label: context.continue_label.clone(),
             break_label: context.break_label.clone(),
-			len: 0
+			len: 0,
+			dimensions: context.dimensions.clone(),
         }
     }
 
@@ -325,7 +397,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
         for statement in statements.iter() {
             match statement {
                 Statement::Return(expression) => {
-                    generate_expression(file, expression, &context.var_map, &context.constants);
+                    generate_expression(file, expression,  &mut context);
                     // Pop all the variables from the stack
                     writeln!(
                         file,
@@ -338,11 +410,11 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     writeln!(file, "    ret").unwrap();
                 }
                 Statement::Expression(expression) => {
-                    generate_expression(file, expression, &context.var_map, &context.constants);
+                    generate_expression(file, expression, &mut context);
                 }
                 Statement::Let(variable, expr) => {
                     if let Some(expr) = expr {
-                        generate_expression(file, expr, &context.var_map, &context.constants);
+                        generate_expression(file, expr, &mut context);
                     }
 
 					// Dereference the variable if it is a pointer
@@ -353,22 +425,37 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
 						number_of_dereferences += 1;
 					}
 
-					if let AssignmentIdentifier::Variable(variable) = variable {
-						if let Some(_) = expr {
-							writeln!(file, "    push rax").unwrap();
-						} else {
-							writeln!(file, "    push 0").unwrap();	// Undefined variables default to 0
-						}
+					if let Some(_) = expr {
+						writeln!(file, "    push rax").unwrap();
+					} else {
+						writeln!(file, "    push 0").unwrap();	// Undefined variables default to 0
+					}
+					context.stack_index -= 8;
+
+					while number_of_dereferences > 0 {
+						writeln!(file, "    push rsp").unwrap();
+						number_of_dereferences -= 1;
 						context.stack_index -= 8;
-
-						while number_of_dereferences > 0 {
-							writeln!(file, "    push rsp").unwrap();
-							number_of_dereferences -= 1;
-							context.stack_index -= 8;
-							context.len += 1;
-						}
-
+						context.len += 1;
+					}
+					
+					if let AssignmentIdentifier::Variable(variable) = variable {
 						context.insert(variable.clone(), context.stack_index);
+					} else if let AssignmentIdentifier::Array(variable, dimensions) = variable {
+						context.insert(variable.clone(), context.stack_index);
+						dbg!(context.stack_index);
+
+						let mut dimensions = dimensions.clone();
+						context.dimensions.insert(variable.clone(), dimensions.len());
+						// Push the dimensions on the stack
+						while let Some(expr) = dimensions.pop() {
+							generate_expression(file, &expr, &mut context);
+							writeln!(file, "    push rax	;pushing array dimensions onto stack").unwrap();
+							context.stack_index -= 8;
+							context.insert(format!("{}:dim{}", variable, dimensions.len()), context.stack_index);
+						}
+					} else {
+						panic!("Expected a variable or an array, got {:?}", variable);
 					}
                 }
                 Statement::Compound(_) => {
@@ -381,7 +468,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     let end_label = format!("end_{}", branch_label);
 
                     writeln!(file, "    ;if statement").unwrap();
-                    generate_expression(file, condition, &context.var_map, &context.constants);
+                    generate_expression(file, condition, &mut context);
                     writeln!(file, "    cmp rax, 0").unwrap();
                     writeln!(file, "    je {}", else_label).unwrap();
                     generate_compound_statement(file, if_statement, &context);
@@ -402,7 +489,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
 
                     writeln!(file, "    ;while statement").unwrap();
                     writeln!(file, "{}:", start_label).unwrap();
-                    generate_expression(file, condition, &context.var_map, &context.constants);
+                    generate_expression(file, condition, &mut context);
                     writeln!(file, "    cmp rax, 0").unwrap();
                     writeln!(file, "    je {}", end_label).unwrap();
                     generate_compound_statement(file, statement, &context);
@@ -434,7 +521,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     writeln!(file, "    ;do while statement").unwrap();
                     writeln!(file, "{}:", start_label).unwrap();
                     generate_compound_statement(file, statement, &context);
-                    generate_expression(file, condition, &context.var_map, &context.constants);
+                    generate_expression(file, condition, &mut context);
                     writeln!(file, "    cmp rax, 0").unwrap();
                     writeln!(file, "    jne {}", start_label).unwrap();
                     writeln!(file, "{}:", end_label).unwrap();
@@ -448,13 +535,13 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     context.break_label = Some(end_label.clone());
 
                     writeln!(file, "    ;for statement").unwrap();
-                    generate_expression(file, init, &context.var_map, &context.constants);
+                    generate_expression(file, init, &mut context);
                     writeln!(file, "{}:", start_label).unwrap();
-                    generate_expression(file, condition, &context.var_map, &context.constants);
+                    generate_expression(file, condition, &mut context);
                     writeln!(file, "    cmp rax, 0").unwrap();
                     writeln!(file, "    je {}", end_label).unwrap();
                     generate_compound_statement(file, statement, &context);
-                    generate_expression(file, update, &context.var_map, &context.constants);
+                    generate_expression(file, update, &mut context);
                     writeln!(file, "    jmp {}", start_label).unwrap();
                     writeln!(file, "{}:", end_label).unwrap();
                 }

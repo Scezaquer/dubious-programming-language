@@ -7,22 +7,21 @@ use std::slice::Iter;
 // OPERATOR PRECEDENCE TABLE:
 // 1. Member access (.)
 // 2. Pre increment (++a) Pre decrement (--a) Unary plus (+a) Unary minus (-a) Logical not (!a) Bitwise not (~a) Dereference (*a) Address of (&a)
-// 3. Exponentiation (a ** b)
-// 4. Multiplication (a * b) Division (a / b) Modulus (a % b)
-// 5. Addition (a + b) Subtraction (a - b)
-// 6. Bitwise left shift (a << b) Bitwise right shift (a >> b)
-// 7. Less than (a < b) Greater than (a > b) Less than or equal to (a <= b) Greater than or equal to (a >= b)
-// 8. Equal to (a == b) Not equal to (a != b)
-// 9. Bitwise and (a & b)
-// 10. Bitwise xor (a ^ b)
-// 11. Bitwise or (a | b)
-// 12. Logical and (a && b)
-// 13. Logical xor (a ^^ b)
-// 14. Logical or (a || b)
-// 15. Assignment (a = b) Add assignment (a += b) Subtract assignment (a -= b) Multiply assignment (a *= b) Divide assignment (a /= b) Modulus assignment (a %= b) Left shift assignment (a <<= b) Right shift assignment (a >>= b) Bitwise and assignment (a &= b) Bitwise xor assignment (a ^= b) Bitwise or assignment (a |= b)
+// 3. Multiplication (a * b) Division (a / b) Modulus (a % b)
+// 4. Addition (a + b) Subtraction (a - b)
+// 5. Bitwise left shift (a << b) Bitwise right shift (a >> b)
+// 6. Less than (a < b) Greater than (a > b) Less than or equal to (a <= b) Greater than or equal to (a >= b)
+// 7. Equal to (a == b) Not equal to (a != b)
+// 8. Bitwise and (a & b)
+// 9. Bitwise xor (a ^ b)
+// 10. Bitwise or (a | b)
+// 11. Logical and (a && b)
+// 12. Logical xor (a ^^ b)
+// 13. Logical or (a || b)
+// 14. Assignment (a = b) Add assignment (a += b) Subtract assignment (a -= b) Multiply assignment (a *= b) Divide assignment (a /= b) Modulus assignment (a %= b) Left shift assignment (a <<= b) Right shift assignment (a >>= b) Bitwise and assignment (a &= b) Bitwise xor assignment (a ^= b) Bitwise or assignment (a |= b)
 
 /// Represents a literal value in the AST.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Literal {
     Int(i64),
     Float(f64),
@@ -33,19 +32,23 @@ pub enum Literal {
 
 /// Represents an atom in the AST.
 ///
-/// An atom is the smallest unit of an expression. It can be a constant, an expression, a variable, or a function call* (*unimplemented).
-#[derive(Debug)]
+/// An atom is the smallest unit of an expression. It can be a constant, an expression, a variable, a function call or an array access.
+#[derive(Debug, Clone)]
 pub enum Atom {
     Literal(Literal),
     Expression(Box<Expression>),
     Variable(String),
     FunctionCall(String, Vec<Expression>),
+	ArrayAccess(String, Vec<Expression>),	// identifier[exp1, exp2, ...]
+	Array(Vec<Expression>, i64),	// Array literal with a given number of dimensions
 }
 
-#[derive(Debug)]
+// In let bindings, the left hand side of the assignment
+#[derive(Debug, Clone)]
 pub enum AssignmentIdentifier {
 	Variable(String),
 	Dereference(Box<AssignmentIdentifier>),
+	Array(String, Vec<Expression>), // identifier[dim1, dim2, ...]
 }
 
 #[derive(Debug)]
@@ -55,12 +58,12 @@ pub enum Type {
 	Bool,
 	Void,
 	Pointer(Box<Type>),
-	Array(Box<Type>, i64),
+	Array(Box<Type>),	// array[type]
 	Function(Box<Type>, Vec<Type>),
 }
 
 /// Represents a unary operator in the AST.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum UnOp {
     // TODO: We only support prefix unary operators for now
     PreIncrement,
@@ -75,7 +78,7 @@ pub enum UnOp {
 }
 
 /// Represents a binary operator in the AST.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum BinOp {
     MemberAccess,
     Multiply,
@@ -101,7 +104,7 @@ pub enum BinOp {
 }
 
 /// Represents an assignment operator in the AST.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum AssignmentOp {
     Assign,
     AddAssign,
@@ -148,7 +151,7 @@ pub struct PrecedenceLevel {
 ///
 /// An expression is a combination of atoms and operators that evaluates to a value.
 /// Expressions can be atoms, unary operations, binary operations, or assignments.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expression {
     Atom(Atom),
     UnaryOp(Box<Expression>, UnOp),
@@ -229,7 +232,7 @@ fn get_un_operator_from_token(token: &TokenWithDebugInfo) -> UnOp {
 ///
 /// A statement is a single instruction in the program.
 /// Statements can be assignments, let bindings, if statements, while loops, loops, do-while loops, for loops, return statements, expressions, compound statements, break statements, or continue statements.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
     Let(AssignmentIdentifier, Option<Expression>),
     If(Expression, Box<Statement>, Option<Box<Statement>>),
@@ -245,7 +248,7 @@ pub enum Statement {
 }
 
 /// Represents a function in the AST.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Function {
     Function(String, Vec<String>, Statement),
 }
@@ -253,19 +256,19 @@ pub enum Function {
 /// Represents a constant in the AST.
 /// Constants can only be assigned on declaration, and can only be assigned a literal,
 /// so they're not terribly useful as of now. They're basically static globals.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Constant {
     Constant(String, Literal),
 }
 
 /// Represents a program in the AST.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Program {
     Program(Vec<Function>, Vec<Constant>),
 }
 
 /// Represents the abstract syntax tree (AST) of a program.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Ast {
     pub program: Program,
 }
@@ -306,6 +309,11 @@ fn parse_literal(token: &TokenWithDebugInfo) -> Literal {
 fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
     let tok = tokens.next().unwrap();
 
+	// Check if what we're parsing is an array literal
+	if let TokenWithDebugInfo { internal_tok: Token::LBracket, .. } = tok {
+		return parse_array(&mut tokens);
+	}
+
     match tok {
         TokenWithDebugInfo { internal_tok: Token::LParen, .. } => {
             let inner_exp = parse_expression(&mut tokens);
@@ -341,7 +349,23 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
                     }
                 }
                 return Atom::FunctionCall(s.to_string(), args);
-            }
+            } else if let TokenWithDebugInfo { internal_tok: Token::LBracket, .. } = next_tok {
+				// Array access
+				tokens.next();
+				let mut args = Vec::new();
+				loop {
+					let next_tok = tokens.clone().next().unwrap();
+					if let TokenWithDebugInfo { internal_tok: Token::RBracket, .. } = next_tok {
+						tokens.next();
+						break;
+					} else if let TokenWithDebugInfo { internal_tok: Token::Comma, .. } = next_tok {
+						tokens.next();
+					} else {
+						args.push(parse_expression(&mut tokens));
+					}
+				}
+				return Atom::ArrayAccess(s.to_string(), args);
+			}
 
             // Variable
             return Atom::Variable(s.to_string());
@@ -358,10 +382,73 @@ fn parse_assignment_identifier(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Ass
 			return AssignmentIdentifier::Dereference(Box::new(parse_assignment_identifier(&mut tokens)));
 		}
 		TokenWithDebugInfo { internal_tok: Token::Identifier(s), .. } => {
+			let next_tok = tokens.clone().next().unwrap();
+			if let TokenWithDebugInfo { internal_tok: Token::LBracket, .. } = next_tok {
+				// Array access
+				tokens.next();
+				let mut args = Vec::new();
+				loop {
+					let next_tok = tokens.clone().next().unwrap();
+					if let TokenWithDebugInfo { internal_tok: Token::RBracket, .. } = next_tok {
+						tokens.next();
+						break;
+					} else if let TokenWithDebugInfo { internal_tok: Token::Comma, .. } = next_tok {
+						tokens.next();
+					} else {
+						args.push(parse_expression(&mut tokens));
+					}
+				}
+				return AssignmentIdentifier::Array(s.to_string(), args);
+			}
 			return AssignmentIdentifier::Variable(s.to_string());
 		}
 		_ => error_unexpected_token("valid assignment identifier", tok)
 	}
+}
+
+fn parse_array(tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
+	let mut elements = Vec::new();
+	loop {
+		let next_tok = tokens.clone().next().unwrap();
+		if let TokenWithDebugInfo { internal_tok: Token::RBracket, .. } = next_tok {
+			tokens.next();
+			break;
+		} else if let TokenWithDebugInfo { internal_tok: Token::Comma, .. } = next_tok {
+			tokens.next();
+		} else {
+			elements.push(parse_expression(tokens));
+		}
+	}
+
+	// Turn the array rectangular, filling with 0s if necessary, and then flatten it
+	let mut max_len = 0;
+	let mut max_dim = 0;
+	for elem in &elements {
+		if let Expression::Atom(Atom::Array(sub_elements, dim)) = elem {
+			if sub_elements.len() > max_len {
+				max_len = sub_elements.len();
+			}
+			if *dim > max_dim {
+				max_dim = *dim;
+			}
+		}
+	}
+
+	let mut flat_elements: Vec<Expression> = Vec::new();
+	for elem in &mut elements {
+		if let Expression::Atom(Atom::Array(sub_elements, _)) = elem {
+			while sub_elements.len() < max_len {
+				sub_elements.push(Expression::Atom(Atom::Literal(Literal::Int(0))));
+			}
+            for sub_elem in sub_elements {
+                flat_elements.push(sub_elem.clone());
+			}
+		} else {
+			flat_elements.push(elem.clone());
+		}
+	}
+
+	return Atom::Array(flat_elements, max_dim + 1);
 }
 
 /// Recursively parses an expression, taking into account operator precedence.
@@ -575,6 +662,19 @@ fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Type {
 				return Type::Bool;
 			} else if k == "void" {
 				return Type::Void;
+			} else if k == "array" {
+				let next_tok = tokens.next().unwrap();
+				if !matches!(next_tok, TokenWithDebugInfo { internal_tok: Token::LBracket, .. }) {
+					error_unexpected_token("opening bracket", next_tok);
+				}
+
+				let inner_type = parse_type(&mut tokens);
+				let next_tok = tokens.next().unwrap();
+
+				if !matches!(next_tok, TokenWithDebugInfo { internal_tok: Token::RBracket, .. }) {
+					error_unexpected_token("closing bracket", next_tok);
+				}
+				return Type::Array(Box::new(inner_type));
 			} else {
 				error_unexpected_token("valid type keyword", tok);
 			}
@@ -582,19 +682,6 @@ fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Type {
 		TokenWithDebugInfo { internal_tok: Token::Operator(Operator::Multiply), .. } => {
 			let inner_type = parse_type(&mut tokens);
 			return Type::Pointer(Box::new(inner_type));
-		}
-		TokenWithDebugInfo { internal_tok: Token::LBracket, .. } => {
-			let inner_type = parse_type(&mut tokens);
-			let size = match tokens.next().unwrap() {
-				TokenWithDebugInfo { internal_tok: Token::IntLiteral(i), .. } => i,
-				_ => error("Expected integer literal for array size", tok)
-			};
-			let next_tok = tokens.next().unwrap();
-			if let TokenWithDebugInfo { internal_tok: Token::RBracket, .. } = next_tok {
-				return Type::Array(Box::new(inner_type), *size);
-			} else {
-				error_unexpected_token("closing bracket", next_tok);
-			}
 		}
 		TokenWithDebugInfo { internal_tok: Token::LParen, .. } => {
 			let return_type = parse_type(&mut tokens);
