@@ -19,6 +19,7 @@ Based on https://norasandler.com/2017/11/29/Write-a-Compiler.html
 - TODO: nasm fails silently. ld too probably. Should instead print a message with the error if that happens
 - TODO: vscode syntax highlighting
 - TODO: Should I make the char type, but make it 64 bits like everything else so that it can actually contain 8 characters at once?
+- TODO: Give the option to generate LLVM IR instead of x86_64
 
 A simple compiler for the Dubious programming language (DPL).
 
@@ -129,7 +130,7 @@ let arr[3]: list[int] = [0, 1, 2];
 let arr2d[3, 4]: list[int] = [[0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3]];
 let arr2d[3, 4]: list[int] = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]; // TODO: Do I make this legal? Is it equivalent to the array above? Probably shouldn't because it opens a whole can of worms with mismatched dimensions, like assigning a [4, 3] array to a [3, 4] array pointer which could lead to some sneaky bugs. Probably best to enfore strict dim match.
 
-let arr2d[2, 2]: list[int] = [[0], [1, 2]];	// Uninitialized entries default to 0, so this is equivalent to [[0, 0], [1, 2]]
+let arr2d[2, 2]: list[int] = [[0], [1, 2]];	// Arrays are cast to the smallest rectangular array that can contain them. Undefined entries default to 0, so this is equivalent to [[0, 0], [1, 2]]
 arr2d[3]; // returns 1: Treat arrays as flat when indexed like this
 arr2d[1, 0]; // returns 1 as well
 
@@ -160,10 +161,10 @@ Alternatively arrays of pointers would be fine.
 should arr2d[2, 2] be list[int] or list[list[int]]? I think list[int] since
 it's just syntactic sugar for that. Technically arr2d is a pointer to the
 beginning of the list, while list[list[int]] would be a pointer to a list which
-itself contains pointers to int lists.
+itself contains pointers to int lists. Useful to keep distinct.
 
 I explicitely don't allow C nonsense like arr[3] being equivalent to 3[arr].
-Array indexation must be of the form `identifier[index]`
+Array indexation must be of the form `identifier[id1, id2, ...]`
 
 TODO: test array implementation thoroughly. 
 - Test 0 autofill
@@ -171,3 +172,8 @@ TODO: test array implementation thoroughly.
 - Test/implement assignment to array
 - Test using expressions as array elements, array indices, array dimensions
 - Assigning an array of the wrong dim should crash
+
+TODO: element-wise operations on arrays?
+TODO: array literals are glitched as fuck if you do weird dimension things. So
+don't. Ideally stick to either rectangular or 1/2d arrays. If you do something
+else, you're on your own, and expect fucked up indexing behavior.

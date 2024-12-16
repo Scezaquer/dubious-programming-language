@@ -443,7 +443,6 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
 						context.insert(variable.clone(), context.stack_index);
 					} else if let AssignmentIdentifier::Array(variable, dimensions) = variable {
 						context.insert(variable.clone(), context.stack_index);
-						dbg!(context.stack_index);
 
 						let mut dimensions = dimensions.clone();
 						context.dimensions.insert(variable.clone(), dimensions.len());

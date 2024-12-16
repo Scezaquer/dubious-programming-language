@@ -3,6 +3,7 @@ use crate::lexer::Token;
 use crate::lexer::TokenWithDebugInfo;
 use core::panic;
 use std::slice::Iter;
+use std::vec;
 
 // OPERATOR PRECEDENCE TABLE:
 // 1. Member access (.)
@@ -39,27 +40,27 @@ pub enum Atom {
     Expression(Box<Expression>),
     Variable(String),
     FunctionCall(String, Vec<Expression>),
-	ArrayAccess(String, Vec<Expression>),	// identifier[exp1, exp2, ...]
-	Array(Vec<Expression>, i64),	// Array literal with a given number of dimensions
+    ArrayAccess(String, Vec<Expression>), // identifier[exp1, exp2, ...]
+    Array(Vec<Expression>, i64),          // Array literal with a given number of dimensions
 }
 
 // In let bindings, the left hand side of the assignment
 #[derive(Debug, Clone)]
 pub enum AssignmentIdentifier {
-	Variable(String),
-	Dereference(Box<AssignmentIdentifier>),
-	Array(String, Vec<Expression>), // identifier[dim1, dim2, ...]
+    Variable(String),
+    Dereference(Box<AssignmentIdentifier>),
+    Array(String, Vec<Expression>), // identifier[dim1, dim2, ...]
 }
 
 #[derive(Debug)]
 pub enum Type {
-	Int,
-	Float,
-	Bool,
-	Void,
-	Pointer(Box<Type>),
-	Array(Box<Type>),	// array[type]
-	Function(Box<Type>, Vec<Type>),
+    Int,
+    Float,
+    Bool,
+    Void,
+    Pointer(Box<Type>),
+    Array(Box<Type>), // array[type]
+    Function(Box<Type>, Vec<Type>),
 }
 
 /// Represents a unary operator in the AST.
@@ -162,7 +163,10 @@ pub enum Expression {
 /// Gets the binary operator corresponding to the token.
 fn get_bin_operator_from_token(token: &TokenWithDebugInfo) -> BinOp {
     match token {
-        TokenWithDebugInfo { internal_tok: Token::Operator(op), .. } => match op {
+        TokenWithDebugInfo {
+            internal_tok: Token::Operator(op),
+            ..
+        } => match op {
             Operator::MemberAccess => BinOp::MemberAccess,
             Operator::Multiply => BinOp::Multiply,
             Operator::Divide => BinOp::Divide,
@@ -192,7 +196,10 @@ fn get_bin_operator_from_token(token: &TokenWithDebugInfo) -> BinOp {
 /// Gets the assignment operator corresponding to the token.
 fn get_assign_operator_from_token(token: &TokenWithDebugInfo) -> AssignmentOp {
     match token {
-        TokenWithDebugInfo { internal_tok: Token::Operator(op), .. } => match op {
+        TokenWithDebugInfo {
+            internal_tok: Token::Operator(op),
+            ..
+        } => match op {
             Operator::Assign => AssignmentOp::Assign,
             Operator::AddAssign => AssignmentOp::AddAssign,
             Operator::SubtractAssign => AssignmentOp::SubtractAssign,
@@ -213,7 +220,10 @@ fn get_assign_operator_from_token(token: &TokenWithDebugInfo) -> AssignmentOp {
 /// Gets the unary operator corresponding to the token.
 fn get_un_operator_from_token(token: &TokenWithDebugInfo) -> UnOp {
     match token {
-        TokenWithDebugInfo { internal_tok: Token::Operator(op), .. } => match op {
+        TokenWithDebugInfo {
+            internal_tok: Token::Operator(op),
+            ..
+        } => match op {
             Operator::Increment => UnOp::PreIncrement,
             Operator::Decrement => UnOp::PreDecrement,
             Operator::Add => UnOp::UnaryPlus,
@@ -278,7 +288,13 @@ impl std::fmt::Display for Literal {
         match self {
             Literal::Int(i) => write!(f, "{}", i),
             Literal::Float(fl) => write!(f, "{}", fl),
-            Literal::Bool(b) => if *b { write!(f, "1") } else { write!(f, "0") },
+            Literal::Bool(b) => {
+                if *b {
+                    write!(f, "1")
+                } else {
+                    write!(f, "0")
+                }
+            }
             Literal::Hex(h) => write!(f, "0x{:x}", h),
             Literal::Binary(b) => write!(f, "0b{:b}", b),
         }
@@ -286,21 +302,39 @@ impl std::fmt::Display for Literal {
 }
 
 fn error(msg: &str, token: &TokenWithDebugInfo) -> ! {
-	panic!("{} Line {}: {}", token.file, token.line, msg);
+    panic!("{} Line {}: {}", token.file, token.line, msg);
 }
 
 fn error_unexpected_token(expected: &str, token: &TokenWithDebugInfo) -> ! {
-	error(&format!("Expected {}, found: {:?}", expected, token.internal_tok), token);
+    error(
+        &format!("Expected {}, found: {:?}", expected, token.internal_tok),
+        token,
+    );
 }
 
 /// Parses a constant from a token.
 fn parse_literal(token: &TokenWithDebugInfo) -> Literal {
     match token {
-        TokenWithDebugInfo { internal_tok: Token::IntLiteral(i), .. } => Literal::Int(*i),
-        TokenWithDebugInfo { internal_tok: Token::FloatLiteral(f), .. } => Literal::Float(*f),
-        TokenWithDebugInfo { internal_tok: Token::HexLiteral(h), .. } => Literal::Hex(*h),
-        TokenWithDebugInfo { internal_tok: Token::BinLiteral(b), .. } => Literal::Binary(*b),
-        TokenWithDebugInfo { internal_tok: Token::BoolLiteral(b), .. } => Literal::Bool(*b),
+        TokenWithDebugInfo {
+            internal_tok: Token::IntLiteral(i),
+            ..
+        } => Literal::Int(*i),
+        TokenWithDebugInfo {
+            internal_tok: Token::FloatLiteral(f),
+            ..
+        } => Literal::Float(*f),
+        TokenWithDebugInfo {
+            internal_tok: Token::HexLiteral(h),
+            ..
+        } => Literal::Hex(*h),
+        TokenWithDebugInfo {
+            internal_tok: Token::BinLiteral(b),
+            ..
+        } => Literal::Binary(*b),
+        TokenWithDebugInfo {
+            internal_tok: Token::BoolLiteral(b),
+            ..
+        } => Literal::Bool(*b),
         _ => error_unexpected_token("constant", token),
     }
 }
@@ -309,146 +343,276 @@ fn parse_literal(token: &TokenWithDebugInfo) -> Literal {
 fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
     let tok = tokens.next().unwrap();
 
-	// Check if what we're parsing is an array literal
-	if let TokenWithDebugInfo { internal_tok: Token::LBracket, .. } = tok {
-		return parse_array(&mut tokens);
-	}
+    // Check if what we're parsing is an array literal
+    if let TokenWithDebugInfo {
+        internal_tok: Token::LBracket,
+        ..
+    } = tok
+    {
+        return parse_array(&mut tokens);
+    }
 
     match tok {
-        TokenWithDebugInfo { internal_tok: Token::LParen, .. } => {
+        TokenWithDebugInfo {
+            internal_tok: Token::LParen,
+            ..
+        } => {
             let inner_exp = parse_expression(&mut tokens);
 
-            if let TokenWithDebugInfo { internal_tok: Token::RParen, .. } = tokens.next().unwrap() {
+            if let TokenWithDebugInfo {
+                internal_tok: Token::RParen,
+                ..
+            } = tokens.next().unwrap()
+            {
                 return Atom::Expression(Box::new(inner_exp));
             } else {
-				error_unexpected_token("closing parenthesis", tok);
+                error_unexpected_token("closing parenthesis", tok);
             }
         }
-        TokenWithDebugInfo { internal_tok: Token::IntLiteral(_), .. }
-        | TokenWithDebugInfo { internal_tok: Token::FloatLiteral(_), .. }
-        | TokenWithDebugInfo { internal_tok: Token::BinLiteral(_), .. }
-        | TokenWithDebugInfo { internal_tok: Token::HexLiteral(_), .. }
-        | TokenWithDebugInfo { internal_tok: Token::BoolLiteral(_), .. } => {
+        TokenWithDebugInfo {
+            internal_tok: Token::IntLiteral(_),
+            ..
+        }
+        | TokenWithDebugInfo {
+            internal_tok: Token::FloatLiteral(_),
+            ..
+        }
+        | TokenWithDebugInfo {
+            internal_tok: Token::BinLiteral(_),
+            ..
+        }
+        | TokenWithDebugInfo {
+            internal_tok: Token::HexLiteral(_),
+            ..
+        }
+        | TokenWithDebugInfo {
+            internal_tok: Token::BoolLiteral(_),
+            ..
+        } => {
             return Atom::Literal(parse_literal(tok));
         }
-        TokenWithDebugInfo { internal_tok: Token::Identifier(s), .. } => {
+        TokenWithDebugInfo {
+            internal_tok: Token::Identifier(s),
+            ..
+        } => {
             let next_tok = tokens.clone().next().unwrap();
-            if let TokenWithDebugInfo { internal_tok: Token::LParen, .. } = next_tok {
+            if let TokenWithDebugInfo {
+                internal_tok: Token::LParen,
+                ..
+            } = next_tok
+            {
                 // Function call
                 tokens.next();
                 let mut args = Vec::new();
                 loop {
                     let next_tok = tokens.clone().next().unwrap();
-                    if let TokenWithDebugInfo { internal_tok: Token::RParen, .. } = next_tok {
+                    if let TokenWithDebugInfo {
+                        internal_tok: Token::RParen,
+                        ..
+                    } = next_tok
+                    {
                         tokens.next();
                         break;
-                    } else if let TokenWithDebugInfo { internal_tok: Token::Comma, .. } = next_tok {
+                    } else if let TokenWithDebugInfo {
+                        internal_tok: Token::Comma,
+                        ..
+                    } = next_tok
+                    {
                         tokens.next();
                     } else {
                         args.push(parse_expression(&mut tokens));
                     }
                 }
                 return Atom::FunctionCall(s.to_string(), args);
-            } else if let TokenWithDebugInfo { internal_tok: Token::LBracket, .. } = next_tok {
-				// Array access
-				tokens.next();
-				let mut args = Vec::new();
-				loop {
-					let next_tok = tokens.clone().next().unwrap();
-					if let TokenWithDebugInfo { internal_tok: Token::RBracket, .. } = next_tok {
-						tokens.next();
-						break;
-					} else if let TokenWithDebugInfo { internal_tok: Token::Comma, .. } = next_tok {
-						tokens.next();
-					} else {
-						args.push(parse_expression(&mut tokens));
-					}
-				}
-				return Atom::ArrayAccess(s.to_string(), args);
-			}
+            } else if let TokenWithDebugInfo {
+                internal_tok: Token::LBracket,
+                ..
+            } = next_tok
+            {
+                // Array access
+                tokens.next();
+                let mut args = Vec::new();
+                loop {
+                    let next_tok = tokens.clone().next().unwrap();
+                    if let TokenWithDebugInfo {
+                        internal_tok: Token::RBracket,
+                        ..
+                    } = next_tok
+                    {
+                        tokens.next();
+                        break;
+                    } else if let TokenWithDebugInfo {
+                        internal_tok: Token::Comma,
+                        ..
+                    } = next_tok
+                    {
+                        tokens.next();
+                    } else {
+                        args.push(parse_expression(&mut tokens));
+                    }
+                }
+                return Atom::ArrayAccess(s.to_string(), args);
+            }
 
             // Variable
             return Atom::Variable(s.to_string());
         }
-        _ => error_unexpected_token("valid atom token", tok)
+        _ => error_unexpected_token("valid atom token", tok),
     }
 }
 
 fn parse_assignment_identifier(mut tokens: &mut Iter<TokenWithDebugInfo>) -> AssignmentIdentifier {
-	let tok = tokens.next().unwrap();
+    let tok = tokens.next().unwrap();
 
-	match tok {
-		TokenWithDebugInfo { internal_tok: Token::Operator(Operator::Multiply), .. } => {
-			return AssignmentIdentifier::Dereference(Box::new(parse_assignment_identifier(&mut tokens)));
-		}
-		TokenWithDebugInfo { internal_tok: Token::Identifier(s), .. } => {
-			let next_tok = tokens.clone().next().unwrap();
-			if let TokenWithDebugInfo { internal_tok: Token::LBracket, .. } = next_tok {
-				// Array access
-				tokens.next();
-				let mut args = Vec::new();
-				loop {
-					let next_tok = tokens.clone().next().unwrap();
-					if let TokenWithDebugInfo { internal_tok: Token::RBracket, .. } = next_tok {
-						tokens.next();
-						break;
-					} else if let TokenWithDebugInfo { internal_tok: Token::Comma, .. } = next_tok {
-						tokens.next();
-					} else {
-						args.push(parse_expression(&mut tokens));
+    match tok {
+        TokenWithDebugInfo {
+            internal_tok: Token::Operator(Operator::Multiply),
+            ..
+        } => {
+            return AssignmentIdentifier::Dereference(Box::new(parse_assignment_identifier(
+                &mut tokens,
+            )));
+        }
+        TokenWithDebugInfo {
+            internal_tok: Token::Identifier(s),
+            ..
+        } => {
+            let next_tok = tokens.clone().next().unwrap();
+            if let TokenWithDebugInfo {
+                internal_tok: Token::LBracket,
+                ..
+            } = next_tok
+            {
+                // Array access
+                tokens.next();
+                let mut args = Vec::new();
+                loop {
+                    let next_tok = tokens.clone().next().unwrap();
+                    if let TokenWithDebugInfo {
+                        internal_tok: Token::RBracket,
+                        ..
+                    } = next_tok
+                    {
+                        tokens.next();
+                        break;
+                    } else if let TokenWithDebugInfo {
+                        internal_tok: Token::Comma,
+                        ..
+                    } = next_tok
+                    {
+                        tokens.next();
+                    } else {
+                        args.push(parse_expression(&mut tokens));
+                    }
+                }
+                return AssignmentIdentifier::Array(s.to_string(), args);
+            }
+            return AssignmentIdentifier::Variable(s.to_string());
+        }
+        _ => error_unexpected_token("valid assignment identifier", tok),
+    }
+}
+
+fn find_arr_dims(array: &Atom) -> Option<Vec<i64>> {
+    match array {
+        Atom::Array(sub_elements, dim) => {
+            let mut dims: Vec<i64> = Vec::new();
+
+            for expr in sub_elements {
+                let elem = match expr {
+                    Expression::Atom(atom) => atom,
+                    _ => continue,
+                };
+
+                if !matches!(elem, Atom::Array(_, _)) {
+                    continue;
+                }
+
+                let sub_dims = find_arr_dims(elem).unwrap();
+				for (i, sub_dim) in sub_dims.iter().enumerate() {
+					if i >= dims.len() {
+						dims.push(*sub_dim);
+					} else if dims[i] < *sub_dim {
+						dims[i] = *sub_dim;
 					}
 				}
-				return AssignmentIdentifier::Array(s.to_string(), args);
+            }
+			dims.insert(0, *dim);
+            return Some(dims);
+        }
+        _ => None,
+    }
+}
+
+fn rectangularize_array(array: &mut Vec<Expression>, depth: usize, max_dims: &Vec<i64>) {
+	let max_size = max_dims[depth] as usize;
+	if depth+1 < max_dims.len() {
+		for elem in array.iter_mut() {
+			if let Expression::Atom(Atom::Array(ref mut sub_array, _)) = elem {
+				rectangularize_array(sub_array, depth + 1, max_dims);
+			} else {
+				let mut new_elem = vec![elem.clone()];
+				rectangularize_array(&mut new_elem, depth + 1, max_dims);
+				*elem = Expression::Atom(Atom::Array(new_elem.clone(), new_elem.len() as i64));
 			}
-			return AssignmentIdentifier::Variable(s.to_string());
 		}
-		_ => error_unexpected_token("valid assignment identifier", tok)
+	}
+
+	while array.len() < max_size {
+		if depth == max_dims.len() - 1 {
+			array.push(Expression::Atom(Atom::Literal(Literal::Int(0))));
+		} else {
+			let mut new_elem = vec![];
+			rectangularize_array(&mut new_elem, depth + 1, max_dims);
+			array.push(Expression::Atom(Atom::Array(new_elem.clone(), new_elem.len() as i64)));
+		}
 	}
 }
 
+fn flatten(array: &Vec<Expression>) -> Vec<Expression> {
+	let mut flat_arr = Vec::new();
+	for elem in array.iter() {
+		if let Expression::Atom(Atom::Array(ref sub_array, _)) = elem {
+			flatten(sub_array);
+			for sub_elem in sub_array.iter() {
+				flat_arr.push(sub_elem.clone());
+			}
+		} else {
+			flat_arr.push(elem.clone());
+		}
+	}
+	return flat_arr;
+}
+
 fn parse_array(tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
-	let mut elements = Vec::new();
-	loop {
-		let next_tok = tokens.clone().next().unwrap();
-		if let TokenWithDebugInfo { internal_tok: Token::RBracket, .. } = next_tok {
-			tokens.next();
-			break;
-		} else if let TokenWithDebugInfo { internal_tok: Token::Comma, .. } = next_tok {
-			tokens.next();
-		} else {
-			elements.push(parse_expression(tokens));
-		}
-	}
+    let mut elements = Vec::new();
+    loop {
+        let next_tok = tokens.clone().next().unwrap();
+        if let TokenWithDebugInfo {
+            internal_tok: Token::RBracket,
+            ..
+        } = next_tok
+        {
+            tokens.next();
+            break;
+        } else if let TokenWithDebugInfo {
+            internal_tok: Token::Comma,
+            ..
+        } = next_tok
+        {
+            tokens.next();
+        } else {
+            elements.push(parse_expression(tokens));
+        }
+    }
 
-	// Turn the array rectangular, filling with 0s if necessary, and then flatten it
-	let mut max_len = 0;
-	let mut max_dim = 0;
-	for elem in &elements {
-		if let Expression::Atom(Atom::Array(sub_elements, dim)) = elem {
-			if sub_elements.len() > max_len {
-				max_len = sub_elements.len();
-			}
-			if *dim > max_dim {
-				max_dim = *dim;
-			}
-		}
-	}
+    // Find the max size in each dimension
+	let array = Atom::Array(elements.clone(), elements.len() as i64);
+    let max_dims = find_arr_dims(&array).unwrap();
+	rectangularize_array(&mut elements, 0, &max_dims);
+	let flat_elements = flatten(&elements);
 
-	let mut flat_elements: Vec<Expression> = Vec::new();
-	for elem in &mut elements {
-		if let Expression::Atom(Atom::Array(sub_elements, _)) = elem {
-			while sub_elements.len() < max_len {
-				sub_elements.push(Expression::Atom(Atom::Literal(Literal::Int(0))));
-			}
-            for sub_elem in sub_elements {
-                flat_elements.push(sub_elem.clone());
-			}
-		} else {
-			flat_elements.push(elem.clone());
-		}
-	}
-
-	return Atom::Array(flat_elements, max_dim + 1);
+    return Atom::Array(flat_elements, max_dims[0]);
 }
 
 /// Recursively parses an expression, taking into account operator precedence.
@@ -462,12 +626,12 @@ fn parse_expression_with_precedence(
         return Expression::Atom(parse_atom(&mut tokens));
     }
 
-	// In case we are actually in an assignment expression the left hand side
-	// has some special rules, so it is parsed separately in parse_assignment_identifier.
-	// We start by assuming we are not in an assignment expression, and if it turns out
-	// we are, we will change the expr variable to an Assignment expression.
-	// In the meantime we keep a copy of the tokens iterator to be able to backtrack
-	let mut next_if_assignment = tokens.clone();
+    // In case we are actually in an assignment expression the left hand side
+    // has some special rules, so it is parsed separately in parse_assignment_identifier.
+    // We start by assuming we are not in an assignment expression, and if it turns out
+    // we are, we will change the expr variable to an Assignment expression.
+    // In the meantime we keep a copy of the tokens iterator to be able to backtrack
+    let mut next_if_assignment = tokens.clone();
 
     // Check if the current token is a unary operator for this precedence level
     let mut next = tokens.clone().next().unwrap();
@@ -509,9 +673,9 @@ fn parse_expression_with_precedence(
                 precedence_table,
             ); // Parse next term
 
-			// Re-parse the left hand side of the assignment expression
-			let assignment_identifier = parse_assignment_identifier(&mut next_if_assignment);
-			expr = Expression::Assignment(assignment_identifier, Box::new(next_term), op);
+            // Re-parse the left hand side of the assignment expression
+            let assignment_identifier = parse_assignment_identifier(&mut next_if_assignment);
+            expr = Expression::Assignment(assignment_identifier, Box::new(next_term), op);
         } else {
             let next_term = parse_expression_with_precedence(
                 &mut tokens,
@@ -650,57 +814,86 @@ fn build_precedence_table() -> Vec<PrecedenceLevel> {
 }
 
 fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Type {
-	let tok = tokens.next().unwrap();
+    let tok = tokens.next().unwrap();
 
-	match tok {
-		TokenWithDebugInfo { internal_tok: Token::PrimitiveType(k), .. } => {
-			if k == "int" {
-				return Type::Int;
-			} else if k == "float" {
-				return Type::Float;
-			} else if k == "bool" {
-				return Type::Bool;
-			} else if k == "void" {
-				return Type::Void;
-			} else if k == "array" {
-				let next_tok = tokens.next().unwrap();
-				if !matches!(next_tok, TokenWithDebugInfo { internal_tok: Token::LBracket, .. }) {
-					error_unexpected_token("opening bracket", next_tok);
-				}
+    match tok {
+        TokenWithDebugInfo {
+            internal_tok: Token::PrimitiveType(k),
+            ..
+        } => {
+            if k == "int" {
+                return Type::Int;
+            } else if k == "float" {
+                return Type::Float;
+            } else if k == "bool" {
+                return Type::Bool;
+            } else if k == "void" {
+                return Type::Void;
+            } else if k == "array" {
+                let next_tok = tokens.next().unwrap();
+                if !matches!(
+                    next_tok,
+                    TokenWithDebugInfo {
+                        internal_tok: Token::LBracket,
+                        ..
+                    }
+                ) {
+                    error_unexpected_token("opening bracket", next_tok);
+                }
 
-				let inner_type = parse_type(&mut tokens);
-				let next_tok = tokens.next().unwrap();
+                let inner_type = parse_type(&mut tokens);
+                let next_tok = tokens.next().unwrap();
 
-				if !matches!(next_tok, TokenWithDebugInfo { internal_tok: Token::RBracket, .. }) {
-					error_unexpected_token("closing bracket", next_tok);
-				}
-				return Type::Array(Box::new(inner_type));
-			} else {
-				error_unexpected_token("valid type keyword", tok);
-			}
-		}
-		TokenWithDebugInfo { internal_tok: Token::Operator(Operator::Multiply), .. } => {
-			let inner_type = parse_type(&mut tokens);
-			return Type::Pointer(Box::new(inner_type));
-		}
-		TokenWithDebugInfo { internal_tok: Token::LParen, .. } => {
-			let return_type = parse_type(&mut tokens);
-			let mut params = Vec::new();
-			loop {
-				let next_tok = tokens.clone().next().unwrap();
-				if let TokenWithDebugInfo { internal_tok: Token::RParen, .. } = next_tok {
-					tokens.next();
-					break;
-				} else if let TokenWithDebugInfo { internal_tok: Token::Comma, .. } = next_tok {
-					tokens.next();
-				} else {
-					params.push(parse_type(&mut tokens));
-				}
-			}
-			return Type::Function(Box::new(return_type), params);
-		}
-		_ => error_unexpected_token("valid type token", tok)
-	}
+                if !matches!(
+                    next_tok,
+                    TokenWithDebugInfo {
+                        internal_tok: Token::RBracket,
+                        ..
+                    }
+                ) {
+                    error_unexpected_token("closing bracket", next_tok);
+                }
+                return Type::Array(Box::new(inner_type));
+            } else {
+                error_unexpected_token("valid type keyword", tok);
+            }
+        }
+        TokenWithDebugInfo {
+            internal_tok: Token::Operator(Operator::Multiply),
+            ..
+        } => {
+            let inner_type = parse_type(&mut tokens);
+            return Type::Pointer(Box::new(inner_type));
+        }
+        TokenWithDebugInfo {
+            internal_tok: Token::LParen,
+            ..
+        } => {
+            let return_type = parse_type(&mut tokens);
+            let mut params = Vec::new();
+            loop {
+                let next_tok = tokens.clone().next().unwrap();
+                if let TokenWithDebugInfo {
+                    internal_tok: Token::RParen,
+                    ..
+                } = next_tok
+                {
+                    tokens.next();
+                    break;
+                } else if let TokenWithDebugInfo {
+                    internal_tok: Token::Comma,
+                    ..
+                } = next_tok
+                {
+                    tokens.next();
+                } else {
+                    params.push(parse_type(&mut tokens));
+                }
+            }
+            return Type::Function(Box::new(return_type), params);
+        }
+        _ => error_unexpected_token("valid type token", tok),
+    }
 }
 
 /// Parses an expression from a list of tokens.
@@ -725,8 +918,11 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
     let statement;
 
     match tok {
-        TokenWithDebugInfo { internal_tok: Token::Keyword(k), .. } => {
-			tokens.next();
+        TokenWithDebugInfo {
+            internal_tok: Token::Keyword(k),
+            ..
+        } => {
+            tokens.next();
             if k == "return" {
                 // return exp;
                 let exp = parse_expression(tokens);
@@ -738,20 +934,28 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
 
                 let next_tok = tokens.next().unwrap();
                 if &Token::Colon != next_tok {
-					error_unexpected_token("colon", next_tok);
+                    error_unexpected_token("colon", next_tok);
                 };
 
-				let _var_type = parse_type(tokens); // TODO: Do something with this
+                let _var_type = parse_type(tokens); // TODO: Do something with this
 
                 let next_tok = tokens.clone().next().unwrap();
-                if let TokenWithDebugInfo { internal_tok: Token::Operator(Operator::Assign), .. } = next_tok {
+                if let TokenWithDebugInfo {
+                    internal_tok: Token::Operator(Operator::Assign),
+                    ..
+                } = next_tok
+                {
                     tokens.next();
                     let exp = parse_expression(tokens);
                     statement = Statement::Let(id, Some(exp));
-                } else if let TokenWithDebugInfo { internal_tok: Token::Semicolon, .. } = next_tok {
+                } else if let TokenWithDebugInfo {
+                    internal_tok: Token::Semicolon,
+                    ..
+                } = next_tok
+                {
                     statement = Statement::Let(id, None);
                 } else {
-					error_unexpected_token("semicolon or assignment operator", next_tok);
+                    error_unexpected_token("semicolon or assignment operator", next_tok);
                 }
             } else if k == "if" {
                 // if (exp) statement [else statement]
@@ -763,7 +967,11 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
                 }
 
                 let next_tok = tokens.clone().next().unwrap();
-                if let TokenWithDebugInfo { internal_tok: Token::Keyword(k), .. } = next_tok {
+                if let TokenWithDebugInfo {
+                    internal_tok: Token::Keyword(k),
+                    ..
+                } = next_tok
+                {
                     if k == "else" {
                         tokens.next();
                         let mut else_stmt = parse_statement(tokens);
@@ -803,23 +1011,47 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
             } else if k == "for" {
                 // for (exp; exp; exp) statement
                 let next_tok = tokens.next().unwrap(); // Skip opening parenthesis
-                if !matches!(next_tok, TokenWithDebugInfo { internal_tok: Token::LParen, .. }) {
-					error_unexpected_token("opening parenthesis", next_tok);
+                if !matches!(
+                    next_tok,
+                    TokenWithDebugInfo {
+                        internal_tok: Token::LParen,
+                        ..
+                    }
+                ) {
+                    error_unexpected_token("opening parenthesis", next_tok);
                 }
                 let init = parse_expression(tokens);
                 let next_tok = tokens.next().unwrap(); // Skip semicolon
-                if !matches!(next_tok, TokenWithDebugInfo { internal_tok: Token::Semicolon, .. }) {
-					error_unexpected_token("semicolon", next_tok);
+                if !matches!(
+                    next_tok,
+                    TokenWithDebugInfo {
+                        internal_tok: Token::Semicolon,
+                        ..
+                    }
+                ) {
+                    error_unexpected_token("semicolon", next_tok);
                 }
                 let cond = parse_expression(tokens);
                 let next_tok = tokens.next().unwrap(); // Skip semicolon
-                if !matches!(next_tok, TokenWithDebugInfo { internal_tok: Token::Semicolon, .. }) {
-					error_unexpected_token("semicolon", next_tok);
+                if !matches!(
+                    next_tok,
+                    TokenWithDebugInfo {
+                        internal_tok: Token::Semicolon,
+                        ..
+                    }
+                ) {
+                    error_unexpected_token("semicolon", next_tok);
                 }
                 let step = parse_expression(tokens);
                 let next_tok = tokens.next().unwrap(); // Skip closing parenthesis
-                if !matches!(next_tok, TokenWithDebugInfo { internal_tok: Token::RParen, .. }) {
-					error_unexpected_token("closing parenthesis", next_tok);
+                if !matches!(
+                    next_tok,
+                    TokenWithDebugInfo {
+                        internal_tok: Token::RParen,
+                        ..
+                    }
+                ) {
+                    error_unexpected_token("closing parenthesis", next_tok);
                 }
                 let mut for_stmt = parse_statement(tokens);
 
@@ -837,32 +1069,43 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
                 }
 
                 let next_tok = tokens.next().unwrap();
-                if let TokenWithDebugInfo { internal_tok: Token::Keyword(k), .. } = next_tok {
+                if let TokenWithDebugInfo {
+                    internal_tok: Token::Keyword(k),
+                    ..
+                } = next_tok
+                {
                     if k == "while" {
                         let exp = parse_expression(tokens);
                         statement = Statement::Dowhile(exp, Box::new(do_stmt));
                     } else {
-						error_unexpected_token("while keyword", next_tok);
+                        error_unexpected_token("while keyword", next_tok);
                     }
                 } else {
-					error_unexpected_token("while keyword", next_tok);
+                    error_unexpected_token("while keyword", next_tok);
                 }
             } else if k == "break" {
                 statement = Statement::Break;
             } else if k == "continue" {
                 statement = Statement::Continue;
             } else {
-				error_unexpected_token("valid keyword token", tok);
+                error_unexpected_token("valid keyword token", tok);
             }
         }
-        TokenWithDebugInfo { internal_tok: Token::LBrace, .. } => {
-			tokens.next();
+        TokenWithDebugInfo {
+            internal_tok: Token::LBrace,
+            ..
+        } => {
+            tokens.next();
             let mut statements = Vec::new();
 
             loop {
                 let next = tokens.clone().next().unwrap();
 
-                if let TokenWithDebugInfo { internal_tok: Token::RBrace, .. } = next {
+                if let TokenWithDebugInfo {
+                    internal_tok: Token::RBrace,
+                    ..
+                } = next
+                {
                     tokens.next();
                     break;
                 } else {
@@ -892,8 +1135,14 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
     }
 
     let tok = tokens.next().unwrap();
-    if !matches!(tok, TokenWithDebugInfo { internal_tok: Token::Semicolon, .. }) {
-		error_unexpected_token("semicolon", tok);
+    if !matches!(
+        tok,
+        TokenWithDebugInfo {
+            internal_tok: Token::Semicolon,
+            ..
+        }
+    ) {
+        error_unexpected_token("semicolon", tok);
     }
 
     return statement;
@@ -905,34 +1154,44 @@ fn parse_const(tokens: &mut Iter<TokenWithDebugInfo>) -> Constant {
     let next_tok = tokens.next().unwrap();
 
     if &Token::Keyword("const".to_string()) != next_tok {
-		error_unexpected_token("const keyword", next_tok);
+        error_unexpected_token("const keyword", next_tok);
     }
 
     let next_tok = tokens.next().unwrap();
     let id = match next_tok {
-        TokenWithDebugInfo { internal_tok: Token::Identifier(id), .. } => id.clone(),
+        TokenWithDebugInfo {
+            internal_tok: Token::Identifier(id),
+            ..
+        } => id.clone(),
         _ => error_unexpected_token("identifier", next_tok),
     };
 
     let next_tok = tokens.next().unwrap();
     if &Token::Colon != next_tok {
-		error_unexpected_token("colon", next_tok);
+        error_unexpected_token("colon", next_tok);
     };
 
-	let _var_type = parse_type(tokens);	// TODO: Do something with this
+    let _var_type = parse_type(tokens); // TODO: Do something with this
 
     let lit;
     let next_tok = tokens.clone().next().unwrap();
-    if let TokenWithDebugInfo { internal_tok: Token::Operator(Operator::Assign), .. } = next_tok {
+    if let TokenWithDebugInfo {
+        internal_tok: Token::Operator(Operator::Assign),
+        ..
+    } = next_tok
+    {
         tokens.next();
         lit = parse_literal(tokens.next().unwrap());
     } else {
-		error_unexpected_token("assignment operator (constants must be assigned on declaration)", next_tok);
+        error_unexpected_token(
+            "assignment operator (constants must be assigned on declaration)",
+            next_tok,
+        );
     }
 
     let next_tok = tokens.next().unwrap();
     if &Token::Semicolon != next_tok {
-		error_unexpected_token("semicolon", next_tok);
+        error_unexpected_token("semicolon", next_tok);
     }
 
     return Constant::Constant(id.to_string(), lit);
@@ -943,18 +1202,34 @@ fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
     let tok = tokens.next().unwrap();
 
     match tok {
-		TokenWithDebugInfo { internal_tok: Token::Keyword(ref k), .. } => if k != "fn" { error_unexpected_token("fn keyword", tok) },
+        TokenWithDebugInfo {
+            internal_tok: Token::Keyword(ref k),
+            ..
+        } => {
+            if k != "fn" {
+                error_unexpected_token("fn keyword", tok)
+            }
+        }
         TokenWithDebugInfo { .. } => error_unexpected_token("fn keyword", tok),
     };
 
     let tok = tokens.next().unwrap();
     let id = match tok {
-        TokenWithDebugInfo { internal_tok: Token::Identifier(id), .. } => id.clone(),
-        TokenWithDebugInfo { .. } => error_unexpected_token("identifier", tok)
+        TokenWithDebugInfo {
+            internal_tok: Token::Identifier(id),
+            ..
+        } => id.clone(),
+        TokenWithDebugInfo { .. } => error_unexpected_token("identifier", tok),
     };
 
     let tok = tokens.next().unwrap();
-    if !matches!(tok, TokenWithDebugInfo { internal_tok: Token::LParen, .. }) {
+    if !matches!(
+        tok,
+        TokenWithDebugInfo {
+            internal_tok: Token::LParen,
+            ..
+        }
+    ) {
         error_unexpected_token("opening parenthesis", tok);
     };
 
@@ -963,22 +1238,46 @@ fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
     loop {
         let tok = tokens.next().unwrap();
 
-        if let TokenWithDebugInfo { internal_tok: Token::RParen, .. } = tok {
+        if let TokenWithDebugInfo {
+            internal_tok: Token::RParen,
+            ..
+        } = tok
+        {
             break;
-        } else if let TokenWithDebugInfo { internal_tok: Token::Comma, .. } = tok {
+        } else if let TokenWithDebugInfo {
+            internal_tok: Token::Comma,
+            ..
+        } = tok
+        {
             continue;
-        } else if let TokenWithDebugInfo { internal_tok: Token::Identifier(id), .. } = tok {
+        } else if let TokenWithDebugInfo {
+            internal_tok: Token::Identifier(id),
+            ..
+        } = tok
+        {
             params.push(id.clone());
             let tok = tokens.next().unwrap();
-            if !matches!(tok, TokenWithDebugInfo { internal_tok: Token::Colon, .. }) {
+            if !matches!(
+                tok,
+                TokenWithDebugInfo {
+                    internal_tok: Token::Colon,
+                    ..
+                }
+            ) {
                 error_unexpected_token("colon", tok);
             }
             let tok = tokens.next().unwrap();
-            if !matches!(tok, TokenWithDebugInfo { internal_tok: Token::PrimitiveType(_), .. }) {
+            if !matches!(
+                tok,
+                TokenWithDebugInfo {
+                    internal_tok: Token::PrimitiveType(_),
+                    ..
+                }
+            ) {
                 error_unexpected_token("type identifier", tok);
             }
         } else {
-			error_unexpected_token("identifier or closing parenthesis", tok);
+            error_unexpected_token("identifier or closing parenthesis", tok);
         }
     }
 
@@ -1004,10 +1303,21 @@ pub fn parse(tokens: &Vec<TokenWithDebugInfo>) -> Ast {
     loop {
         let next_tok = tokens.clone().next().unwrap();
         match next_tok {
-            TokenWithDebugInfo { internal_tok: Token::EOF, .. } => break,
-            TokenWithDebugInfo { internal_tok: Token::Keyword(ref k), .. } if k == "fn" => functions.push(parse_function(&mut tokens)),
-            TokenWithDebugInfo { internal_tok: Token::Keyword(ref k), .. } if k == "const" => constants.push(parse_const(&mut tokens)),
-            TokenWithDebugInfo { .. } => error_unexpected_token("function or constant declaration", next_tok),
+            TokenWithDebugInfo {
+                internal_tok: Token::EOF,
+                ..
+            } => break,
+            TokenWithDebugInfo {
+                internal_tok: Token::Keyword(ref k),
+                ..
+            } if k == "fn" => functions.push(parse_function(&mut tokens)),
+            TokenWithDebugInfo {
+                internal_tok: Token::Keyword(ref k),
+                ..
+            } if k == "const" => constants.push(parse_const(&mut tokens)),
+            TokenWithDebugInfo { .. } => {
+                error_unexpected_token("function or constant declaration", next_tok)
+            }
         }
     }
 

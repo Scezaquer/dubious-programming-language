@@ -1,0 +1,4 @@
+fn main(){
+	let arr[2, 2]: array[int] = [1, [2, 3]];
+	return arr[1, 0];
+}

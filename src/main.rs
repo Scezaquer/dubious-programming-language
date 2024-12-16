@@ -112,8 +112,6 @@ fn main() {
 		asm_output_file = output_file.clone();
 	}
 
-	dbg!(ast.clone());
-
     generate(&ast, &asm_output_file);
     if !args.output_asm {
         // nasm -f elf64 out.s -o out.o

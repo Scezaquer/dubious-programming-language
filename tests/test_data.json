@@ -446,5 +446,26 @@
 		"filename": "pointers/triple_dereference.dpl",
 		"input": [],
 		"output": 5
+	},
+	{
+		"name": "array",
+		"description": "1d Array creating and access",
+		"filename": "arrays/array.dpl",
+		"input": [],
+		"output": 5
+	},
+	{
+		"name": "array2d",
+		"description": "2d Array creating and access",
+		"filename": "arrays/array2d.dpl",
+		"input": [],
+		"output": 9
+	},
+	{
+		"name": "array_2d_implicit",
+		"description": "2d Array creating and access with implicit shape",
+		"filename": "arrays/array_2d_implicit.dpl",
+		"input": [],
+		"output": 2
 	}
 ]
