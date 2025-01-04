@@ -61,9 +61,8 @@ pub enum Type {
     Bool,
     Void,
 	Char,
-	String,
     Pointer(Box<Type>),
-    Array(Box<Type>), // array[type]
+    Array(Box<Type>), // array[type]. Strings are array[char]
     Function(Box<Type>, Vec<Type>),
 }
 
@@ -341,6 +340,10 @@ fn parse_literal(token: &TokenWithDebugInfo) -> Literal {
             internal_tok: Token::BoolLiteral(b),
             ..
         } => Literal::Bool(*b),
+		TokenWithDebugInfo {
+			internal_tok: Token::CharLiteral(c),
+			..
+		} => Literal::Char(*c),
         _ => error_unexpected_token("constant", token),
     }
 }
@@ -394,9 +397,22 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
         | TokenWithDebugInfo {
             internal_tok: Token::BoolLiteral(_),
             ..
-        } => {
+        } 
+		| TokenWithDebugInfo {
+			internal_tok: Token::CharLiteral(_),
+			..
+		} => {
             return Atom::Literal(parse_literal(tok));
-        }
+        },
+		TokenWithDebugInfo {
+			internal_tok: Token::StringLiteral(s),
+			..
+		} => {
+			return Atom::Array(
+				s.chars().map(|c| Expression::Atom(Atom::Literal(Literal::Char(c)))).collect(),
+				s.len() as i64
+			);
+		}
         TokenWithDebugInfo {
             internal_tok: Token::Identifier(s),
             ..
@@ -835,7 +851,11 @@ fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Type {
                 return Type::Bool;
             } else if k == "void" {
                 return Type::Void;
-            } else if k == "array" {
+            } else if k == "char" {
+				return Type::Char;
+			} else if k == "str" {
+				return Type::Array(Box::new(Type::Char));
+			} else if k == "array" {
                 let next_tok = tokens.next().unwrap();
                 if !matches!(
                     next_tok,

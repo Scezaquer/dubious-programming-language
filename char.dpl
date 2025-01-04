@@ -1,0 +1,4 @@
+fn main(){
+	let a: char = 'a';
+	return a;
+}

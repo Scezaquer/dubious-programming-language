@@ -59,7 +59,6 @@ impl std::fmt::Display for Type {
 			Type::Bool => write!(f, "bool"),
 			Type::Char => write!(f, "char"),
 			Type::Void => write!(f, "void"),
-			Type::String => write!(f, "string"),
 			Type::Pointer(t) => write!(f, "*{}", t),
 			Type::Array(t) => write!(f, "[{}]", t),
 			Type::Function(ret, params) => {

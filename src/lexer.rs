@@ -63,6 +63,8 @@ pub enum Token {
     PrimitiveType(String),
     FloatLiteral(f64),
     IntLiteral(i64),
+	CharLiteral(char),
+	StringLiteral(String),
 	BinLiteral(i64),
 	HexLiteral(i64),
 	BoolLiteral(bool),
@@ -145,7 +147,7 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
     let identifier_re = Regex::new(r"^[a-zA-Z_][a-zA-Z0-9_]*").unwrap();
 
     // Primitive types are any of the following strings: int float char void array
-    let primitive_type_re = Regex::new(r"^(int|float|char|void|array)").unwrap();
+    let primitive_type_re = Regex::new(r"^(int|float|bool|char|str|void|array)").unwrap();
 
     // Floats are a sequence of digits, followed by a decimal point
     // and more digits
@@ -174,6 +176,10 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
 	let whitespace_re = Regex::new(r"^[^\S\n]+").unwrap();
 
 	let preprocessor_re = Regex::new(r"^\#(include|define|undef|ifdef|ifndef|if|elif|else|endif|error|print).*?(\n|$)").unwrap();
+
+	let char_re = Regex::new(r"^'.'").unwrap();
+
+	let string_re = Regex::new(r#"^"(?:[^"\\]|\\.)*""#).unwrap();
 
 	// Since the preprocessor will have removed actual comments, it's safe to assume that
 	// any line starting with // was something the preprocesser added
@@ -250,6 +256,12 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
             pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = bool_re.captures(rest) {
 			tok = Token::BoolLiteral(caps.get(0).unwrap().as_str() == "true");
+			pos += caps.get(0).unwrap().end();
+		} else if let Some(caps) = char_re.captures(rest) {
+			tok = Token::CharLiteral(caps.get(0).unwrap().as_str().chars().nth(1).unwrap());
+			pos += caps.get(0).unwrap().end();
+		} else if let Some(caps) = string_re.captures(rest) {
+			tok = Token::StringLiteral(caps.get(0).unwrap().as_str().strip_prefix("\"").unwrap().strip_suffix("\"").unwrap().to_string());
 			pos += caps.get(0).unwrap().end();
 		} else if let Some(caps) = large_operator_re.captures(rest) {
             let op = match caps.get(0).unwrap().as_str() {
