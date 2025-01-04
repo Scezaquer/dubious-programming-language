@@ -412,7 +412,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                 Statement::Expression(expression) => {
                     generate_expression(file, expression, &mut context);
                 }
-                Statement::Let(variable, expr) => {
+                Statement::Let(variable, expr, _) => {
                     if let Some(expr) = expr {
                         generate_expression(file, expr, &mut context);
                     }
@@ -600,7 +600,7 @@ fn generate_function(file: &mut File, function: &Function, context: &Context) {
 }
 
 fn generate_constant(file: &mut File, constant: &Constant) {
-	let Constant::Constant(name, constant) = constant;
+	let Constant::Constant(name, constant, _) = constant;
 	writeln!(file, "    {} equ {}", name, constant).unwrap();
 }
 
@@ -626,7 +626,7 @@ pub fn generate(ast: &Ast, out_path: &str) {
 
 	for constant in const_vector.iter() {
 		generate_constant(&mut file, constant);
-		let Constant::Constant(name, _) = constant;
+		let Constant::Constant(name, _, _) = constant;
 		if let Some(_) = context.var_map.get(name) {
 			panic!("Variable {} already declared as a constant. Constants cannot be declared twice", name);
 		}

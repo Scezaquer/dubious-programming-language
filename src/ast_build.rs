@@ -29,6 +29,8 @@ pub enum Literal {
     Bool(bool),
     Hex(i64),
     Binary(i64),
+	Char(char),
+	String(String),
 }
 
 /// Represents an atom in the AST.
@@ -52,12 +54,14 @@ pub enum AssignmentIdentifier {
     Array(String, Vec<Expression>), // identifier[dim1, dim2, ...]
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Type {
     Int,
     Float,
     Bool,
     Void,
+	Char,
+	String,
     Pointer(Box<Type>),
     Array(Box<Type>), // array[type]
     Function(Box<Type>, Vec<Type>),
@@ -244,7 +248,7 @@ fn get_un_operator_from_token(token: &TokenWithDebugInfo) -> UnOp {
 /// Statements can be assignments, let bindings, if statements, while loops, loops, do-while loops, for loops, return statements, expressions, compound statements, break statements, or continue statements.
 #[derive(Debug, Clone)]
 pub enum Statement {
-    Let(AssignmentIdentifier, Option<Expression>),
+    Let(AssignmentIdentifier, Option<Expression>, Type),
     If(Expression, Box<Statement>, Option<Box<Statement>>),
     While(Expression, Box<Statement>),
     Loop(Box<Statement>),
@@ -268,7 +272,7 @@ pub enum Function {
 /// so they're not terribly useful as of now. They're basically static globals.
 #[derive(Debug, Clone)]
 pub enum Constant {
-    Constant(String, Literal),
+    Constant(String, Literal, Type),
 }
 
 /// Represents a program in the AST.
@@ -297,6 +301,8 @@ impl std::fmt::Display for Literal {
             }
             Literal::Hex(h) => write!(f, "0x{:x}", h),
             Literal::Binary(b) => write!(f, "0b{:b}", b),
+			Literal::Char(c) => write!(f, "'{}'", c),
+			Literal::String(s) => write!(f, "\"{}\"", s),// TODO: this may be fucked
         }
     }
 }
@@ -937,7 +943,7 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
                     error_unexpected_token("colon", next_tok);
                 };
 
-                let _var_type = parse_type(tokens); // TODO: Do something with this
+                let var_type = parse_type(tokens); // TODO: Do something with this
 
                 let next_tok = tokens.clone().next().unwrap();
                 if let TokenWithDebugInfo {
@@ -947,13 +953,13 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
                 {
                     tokens.next();
                     let exp = parse_expression(tokens);
-                    statement = Statement::Let(id, Some(exp));
+                    statement = Statement::Let(id, Some(exp), var_type);
                 } else if let TokenWithDebugInfo {
                     internal_tok: Token::Semicolon,
                     ..
                 } = next_tok
                 {
-                    statement = Statement::Let(id, None);
+                    statement = Statement::Let(id, None, var_type);
                 } else {
                     error_unexpected_token("semicolon or assignment operator", next_tok);
                 }
@@ -1171,7 +1177,7 @@ fn parse_const(tokens: &mut Iter<TokenWithDebugInfo>) -> Constant {
         error_unexpected_token("colon", next_tok);
     };
 
-    let _var_type = parse_type(tokens); // TODO: Do something with this
+    let var_type = parse_type(tokens); // TODO: Do something with this
 
     let lit;
     let next_tok = tokens.clone().next().unwrap();
@@ -1194,7 +1200,7 @@ fn parse_const(tokens: &mut Iter<TokenWithDebugInfo>) -> Constant {
         error_unexpected_token("semicolon", next_tok);
     }
 
-    return Constant::Constant(id.to_string(), lit);
+    return Constant::Constant(id.to_string(), lit, var_type);
 }
 
 /// Parses a function from a list of tokens.

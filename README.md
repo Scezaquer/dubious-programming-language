@@ -11,8 +11,6 @@ Based on https://norasandler.com/2017/11/29/Write-a-Compiler.html
 - TODO: default function parameters ?
 - TODO: kwargs ?
 - TODO: improve #include
-- TODO: pointers
-- TODO: stack arrays
 - TODO: heap memory stuff
 - TODO: std library
 - TODO: inline asm ?
@@ -20,6 +18,7 @@ Based on https://norasandler.com/2017/11/29/Write-a-Compiler.html
 - TODO: vscode syntax highlighting
 - TODO: Should I make the char type, but make it 64 bits like everything else so that it can actually contain 8 characters at once?
 - TODO: Give the option to generate LLVM IR instead of x86_64
+- TODO: Vars of different types
 
 A simple compiler for the Dubious programming language (DPL).
 

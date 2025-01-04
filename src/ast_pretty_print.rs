@@ -1,5 +1,5 @@
 use crate::ast_build::{
-	AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Program, Statement, UnOp, AssignmentIdentifier
+	AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Program, Statement, Type, UnOp
 };
 
 impl std::fmt::Display for Ast {
@@ -27,7 +27,7 @@ impl std::fmt::Display for Program {
 impl std::fmt::Display for Constant {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Constant::Constant(name, value) => write!(f, "const {} = {};", name, value)
+			Constant::Constant(name, value, t) => write!(f, "const {}: {} = {};", name, t, value)
 		}
 	}
 }
@@ -51,11 +51,36 @@ impl std::fmt::Display for Function {
 	}
 }
 
+impl std::fmt::Display for Type {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Type::Int => write!(f, "int"),
+			Type::Float => write!(f, "float"),
+			Type::Bool => write!(f, "bool"),
+			Type::Char => write!(f, "char"),
+			Type::Void => write!(f, "void"),
+			Type::String => write!(f, "string"),
+			Type::Pointer(t) => write!(f, "*{}", t),
+			Type::Array(t) => write!(f, "[{}]", t),
+			Type::Function(ret, params) => {
+				write!(f, "fn(")?;
+				for (i, param) in params.iter().enumerate() {
+					write!(f, "{}", param)?;
+					if i < params.len() - 1 {
+						write!(f, ", ")?;
+					}
+				}
+				write!(f, ") -> {}", ret)
+			}
+		}
+	}
+}
+
 impl std::fmt::Display for Statement {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Statement::Let(var, Some(expr)) => write!(f, "let {} = {};", var, expr),
-			Statement::Let(var, None) => write!(f, "let {};", var),
+			Statement::Let(var, Some(expr), t) => write!(f, "let {}: {} = {};", var, t, expr),
+			Statement::Let(var, None, t) => write!(f, "let {}: {};", var, t),
 			Statement::If(cond, then_stmt, Some(else_stmt)) => {
 				write!(f, "if ({}) {{\n{}\n}} else {{\n{}\n}}", cond, then_stmt, else_stmt)
 			}

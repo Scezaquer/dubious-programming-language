@@ -4,7 +4,10 @@ mod preprocessor;
 mod lexer;
 /// Parser: Turns the list of tokens into an abstract syntax tree (AST).
 mod ast_build;
+/// Pretty printer: Prints the AST in a human-readable format.
 mod ast_pretty_print;
+/// Checker: Performs type checking and other checks on the AST to ensure it is valid.
+mod logic_checker;
 /// Code generator: Turns the AST into x86_64 assembly code.
 mod code_generator;
 
@@ -15,6 +18,7 @@ use lexer::lex;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use logic_checker::check_program;
 
 use clap::Parser;
 
@@ -94,6 +98,12 @@ fn main() {
         dbg!(&ast);
         println!("{}", ast);
     }
+
+	if let Err(e) = check_program(&ast) {
+		eprintln!("Error: {}", e);
+		std::process::exit(1);
+	}
+
 
     // We make a .s file if the user wants to see the assembly code,
     // otherwise don't use any extension.
