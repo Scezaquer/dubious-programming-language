@@ -35,15 +35,15 @@ impl std::fmt::Display for Constant {
 impl std::fmt::Display for Function {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Function::Function(name, params, body) => {
+			Function::Function(name, params, body, return_type) => {
 				write!(f, "fn {}(", name)?;
 				for (i, param) in params.iter().enumerate() {
-					write!(f, "{}", param)?;
+					write!(f, "{}: {}", param.0, param.1)?;
 					if i < params.len() - 1 {
 						write!(f, ", ")?;
 					}
 				}
-				writeln!(f, ") {{")?;
+				writeln!(f, "): {} {{", return_type)?;
 				writeln!(f, "{}", body)?;
 				writeln!(f, "}}")
 			}
@@ -56,7 +56,6 @@ impl std::fmt::Display for Type {
 		match self {
 			Type::Int => write!(f, "int"),
 			Type::Float => write!(f, "float"),
-			Type::Bool => write!(f, "bool"),
 			Type::Char => write!(f, "char"),
 			Type::Void => write!(f, "void"),
 			Type::Pointer(t) => write!(f, "*{}", t),

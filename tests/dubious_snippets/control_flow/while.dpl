@@ -1,4 +1,4 @@
-fn main() {
+fn main(): int {
 	let a:int = 0;
     while a < 10 {
 		a = a + 1;

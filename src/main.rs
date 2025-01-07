@@ -99,11 +99,7 @@ fn main() {
         println!("{}", ast);
     }
 
-	if let Err(e) = check_program(&ast) {
-		eprintln!("Error: {}", e);
-		std::process::exit(1);
-	}
-
+	check_program(&ast);
 
     // We make a .s file if the user wants to see the assembly code,
     // otherwise don't use any extension.

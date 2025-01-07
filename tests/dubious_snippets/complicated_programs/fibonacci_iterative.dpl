@@ -1,4 +1,4 @@
-fn main() {
+fn main(): int {
 	/*
 	Probably not the most beautiful fib code you've ever seen
 	but have you ever written one in your own language? Hm? Didn't think so.

@@ -26,7 +26,6 @@ use std::vec;
 pub enum Literal {
     Int(i64),
     Float(f64),
-    Bool(bool),
     Hex(i64),
     Binary(i64),
 	Char(char),
@@ -58,7 +57,6 @@ pub enum AssignmentIdentifier {
 pub enum Type {
     Int,
     Float,
-    Bool,
     Void,
 	Char,
     Pointer(Box<Type>),
@@ -263,7 +261,7 @@ pub enum Statement {
 /// Represents a function in the AST.
 #[derive(Debug, Clone)]
 pub enum Function {
-    Function(String, Vec<String>, Statement),
+	Function(String, Vec<(String, Type)>, Statement, Type),
 }
 
 /// Represents a constant in the AST.
@@ -291,13 +289,6 @@ impl std::fmt::Display for Literal {
         match self {
             Literal::Int(i) => write!(f, "{}", i),
             Literal::Float(fl) => write!(f, "{}", fl),
-            Literal::Bool(b) => {
-                if *b {
-                    write!(f, "1")
-                } else {
-                    write!(f, "0")
-                }
-            }
             Literal::Hex(h) => write!(f, "0x{:x}", h),
             Literal::Binary(b) => write!(f, "0b{:b}", b),
 			Literal::Char(c) => write!(f, "'{}'", c),
@@ -339,7 +330,13 @@ fn parse_literal(token: &TokenWithDebugInfo) -> Literal {
         TokenWithDebugInfo {
             internal_tok: Token::BoolLiteral(b),
             ..
-        } => Literal::Bool(*b),
+        } => {
+			if *b {
+				Literal::Int(1)
+			} else {
+				Literal::Int(0)
+			}
+		},
 		TokenWithDebugInfo {
 			internal_tok: Token::CharLiteral(c),
 			..
@@ -848,7 +845,7 @@ fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Type {
             } else if k == "float" {
                 return Type::Float;
             } else if k == "bool" {
-                return Type::Bool;
+                return Type::Int;
             } else if k == "void" {
                 return Type::Void;
             } else if k == "char" {
@@ -1224,6 +1221,7 @@ fn parse_const(tokens: &mut Iter<TokenWithDebugInfo>) -> Constant {
 }
 
 /// Parses a function from a list of tokens.
+/// fn id(params): type statement
 fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
     let tok = tokens.next().unwrap();
 
@@ -1281,7 +1279,6 @@ fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
             ..
         } = tok
         {
-            params.push(id.clone());
             let tok = tokens.next().unwrap();
             if !matches!(
                 tok,
@@ -1290,22 +1287,27 @@ fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
                     ..
                 }
             ) {
+				dbg!(tok);
                 error_unexpected_token("colon", tok);
             }
-            let tok = tokens.next().unwrap();
-            if !matches!(
-                tok,
-                TokenWithDebugInfo {
-                    internal_tok: Token::PrimitiveType(_),
-                    ..
-                }
-            ) {
-                error_unexpected_token("type identifier", tok);
-            }
+			params.push((id.clone(), parse_type(&mut tokens)));
         } else {
             error_unexpected_token("identifier or closing parenthesis", tok);
         }
     }
+
+	let tok = tokens.next().unwrap();
+	if !matches!(
+		tok,
+		TokenWithDebugInfo {
+			internal_tok: Token::Colon,
+			..
+		}
+	) {
+		error_unexpected_token("colon", tok);
+	}
+
+	let return_type = parse_type(&mut tokens);
 
     let mut statement = parse_statement(&mut tokens);
 
@@ -1316,7 +1318,7 @@ fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
         statement = Statement::Compound(vec![statement]);
     }
 
-    return Function::Function(id, params, statement);
+    return Function::Function(id, params, statement, return_type);
 }
 
 /// Parses an abstract syntax tree (AST) from a list of tokens.

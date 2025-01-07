@@ -1,10 +1,10 @@
 #define test 2 + 3
 #ifndef test
-fn main() {
+fn main(): int {
 	return 3;
 }
 #else
-fn main() {
+fn main(): int {
 	return test;
 }
 #endif

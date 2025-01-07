@@ -1,4 +1,4 @@
-fn main() {
+fn main(): int {
     let a: int = 2;
     a = a + 1;
     return a;

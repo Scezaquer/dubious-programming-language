@@ -578,11 +578,11 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
 fn generate_function(file: &mut File, function: &Function, context: &Context) {
     let mut context = Context::from_last_context(context);
 
-    let Function::Function(name, params, statement) = function;
+    let Function::Function(name, params, statement, return_type) = function;
 
 	context.stack_index = 24;	// Skip rbp, rbx and the return address
 	for param in params.iter() {
-		context.insert(param.clone(), context.stack_index);
+		context.insert(param.0.clone(), context.stack_index);
 		context.stack_index += 8;
 	}
 	context.stack_index = 0;

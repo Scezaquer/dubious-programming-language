@@ -1,4 +1,4 @@
-fn main() {
+fn main(): int {
 	if false return 0;
 	else if true return 1;
 	return 2;

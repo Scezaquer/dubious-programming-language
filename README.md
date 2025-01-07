@@ -176,3 +176,5 @@ TODO: element-wise operations on arrays?
 TODO: array literals are glitched as fuck if you do weird dimension things. So
 don't. Ideally stick to either rectangular or 1/2d arrays. If you do something
 else, you're on your own, and expect fucked up indexing behavior.
+
+Type `str` is an alias of type `array[char]`. Type `bool` is an alias of type `int`

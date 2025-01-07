@@ -1,5 +1,5 @@
 #define test 15
-fn main() {
+fn main(): int {
 	return test;
 }
 #undef test
