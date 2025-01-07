@@ -176,8 +176,9 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
 	let whitespace_re = Regex::new(r"^[^\S\n]+").unwrap();
 
 	let preprocessor_re = Regex::new(r"^\#(include|define|undef|ifdef|ifndef|if|elif|else|endif|error|print).*?(\n|$)").unwrap();
-
-	let char_re = Regex::new(r"^'.?.?.?.?.?.?.?.?'").unwrap();
+	
+	let char_re = Regex::new(r"^'[^']{0,8}?'").unwrap();
+	//let char_re = Regex::new(r"^'(?:\\'|[^']){0,8}'").unwrap(); // This one supports escaping quotes (\'), but the rest of the code doesn't so its commented out for now
 
 	let string_re = Regex::new(r#"^"(?:[^"\\]|\\.)*""#).unwrap();
 

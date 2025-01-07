@@ -1,11 +1,10 @@
 # Dubious-Programming-Language
 
-Based on https://norasandler.com/2017/11/29/Write-a-Compiler.html
+Partially based on https://norasandler.com/2017/11/29/Write-a-Compiler.html
 
 - TODO: Helpful compiler error messages at the code generation stage (make &lt;T>TokenWithDebugInfo generic?)
 - TODO: Structs and enums?
 - TODO: better checker error messages
-- TODO: better code generator error messages
 - TODO: make generator write comments in asm file
 - TODO: register allocation
 - TODO: default function parameters ?
@@ -16,8 +15,10 @@ Based on https://norasandler.com/2017/11/29/Write-a-Compiler.html
 - TODO: inline asm ?
 - TODO: nasm fails silently. ld too probably. Should instead print a message with the error if that happens
 - TODO: vscode syntax highlighting
-- TODO: Should I make the char type, but make it 64 bits like everything else so that it can actually contain 8 characters at once?
 - TODO: Give the option to generate LLVM IR instead of x86_64
+- TODO: floating point arithmetic
+- TODO: Wiki
+- TODO: support escape characters
 
 A simple compiler for the Dubious programming language (DPL).
 
@@ -176,6 +177,7 @@ TODO: element-wise operations on arrays?
 TODO: array literals are glitched as fuck if you do weird dimension things. So
 don't. Ideally stick to either rectangular or 1/2d arrays. If you do something
 else, you're on your own, and expect fucked up indexing behavior.
+TODO: make arr.len a variable accessible in code
 
 Type `str` is an alias of type `array[char]`. Type `bool` is an alias of type `int`
 
