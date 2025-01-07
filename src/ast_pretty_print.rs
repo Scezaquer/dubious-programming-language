@@ -122,6 +122,7 @@ impl std::fmt::Display for Expression {
 			Expression::UnaryOp(expr, op) => write!(f, "({}{})", op, expr),
 			Expression::BinaryOp(lhs, rhs, op) => write!(f, "({} {} {})", lhs, rhs, op),
 			Expression::Assignment(var, expr, op) => write!(f, "{} {} {}", var, op, expr),
+			Expression::TypeCast(expr, t) => write!(f, "({} : {})", expr, t),
 		}
 	}
 }

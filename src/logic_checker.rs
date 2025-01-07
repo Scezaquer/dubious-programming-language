@@ -47,7 +47,7 @@ fn type_expression(expr: &Expression, context: &Context) -> Type {
 					}
 					Type::Array(Box::new(array_type.unwrap()))
 				},
-				Atom::FunctionCall(_, _) => Type::Int,	// TODO: function return type
+				Atom::FunctionCall(_, _) => Type::Int,	// TODO: function return type, check arguments
 				Atom::ArrayAccess(_, _) => Type::Int,	// TODO: array type
 				Atom::Expression(expr) => type_expression(expr, context),
 			}
@@ -156,6 +156,10 @@ fn type_expression(expr: &Expression, context: &Context) -> Type {
 				},
 			}
 		},
+		Expression::TypeCast(expr, t) => {
+			type_expression(expr, context);
+			t.clone()
+		},
 	}
 }
 
@@ -207,7 +211,7 @@ fn type_statement(statement: &Statement, context: &Context) -> Type {
 
 					let mut flag = true;
 					let mut name = name;
-					
+
 					while flag {
 						if let AssignmentIdentifier::Dereference(inner) = name {
 							name = inner;
@@ -244,7 +248,7 @@ fn type_statement(statement: &Statement, context: &Context) -> Type {
 				}
 
 				if *var_type != expr_type {
-					panic!("Variable type does not match expression type");
+					panic!("Variable type ({}) does not match expression type ({})", var_type, expr_type);
 				}
 			}
 			return t;
@@ -286,12 +290,19 @@ fn typechecking(ast: &Ast) {
 	}
 
 	for function in functions {
-		let Function::Function(name, params, body, return_type) = function;
+		// Functions are defined everywhere
+		let Function::Function(name, _, _, return_type) = function;
 		context.functions.insert(name.clone(), return_type.clone());
+	}
+
+	for function in functions {
+		let Function::Function(name, params, body, return_type) = function;
+		let mut local_context = context.clone();
+		// Function parameters are only in scope in the function
 		for (param_name, param_type) in params {
-			context.variables.insert(param_name.clone(), param_type.clone());
+			local_context.variables.insert(param_name.clone(), param_type.clone());
 		}
-		let body_type = type_statement(body, &context);
+		let body_type = type_statement(body, &local_context);
 		if body_type != *return_type {
 			panic!("Function '{}' return type ({}) does not match body type ({})", name, return_type, body_type);
 		}

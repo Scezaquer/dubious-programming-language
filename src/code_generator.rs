@@ -325,6 +325,10 @@ fn generate_expression(file: &mut File, expression: &Expression, context: &mut C
 				panic!("Undeclared variable {:?}", variable);
 			}
         }
+		Expression::TypeCast(expr, t) => {
+			// Unsure if I should be doing something here or nah
+			generate_expression(file, expr, context);
+		}
     }
 }
 

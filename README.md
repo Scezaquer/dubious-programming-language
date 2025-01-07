@@ -3,9 +3,9 @@
 Based on https://norasandler.com/2017/11/29/Write-a-Compiler.html
 
 - TODO: Helpful compiler error messages at the code generation stage (make &lt;T>TokenWithDebugInfo generic?)
-- TODO: String literals
 - TODO: Structs and enums?
-- TODO: Checker
+- TODO: better checker error messages
+- TODO: better code generator error messages
 - TODO: make generator write comments in asm file
 - TODO: register allocation
 - TODO: default function parameters ?
@@ -18,7 +18,7 @@ Based on https://norasandler.com/2017/11/29/Write-a-Compiler.html
 - TODO: vscode syntax highlighting
 - TODO: Should I make the char type, but make it 64 bits like everything else so that it can actually contain 8 characters at once?
 - TODO: Give the option to generate LLVM IR instead of x86_64
-- TODO: Vars of different types
+- TODO: Type casting
 
 A simple compiler for the Dubious programming language (DPL).
 
@@ -70,7 +70,8 @@ an x86_64 assembly file or an elf64 binary.
 11. **Logical AND**: `a && b`V
 12. **Logical XOR**: `a ^^ b`
 13. **Logical OR**: `a || b`
-14. **Assignment operators**: `a = b`, `a += b`, `a -= b`, `a *= b`, `a /= b`, `a %= b`, `a <<= b`, `a >>= b`, `a &= b`, `a ^= b`, `a |= b`
+14. **Type cast**: `a : b`
+15. **Assignment operators**: `a = b`, `a += b`, `a -= b`, `a *= b`, `a /= b`, `a %= b`, `a <<= b`, `a >>= b`, `a &= b`, `a ^= b`, `a |= b`
 
 Note: Assignment operators have a return value equal to the expression being assigned.
 

@@ -159,6 +159,7 @@ pub enum Expression {
     UnaryOp(Box<Expression>, UnOp),
     BinaryOp(Box<Expression>, Box<Expression>, BinOp),
     Assignment(AssignmentIdentifier, Box<Expression>, AssignmentOp),
+	TypeCast(Box<Expression>, Type),
 }
 
 /// Gets the binary operator corresponding to the token.
@@ -705,6 +706,16 @@ fn parse_expression_with_precedence(
         }
         next = tokens.clone().next().unwrap();
     }
+
+	// Type cast
+	if let TokenWithDebugInfo {
+		internal_tok: Token::Colon,
+		..
+	} = next {
+		tokens.next();
+		let type_casted = parse_type(&mut tokens);
+		expr = Expression::TypeCast(Box::new(expr), type_casted);
+	}
 
     expr
 }
