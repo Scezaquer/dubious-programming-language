@@ -1,4 +1,4 @@
 fn main(): int {
-	let a: char = 'abcd';
+	let a: char = 'abcdefgh';
 	return a : int;
 }

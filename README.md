@@ -182,17 +182,17 @@ Type `str` is an alias of type `array[char]`. Type `bool` is an alias of type `i
 The `char` type is different from usual. Since all data types are 64 bits, it
 would be very wasteful to have individual characters take 64 bits, especially
 when manipulating long strings or text files. So `char` can actually contain
-up to 4 characters. This means that `'a'` is a char, but `'abcd'` is also a char.
-However, `'abcde'` is not.
+up to 8 characters. This means that `'a'` is a char, but `'abcdefgh'` is also a char.
+However, `'abcdefghi'` is not.
 
 In memory, characters in the char are stored backwards, such that `'abcd'`
 corresponds to hex `0x64636261`, which naïvely translates to `dcba`. This is so
-that chars with less than 4 letters behave as expected (meaning, `'a'` corresponds
-to hex `0x61` instead of `0x61000000`)
+that chars with less than 8 letters behave as expected (meaning, `'a'` corresponds
+to hex `0x61` instead of `0x6100000000000000`)
 
-This also means that `str` are actually chunked into groups of 4 characters,
-which is important to keep in mind when indexing them. I.e., `let a: str = "abcdefg"`
-will give you `a[0] == 'abcd'` and `a[1] == 'efg'`. Finer access is obtained through
+This also means that `str` are actually chunked into groups of 8 characters,
+which is important to keep in mind when indexing them. I.e., `let a: str = "abcdefghij"`
+will give you `a[0] == 'abcdefgh'` and `a[1] == 'ij'`. Finer access is obtained through
 casting to int and bitwise manipulation.
 
 - TODO: str and char tests
