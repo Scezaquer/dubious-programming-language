@@ -28,7 +28,7 @@ pub enum Literal {
     Float(f64),
     Hex(i64),
     Binary(i64),
-	Char(char),
+	Char(String),
 	String(String),
 }
 
@@ -341,7 +341,7 @@ fn parse_literal(token: &TokenWithDebugInfo) -> Literal {
 		TokenWithDebugInfo {
 			internal_tok: Token::CharLiteral(c),
 			..
-		} => Literal::Char(*c),
+		} => Literal::Char(c.clone()),
         _ => error_unexpected_token("constant", token),
     }
 }
@@ -407,8 +407,12 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
 			..
 		} => {
 			return Atom::Array(
-				s.chars().map(|c| Expression::Atom(Atom::Literal(Literal::Char(c)))).collect(),
-				s.len() as i64
+				s.chars()
+					.collect::<Vec<_>>()
+					.chunks(4)
+					.map(|chunk| Expression::Atom(Atom::Literal(Literal::Char(chunk.iter().collect()))))
+					.collect(),
+				(s.len() as i64 + 3) / 4
 			);
 		}
         TokenWithDebugInfo {

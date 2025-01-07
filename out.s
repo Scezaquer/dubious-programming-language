@@ -13,16 +13,10 @@ main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
-    mov rax, 'c'
+    mov rax, 'ab'
     push rax
-    mov rax, 'b'
-    push rax
-    mov rax, 'a'
-    push rax
-    mov rax, rsp	; Move the address of the array to rax
-    push rax
-    mov rax, [rbp-32]
-    add rsp, 32		;pop local variables before return
+    mov rax, [rbp-8]
+    add rsp, 8		;pop local variables before return
     pop rbx		;restore rbx for caller function
     pop rbp		;restore base pointer
     ret

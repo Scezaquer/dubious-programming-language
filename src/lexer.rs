@@ -63,7 +63,7 @@ pub enum Token {
     PrimitiveType(String),
     FloatLiteral(f64),
     IntLiteral(i64),
-	CharLiteral(char),
+	CharLiteral(String),
 	StringLiteral(String),
 	BinLiteral(i64),
 	HexLiteral(i64),
@@ -177,7 +177,7 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
 
 	let preprocessor_re = Regex::new(r"^\#(include|define|undef|ifdef|ifndef|if|elif|else|endif|error|print).*?(\n|$)").unwrap();
 
-	let char_re = Regex::new(r"^'.'").unwrap();
+	let char_re = Regex::new(r"^'.?.?.?.?'").unwrap();
 
 	let string_re = Regex::new(r#"^"(?:[^"\\]|\\.)*""#).unwrap();
 
@@ -258,7 +258,7 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
 			tok = Token::BoolLiteral(caps.get(0).unwrap().as_str() == "true");
 			pos += caps.get(0).unwrap().end();
 		} else if let Some(caps) = char_re.captures(rest) {
-			tok = Token::CharLiteral(caps.get(0).unwrap().as_str().chars().nth(1).unwrap());
+			tok = Token::CharLiteral(caps.get(0).unwrap().as_str().strip_prefix("'").unwrap().strip_suffix("'").unwrap().to_string());
 			pos += caps.get(0).unwrap().end();
 		} else if let Some(caps) = string_re.captures(rest) {
 			tok = Token::StringLiteral(caps.get(0).unwrap().as_str().strip_prefix("\"").unwrap().strip_suffix("\"").unwrap().to_string());
