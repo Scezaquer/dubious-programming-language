@@ -1,3 +1,5 @@
+use std::mem;
+
 use crate::ast_build::{
 	AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Program, Statement, Type, UnOp
 };
@@ -11,14 +13,31 @@ impl std::fmt::Display for Ast {
 impl std::fmt::Display for Program {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Program::Program(functions, constants) => {
+			Program::Program(functions, constants, structs) => {
 				for constant in constants {
 					writeln!(f, "{}", constant)?;
 				}
 				for function in functions {
 					writeln!(f, "{}", function)?;
 				}
+				for struct_ in structs {
+					writeln!(f, "{}", struct_)?;
+				}
 				Ok(())
+			}
+		}
+	}
+}
+
+impl std::fmt::Display for crate::ast_build::Struct {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match &self {
+			&crate::ast_build::Struct{ id, members } => {
+				write!(f, "struct {} {{\n", id)?;
+				for member in members {
+					write!(f, "{}: {},\n", member.0, member.1)?;
+				}
+				write!(f, "}}")
 			}
 		}
 	}
@@ -70,6 +89,7 @@ impl std::fmt::Display for Type {
 				}
 				write!(f, ") -> {}", ret)
 			}
+			Type::Struct(id) => write!(f, "{}", id),
 		}
 	}
 }
@@ -154,6 +174,17 @@ impl std::fmt::Display for Atom {
 				}
 				write!(f, "]")
 			}
+			Atom::StructInstance(id, members) => {
+				write!(f, "{} {{", id)?;
+				for (i, member) in members.iter().enumerate() {
+					write!(f, "{}", member)?;
+					if i < members.len() - 1 {
+						write!(f, ", ")?;
+					}
+				}
+				write!(f, "}}")
+			}
+			Atom::MemberAccess(id, member) => write!(f, "{}.{}", id, member),
 		}
 	}
 }

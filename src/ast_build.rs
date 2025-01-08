@@ -28,8 +28,8 @@ pub enum Literal {
     Float(f64),
     Hex(i64),
     Binary(i64),
-	Char(String),
-	String(String),
+    Char(String),
+    String(String),
 }
 
 /// Represents an atom in the AST.
@@ -43,6 +43,8 @@ pub enum Atom {
     FunctionCall(String, Vec<Expression>),
     ArrayAccess(String, Vec<Expression>), // identifier[exp1, exp2, ...]
     Array(Vec<Expression>, i64),          // Array literal with a given number of dimensions
+	StructInstance(String, Vec<Expression>), // Struct instance with a given number of fields
+	MemberAccess(String, Box<Atom>)
 }
 
 // In let bindings, the left hand side of the assignment
@@ -58,10 +60,11 @@ pub enum Type {
     Int,
     Float,
     Void,
-	Char,
+    Char,
     Pointer(Box<Type>),
     Array(Box<Type>), // array[type]. Strings are array[char]
     Function(Box<Type>, Vec<Type>),
+	Struct(String),
 }
 
 /// Represents a unary operator in the AST.
@@ -159,7 +162,7 @@ pub enum Expression {
     UnaryOp(Box<Expression>, UnOp),
     BinaryOp(Box<Expression>, Box<Expression>, BinOp),
     Assignment(AssignmentIdentifier, Box<Expression>, AssignmentOp),
-	TypeCast(Box<Expression>, Type),
+    TypeCast(Box<Expression>, Type),
 }
 
 /// Gets the binary operator corresponding to the token.
@@ -169,7 +172,6 @@ fn get_bin_operator_from_token(token: &TokenWithDebugInfo) -> BinOp {
             internal_tok: Token::Operator(op),
             ..
         } => match op {
-            Operator::MemberAccess => BinOp::MemberAccess,
             Operator::Multiply => BinOp::Multiply,
             Operator::Divide => BinOp::Divide,
             Operator::Modulus => BinOp::Modulus,
@@ -262,21 +264,21 @@ pub enum Statement {
 /// Represents a function in the AST.
 #[derive(Debug, Clone)]
 pub enum Function {
-	Function(String, Vec<(String, Type)>, Statement, Type),
+    Function(String, Vec<(String, Type)>, Statement, Type),
 }
 
 /// Represents a constant in the AST.
 /// Constants can only be assigned on declaration, and can only be assigned a literal,
 /// so they're not terribly useful as of now. They're basically static globals.
 #[derive(Debug, Clone)]
-pub enum Constant {
+pub enum Constant {  //TODO: should be a struct instead of enum
     Constant(String, Literal, Type),
 }
 
 /// Represents a program in the AST.
 #[derive(Debug, Clone)]
-pub enum Program {
-    Program(Vec<Function>, Vec<Constant>),
+pub enum Program {	//TODO: should be a struct instead of enum
+    Program(Vec<Function>, Vec<Constant>, Vec<Struct>),
 }
 
 /// Represents the abstract syntax tree (AST) of a program.
@@ -292,8 +294,8 @@ impl std::fmt::Display for Literal {
             Literal::Float(fl) => write!(f, "{}", fl),
             Literal::Hex(h) => write!(f, "0x{:x}", h),
             Literal::Binary(b) => write!(f, "0b{:b}", b),
-			Literal::Char(c) => write!(f, "'{}'", c),
-			Literal::String(s) => write!(f, "\"{}\"", s),// TODO: this may be fucked
+            Literal::Char(c) => write!(f, "'{}'", c),
+            Literal::String(s) => write!(f, "\"{}\"", s), // TODO: this may be fucked
         }
     }
 }
@@ -332,16 +334,16 @@ fn parse_literal(token: &TokenWithDebugInfo) -> Literal {
             internal_tok: Token::BoolLiteral(b),
             ..
         } => {
-			if *b {
-				Literal::Int(1)
-			} else {
-				Literal::Int(0)
-			}
-		},
-		TokenWithDebugInfo {
-			internal_tok: Token::CharLiteral(c),
-			..
-		} => Literal::Char(c.clone()),
+            if *b {
+                Literal::Int(1)
+            } else {
+                Literal::Int(0)
+            }
+        }
+        TokenWithDebugInfo {
+            internal_tok: Token::CharLiteral(c),
+            ..
+        } => Literal::Char(c.clone()),
         _ => error_unexpected_token("constant", token),
     }
 }
@@ -395,31 +397,34 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
         | TokenWithDebugInfo {
             internal_tok: Token::BoolLiteral(_),
             ..
-        } 
-		| TokenWithDebugInfo {
-			internal_tok: Token::CharLiteral(_),
-			..
-		} => {
+        }
+        | TokenWithDebugInfo {
+            internal_tok: Token::CharLiteral(_),
+            ..
+        } => {
             return Atom::Literal(parse_literal(tok));
-        },
-		TokenWithDebugInfo {
-			internal_tok: Token::StringLiteral(s),
-			..
-		} => {
-			return Atom::Array(
-				s.chars()
-					.collect::<Vec<_>>()
-					.chunks(4)
-					.map(|chunk| Expression::Atom(Atom::Literal(Literal::Char(chunk.iter().collect()))))
-					.collect(),
-				(s.len() as i64 + 3) / 4
-			);
-		}
+        }
+        TokenWithDebugInfo {
+            internal_tok: Token::StringLiteral(s),
+            ..
+        } => {
+            return Atom::Array(
+                s.chars()
+                    .collect::<Vec<_>>()
+                    .chunks(4)
+                    .map(|chunk| {
+                        Expression::Atom(Atom::Literal(Literal::Char(chunk.iter().collect())))
+                    })
+                    .collect(),
+                (s.len() as i64 + 3) / 4,
+            );
+        }
         TokenWithDebugInfo {
             internal_tok: Token::Identifier(s),
             ..
         } => {
             let next_tok = tokens.clone().next().unwrap();
+			// TODO: Make this if-else chain into match statement
             if let TokenWithDebugInfo {
                 internal_tok: Token::LParen,
                 ..
@@ -476,7 +481,43 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
                     }
                 }
                 return Atom::ArrayAccess(s.to_string(), args);
-            }
+            } else if let TokenWithDebugInfo {
+                internal_tok: Token::LBrace,
+                ..
+            } = next_tok 
+			{
+				// Struct instance
+				tokens.next();
+				let mut fields = Vec::new();
+				loop {
+					let next_tok = tokens.clone().next().unwrap();
+					if let TokenWithDebugInfo {
+						internal_tok: Token::RBrace,
+						..
+					} = next_tok
+					{
+						tokens.next();
+						break;
+					} else if let TokenWithDebugInfo {
+						internal_tok: Token::Comma,
+						..
+					} = next_tok
+					{
+						tokens.next();
+					} else {
+						fields.push(parse_expression(&mut tokens));
+					}
+				}
+				return Atom::StructInstance(s.to_string(), fields);
+			} else if let TokenWithDebugInfo {
+                internal_tok: Token::Dot,
+                ..
+            } = next_tok {
+				// Member access
+				tokens.next();
+				let member = parse_atom(tokens);
+				return Atom::MemberAccess(s.to_string(), Box::new(member));
+			}
 
             // Variable
             return Atom::Variable(s.to_string());
@@ -553,15 +594,15 @@ fn find_arr_dims(array: &Atom) -> Option<Vec<i64>> {
                 }
 
                 let sub_dims = find_arr_dims(elem).unwrap();
-				for (i, sub_dim) in sub_dims.iter().enumerate() {
-					if i >= dims.len() {
-						dims.push(*sub_dim);
-					} else if dims[i] < *sub_dim {
-						dims[i] = *sub_dim;
-					}
-				}
+                for (i, sub_dim) in sub_dims.iter().enumerate() {
+                    if i >= dims.len() {
+                        dims.push(*sub_dim);
+                    } else if dims[i] < *sub_dim {
+                        dims[i] = *sub_dim;
+                    }
+                }
             }
-			dims.insert(0, *dim);
+            dims.insert(0, *dim);
             return Some(dims);
         }
         _ => None,
@@ -569,43 +610,46 @@ fn find_arr_dims(array: &Atom) -> Option<Vec<i64>> {
 }
 
 fn rectangularize_array(array: &mut Vec<Expression>, depth: usize, max_dims: &Vec<i64>) {
-	let max_size = max_dims[depth] as usize;
-	if depth+1 < max_dims.len() {
-		for elem in array.iter_mut() {
-			if let Expression::Atom(Atom::Array(ref mut sub_array, _)) = elem {
-				rectangularize_array(sub_array, depth + 1, max_dims);
-			} else {
-				let mut new_elem = vec![elem.clone()];
-				rectangularize_array(&mut new_elem, depth + 1, max_dims);
-				*elem = Expression::Atom(Atom::Array(new_elem.clone(), new_elem.len() as i64));
-			}
-		}
-	}
+    let max_size = max_dims[depth] as usize;
+    if depth + 1 < max_dims.len() {
+        for elem in array.iter_mut() {
+            if let Expression::Atom(Atom::Array(ref mut sub_array, _)) = elem {
+                rectangularize_array(sub_array, depth + 1, max_dims);
+            } else {
+                let mut new_elem = vec![elem.clone()];
+                rectangularize_array(&mut new_elem, depth + 1, max_dims);
+                *elem = Expression::Atom(Atom::Array(new_elem.clone(), new_elem.len() as i64));
+            }
+        }
+    }
 
-	while array.len() < max_size {
-		if depth == max_dims.len() - 1 {
-			array.push(Expression::Atom(Atom::Literal(Literal::Int(0))));
-		} else {
-			let mut new_elem = vec![];
-			rectangularize_array(&mut new_elem, depth + 1, max_dims);
-			array.push(Expression::Atom(Atom::Array(new_elem.clone(), new_elem.len() as i64)));
-		}
-	}
+    while array.len() < max_size {
+        if depth == max_dims.len() - 1 {
+            array.push(Expression::Atom(Atom::Literal(Literal::Int(0))));
+        } else {
+            let mut new_elem = vec![];
+            rectangularize_array(&mut new_elem, depth + 1, max_dims);
+            array.push(Expression::Atom(Atom::Array(
+                new_elem.clone(),
+                new_elem.len() as i64,
+            )));
+        }
+    }
 }
 
 fn flatten(array: &Vec<Expression>) -> Vec<Expression> {
-	let mut flat_arr = Vec::new();
-	for elem in array.iter() {
-		if let Expression::Atom(Atom::Array(ref sub_array, _)) = elem {
-			flatten(sub_array);
-			for sub_elem in sub_array.iter() {
-				flat_arr.push(sub_elem.clone());
-			}
-		} else {
-			flat_arr.push(elem.clone());
-		}
-	}
-	return flat_arr;
+    let mut flat_arr = Vec::new();
+    for elem in array.iter() {
+        if let Expression::Atom(Atom::Array(ref sub_array, _)) = elem {
+            flatten(sub_array);
+            for sub_elem in sub_array.iter() {
+                flat_arr.push(sub_elem.clone());
+            }
+        } else {
+            flat_arr.push(elem.clone());
+        }
+    }
+    return flat_arr;
 }
 
 fn parse_array(tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
@@ -631,10 +675,10 @@ fn parse_array(tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
     }
 
     // Find the max size in each dimension
-	let array = Atom::Array(elements.clone(), elements.len() as i64);
+    let array = Atom::Array(elements.clone(), elements.len() as i64);
     let max_dims = find_arr_dims(&array).unwrap();
-	rectangularize_array(&mut elements, 0, &max_dims);
-	let flat_elements = flatten(&elements);
+    rectangularize_array(&mut elements, 0, &max_dims);
+    let flat_elements = flatten(&elements);
 
     return Atom::Array(flat_elements, max_dims[0]);
 }
@@ -711,15 +755,16 @@ fn parse_expression_with_precedence(
         next = tokens.clone().next().unwrap();
     }
 
-	// Type cast
-	if let TokenWithDebugInfo {
-		internal_tok: Token::Colon,
-		..
-	} = next {
-		tokens.next();
-		let type_casted = parse_type(&mut tokens);
-		expr = Expression::TypeCast(Box::new(expr), type_casted);
-	}
+    // Type cast
+    if let TokenWithDebugInfo {
+        internal_tok: Token::Colon,
+        ..
+    } = next
+    {
+        tokens.next();
+        let type_casted = parse_type(&mut tokens);
+        expr = Expression::TypeCast(Box::new(expr), type_casted);
+    }
 
     expr
 }
@@ -748,6 +793,11 @@ fn parse_expression_with_precedence(
 /// 15. Assignment (a = b) Add assignment (a += b) Subtract assignment (a -= b) Multiply assignment (a *= b) Divide assignment (a /= b) Modulus assignment (a %= b) Left shift assignment (a <<= b) Right shift assignment (a >>= b) Bitwise and assignment (a &= b) Bitwise xor assignment (a ^= b) Bitwise or assignment (a |= b)
 fn build_precedence_table() -> Vec<PrecedenceLevel> {
     vec![
+		PrecedenceLevel {
+            binary_ops: vec![],
+            unary_ops: vec![],
+            assignment_ops: vec![],
+        },
         PrecedenceLevel {
             binary_ops: vec![BinOp::MemberAccess],
             unary_ops: vec![],
@@ -864,10 +914,10 @@ fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Type {
             } else if k == "void" {
                 return Type::Void;
             } else if k == "char" {
-				return Type::Char;
-			} else if k == "str" {
-				return Type::Array(Box::new(Type::Char));
-			} else if k == "array" {
+                return Type::Char;
+            } else if k == "str" {
+                return Type::Array(Box::new(Type::Char));
+            } else if k == "array" {
                 let next_tok = tokens.next().unwrap();
                 if !matches!(
                     next_tok,
@@ -930,6 +980,10 @@ fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Type {
             }
             return Type::Function(Box::new(return_type), params);
         }
+		TokenWithDebugInfo {
+            internal_tok: Token::Identifier(id),
+            ..
+        } => Type::Struct(id.to_string()), // TODO: test in typechecker if struct exists
         _ => error_unexpected_token("valid type token", tok),
     }
 }
@@ -1302,27 +1356,26 @@ fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
                     ..
                 }
             ) {
-				dbg!(tok);
                 error_unexpected_token("colon", tok);
             }
-			params.push((id.clone(), parse_type(&mut tokens)));
+            params.push((id.clone(), parse_type(&mut tokens)));
         } else {
             error_unexpected_token("identifier or closing parenthesis", tok);
         }
     }
 
-	let tok = tokens.next().unwrap();
-	if !matches!(
-		tok,
-		TokenWithDebugInfo {
-			internal_tok: Token::Colon,
-			..
-		}
-	) {
-		error_unexpected_token("colon", tok);
-	}
+    let tok = tokens.next().unwrap();
+    if !matches!(
+        tok,
+        TokenWithDebugInfo {
+            internal_tok: Token::Colon,
+            ..
+        }
+    ) {
+        error_unexpected_token("colon", tok);
+    }
 
-	let return_type = parse_type(&mut tokens);
+    let return_type = parse_type(&mut tokens);
 
     let mut statement = parse_statement(&mut tokens);
 
@@ -1336,11 +1389,94 @@ fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
     return Function::Function(id, params, statement, return_type);
 }
 
+#[derive(Debug, Clone)]
+pub struct Struct {
+	pub id: String,
+	pub members: Vec<(String, Type)>,
+}
+
+fn parse_struct(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Struct {
+    let tok = tokens.next().unwrap();
+
+    if let TokenWithDebugInfo {
+        internal_tok: Token::Keyword(ref k),
+        ..
+    } = tok
+    {
+        if k != "struct" {
+            error_unexpected_token("struct keyword", tok)
+        }
+    } else {
+        error_unexpected_token("struct keyword", tok)
+    }
+
+    let tok = tokens.next().unwrap();
+    let id = match tok {
+        TokenWithDebugInfo {
+            internal_tok: Token::Identifier(id),
+            ..
+        } => id.clone(),
+        TokenWithDebugInfo { .. } => error_unexpected_token("identifier", tok),
+    };
+
+    let tok = tokens.next().unwrap();
+    if !matches!(
+        tok,
+        TokenWithDebugInfo {
+            internal_tok: Token::LBrace,
+            ..
+        }
+    ) {
+        error_unexpected_token("opening brace", tok);
+    }
+
+    let mut members = Vec::new();
+
+    loop {
+        let tok = tokens.next().unwrap();
+
+        if let TokenWithDebugInfo {
+            internal_tok: Token::RBrace,
+            ..
+        } = tok
+        {
+            break;
+        } else if let TokenWithDebugInfo {
+            internal_tok: Token::Semicolon,
+            ..
+        } = tok
+        {
+            continue;
+        } else if let TokenWithDebugInfo {
+            internal_tok: Token::Identifier(id),
+            ..
+        } = tok
+        {
+            let tok = tokens.next().unwrap();
+            if !matches!(
+                tok,
+                TokenWithDebugInfo {
+                    internal_tok: Token::Colon,
+                    ..
+                }
+            ) {
+                error_unexpected_token("colon", tok);
+            }
+            members.push((id.clone(), parse_type(&mut tokens)));
+        } else {
+            error_unexpected_token("identifier or closing brace", tok);
+        }
+    }
+
+    return Struct { id, members };
+}
+
 /// Parses an abstract syntax tree (AST) from a list of tokens.
 pub fn parse(tokens: &Vec<TokenWithDebugInfo>) -> Ast {
     let mut tokens = tokens.iter();
     let mut functions = Vec::new();
     let mut constants = Vec::new();
+	let mut structs = Vec::new();
 
     // Parse functions until there are no more tokens
     loop {
@@ -1358,14 +1494,19 @@ pub fn parse(tokens: &Vec<TokenWithDebugInfo>) -> Ast {
                 internal_tok: Token::Keyword(ref k),
                 ..
             } if k == "const" => constants.push(parse_const(&mut tokens)),
-            TokenWithDebugInfo { .. } => {
-                error_unexpected_token("function or constant declaration", next_tok)
-            }
+            TokenWithDebugInfo {
+                internal_tok: Token::Keyword(ref k),
+                ..
+            } if k == "struct" => structs.push(parse_struct(&mut tokens)),
+            TokenWithDebugInfo { .. } => error_unexpected_token(
+                "function, constant, struct, enum or union declaration",
+                next_tok,
+            ),
         }
     }
 
     let ast = Ast {
-        program: Program::Program(functions, constants),
+        program: Program::Program(functions, constants, structs),
     };
     return ast;
 }

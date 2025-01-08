@@ -45,7 +45,6 @@ pub enum Operator {
     BitwiseAndAssign,   // &=
     BitwiseXorAssign,   // ^=
     BitwiseOrAssign,    // |=
-    MemberAccess,       // .
 	Comma,              // ,
 }
 
@@ -80,6 +79,7 @@ pub enum Token {
     RBracket,
     Keyword(String),
     EOF,
+	Dot
 }
 
 /// A token with extra debug information to print more useful error messages.
@@ -171,7 +171,7 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
     let large_operator_re = Regex::new(r"^(==|!=|<=|>=|&&|\|\||\+\+|--|<<=|>>=|<<|>>|\+=|-=|\*=|\/=|%=|&=|\^=|\|=|\^\^)").unwrap();
 
     // Keywords are any of the following strings: if else while for return
-    let keyword_re = Regex::new(r"^(if|else|do|while|for|loop|return|fn|let|break|continue|const)").unwrap();
+    let keyword_re = Regex::new(r"^(if|else|do|while|for|loop|return|fn|let|break|continue|const|struct|union|enum)").unwrap();
 
 	let whitespace_re = Regex::new(r"^[^\S\n]+").unwrap();
 
@@ -240,10 +240,10 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
         } else if rest.starts_with("]") {
             tok = Token::RBracket;
             pos += 1;
-        } else if let Some(caps) = primitive_type_re.captures(rest) {
-            tok = Token::PrimitiveType(caps.get(0).unwrap().as_str().to_string());
-            pos += caps.get(0).unwrap().end();
-        } else if let Some(caps) = bin_re.captures(rest) {
+        } else if rest.starts_with(".") {
+			tok = Token::Dot;
+			pos += 1;
+		} else if let Some(caps) = bin_re.captures(rest) {
 			tok = Token::BinLiteral(i64::from_str_radix(caps.get(0).unwrap().as_str().strip_prefix("0b").unwrap(), 2).unwrap());
 			pos += caps.get(0).unwrap().end();
 		} else if let Some(caps) = hex_re.captures(rest) {
@@ -306,7 +306,6 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
                 "!" => Operator::LogicalNot,
                 "~" => Operator::BitwiseNot,
                 "^" => Operator::BitwiseXor,
-                "." => Operator::MemberAccess,
 				"," => Operator::Comma,
                 _ => unreachable!(),
             };
@@ -314,6 +313,9 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
             pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = keyword_re.captures(rest) {
             tok = Token::Keyword(caps.get(0).unwrap().as_str().to_string());
+            pos += caps.get(0).unwrap().end();
+        } else if let Some(caps) = primitive_type_re.captures(rest) {
+            tok = Token::PrimitiveType(caps.get(0).unwrap().as_str().to_string());
             pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = identifier_re.captures(rest) {
             tok = Token::Identifier(caps.get(0).unwrap().as_str().to_string());

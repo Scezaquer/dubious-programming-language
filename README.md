@@ -3,7 +3,7 @@
 Partially based on https://norasandler.com/2017/11/29/Write-a-Compiler.html
 
 - TODO: Helpful compiler error messages at the code generation stage (make &lt;T>TokenWithDebugInfo generic?)
-- TODO: Structs and enums?
+- TODO: Structs, enums, unions
 - TODO: better checker error messages
 - TODO: make generator write comments in asm file
 - TODO: register allocation
@@ -198,3 +198,32 @@ will give you `a[0] == 'abcdefgh'` and `a[1] == 'ij'`. Finer access is obtained 
 casting to int and bitwise manipulation.
 
 - TODO: str and char tests
+
+Physically in memory, structs are just like arrays where each entry can have
+a different type. When instantiating a struct, we get a pointer to the first
+attribute. This means that array-style indexing should work for structs (should it?
+currently it does but breaks typechecking. TODO: Fix)
+
+```
+struct S {
+	first_attribute: int;
+	second_attribute: char;
+}
+
+fn main(): int {
+	let a: S = S{ 1, 'a' };
+	return a.first_attribute; // This should be the same as a[0]. TODO: a[1] return 97 but should actually complain because char != int
+}
+```
+
+TODO: should I support this syntax for instantiation ? :
+```
+let a: S = S{ 
+	first_attribute: 1,
+	second_attribute: 'a'
+	};
+```
+
+- TODO: mixing member access and array access should be broken (something.attribute[0] doesn't work)
+- TODO: nested structs don't work yet
+- TODO: make tests for structs

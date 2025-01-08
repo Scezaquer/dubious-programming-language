@@ -1,5 +1,5 @@
 use crate::ast_build::{
-    AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Program, Statement, UnOp
+    AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Program, Statement, Struct, UnOp
 };
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -112,6 +112,44 @@ fn generate_atom(file: &mut File, atom: &Atom, context: &mut Context) {
 				// Move the address of the array to rax
 				writeln!(file, "    mov rax, rsp	; Move the address of the array to rax").unwrap();
 			}
+		Atom::StructInstance(_, members) => {
+			// Like an array, but with named fields
+			// Push expressions on stack in reverse order
+			for expr in members.iter().rev() {
+				generate_expression(file, expr, context);
+				writeln!(file, "    push rax").unwrap();
+				context.stack_index -= 8;
+				context.len += 1;
+			}
+			// Move the address of the struct to rax
+			writeln!(file, "    mov rax, rsp	; Move the address of the struct to rax").unwrap();
+		}
+		Atom::MemberAccess(id, member) => {
+			let member = member.as_ref();
+			match member{
+				Atom::Variable(name) => {
+					let var_address = context.var_map.get(id).expect(format!("Undeclared variable {}", id).as_str()).clone();
+
+					let var_type = context.var_types.get(id).expect(format!("Undeclared variable {}", id).as_str());
+
+					writeln!(file, "    mov rcx, {}", context.structs.get(var_type).unwrap().get(name).unwrap()).unwrap();
+					writeln!(file, "    mov rax, rbp").unwrap();
+					if var_address < 0 {
+						writeln!(file, "	sub rax, {}", var_address.abs()).unwrap();
+					} else {
+						writeln!(file, "	add rax, {}", var_address).unwrap();
+					}
+					// At this stage, the value at address rax is a pointer to the beginning of the array
+					writeln!(file, "	mov rax, [rax]").unwrap();
+					writeln!(file, "    mov rax, [rax + rcx * 8]").unwrap();
+					return;
+				}
+				Atom::MemberAccess(id, sub_member) => {
+					panic!("Nested struct members are not supported yet");
+				}
+				_ => { panic!("Expected a variable, got {:?}", member); }
+			}
+		}
         //_ => unimplemented!(),
     }
 }
@@ -336,8 +374,12 @@ fn generate_expression(file: &mut File, expression: &Expression, context: &mut C
 struct Context {
 	/// HashMap to store the variables and their addresses
     var_map: HashMap<String, i64>,
+	/// HashMap to store the var types
+	var_types: HashMap<String, String>,
 	/// Set of constant variables
 	constants: HashSet<String>,
+	/// Structs
+	structs: HashMap<String, HashMap<String, i64>>,
 	/// Stack index to keep track of the stack pointer
     stack_index: i64,
 	/// HashSet to store the variables that were declared in the current block
@@ -356,7 +398,9 @@ impl Context {
     fn new() -> Context {
         Context {
             var_map: HashMap::new(),
+			var_types: HashMap::new(),
 			constants: HashSet::new(),
+			structs: HashMap::new(),
             stack_index: 0,
             local_variables: HashSet::new(),
             continue_label: None,
@@ -372,7 +416,9 @@ impl Context {
     fn from_last_context(context: &Context) -> Context {
         Context {
             var_map: context.var_map.clone(),
+			var_types: context.var_types.clone(),
 			constants: context.constants.clone(),
+			structs: context.structs.clone(),
             stack_index: context.stack_index.clone(),
             local_variables: HashSet::new(),
             continue_label: context.continue_label.clone(),
@@ -383,8 +429,9 @@ impl Context {
     }
 
 	/// Insert a variable into the context
-    fn insert(&mut self, key: String, value: i64) {
+    fn insert(&mut self, key: String, value: i64, var_type: String) {
         self.var_map.insert(key.clone(), value);
+		self.var_types.insert(key.clone(), var_type);
         self.local_variables.insert(key);
 		self.len += 1;
     }
@@ -416,7 +463,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                 Statement::Expression(expression) => {
                     generate_expression(file, expression, &mut context);
                 }
-                Statement::Let(variable, expr, _) => {
+                Statement::Let(variable, expr, var_type) => {
                     if let Some(expr) = expr {
                         generate_expression(file, expr, &mut context);
                     }
@@ -444,9 +491,9 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
 					}
 					
 					if let AssignmentIdentifier::Variable(variable) = variable {
-						context.insert(variable.clone(), context.stack_index);
+						context.insert(variable.clone(), context.stack_index, var_type.to_string());
 					} else if let AssignmentIdentifier::Array(variable, dimensions) = variable {
-						context.insert(variable.clone(), context.stack_index);
+						context.insert(variable.clone(), context.stack_index, var_type.to_string());
 
 						let mut dimensions = dimensions.clone();
 						context.dimensions.insert(variable.clone(), dimensions.len());
@@ -455,7 +502,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
 							generate_expression(file, &expr, &mut context);
 							writeln!(file, "    push rax	;pushing array dimensions onto stack").unwrap();
 							context.stack_index -= 8;
-							context.insert(format!("{}:dim{}", variable, dimensions.len()), context.stack_index);
+							context.insert(format!("{}:dim{}", variable, dimensions.len()), context.stack_index, "int".to_string());
 						}
 					} else {
 						panic!("Expected a variable or an array, got {:?}", variable);
@@ -586,7 +633,7 @@ fn generate_function(file: &mut File, function: &Function, context: &Context) {
 
 	context.stack_index = 24;	// Skip rbp, rbx and the return address
 	for param in params.iter() {
-		context.insert(param.0.clone(), context.stack_index);
+		context.insert(param.0.clone(), context.stack_index, param.1.to_string());
 		context.stack_index += 8;
 	}
 	context.stack_index = 0;
@@ -615,7 +662,8 @@ pub fn generate(ast: &Ast, out_path: &str) {
 
     // Post-order traversal of the AST to generate x86_64 (+nasm pseudo-instructions)
 
-    let Program::Program(function_vector, const_vector) = &ast.program;
+	// TODO: structs
+    let Program::Program(function_vector, const_vector, structs) = &ast.program;
     writeln!(file, "[BITS 64]").unwrap();
     writeln!(file, "section .text").unwrap();
     writeln!(file, "").unwrap();
@@ -635,6 +683,16 @@ pub fn generate(ast: &Ast, out_path: &str) {
 			panic!("Variable {} already declared as a constant. Constants cannot be declared twice", name);
 		}
 		context.constants.insert(name.clone());
+	}
+
+	for struct_ in structs.iter() {
+		let Struct{ id, members} = struct_;
+		let mut member_names = HashMap::new();
+		for (i, member) in members.iter().enumerate() {
+			let (name, _) = member;
+			member_names.insert(name.clone(), i as i64);
+		}
+		context.structs.insert(id.clone(), member_names);
 	}
 
     for function in function_vector.iter() {
