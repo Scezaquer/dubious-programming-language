@@ -411,12 +411,12 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
             return Atom::Array(
                 s.chars()
                     .collect::<Vec<_>>()
-                    .chunks(4)
+                    .chunks(8)
                     .map(|chunk| {
                         Expression::Atom(Atom::Literal(Literal::Char(chunk.iter().collect())))
                     })
                     .collect(),
-                (s.len() as i64 + 3) / 4,
+                (s.len() as i64 + 3) / 8,
             );
         }
         TokenWithDebugInfo {

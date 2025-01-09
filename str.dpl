@@ -1,4 +1,0 @@
-fn main(){
-	let a: str = "abc";
-	return a[0];
-}

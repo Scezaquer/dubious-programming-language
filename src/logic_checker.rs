@@ -324,9 +324,15 @@ fn type_statement(statement: &Statement, context: &Context) -> Type {
                         }
                     }
 
-                    new_context
+					if let AssignmentIdentifier::Array(var_name, _) = name {
+						new_context
+                        .variables
+                        .insert(var_name.to_string(), var_type.clone());
+					} else {
+						new_context
                         .variables
                         .insert(name.to_string(), var_type.clone());
+					}
                 }
             }
             return last_type;

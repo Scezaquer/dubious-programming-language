@@ -1,0 +1,4 @@
+fn main(): int {
+	let a: str = "abcdefghijklmnopqrstuvwxyz1234567890";
+	return a[3] >> 24; // '2' = 50
+}

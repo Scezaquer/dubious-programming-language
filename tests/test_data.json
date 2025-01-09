@@ -467,5 +467,54 @@
 		"filename": "arrays/array_2d_implicit.dpl",
 		"input": [],
 		"output": 2
+	},
+	{
+		"name": "edgecase_to_fix",
+		"description": "weird edgecase where the elements of the array would be added to scope, but not the variable containing the array pointer",
+		"filename": "arrays/edgecase_to_fix.dpl",
+		"input": [],
+		"output": 0
+	},
+	{
+		"name": "char",
+		"description" : "char type declaration with single character and cast to int to return",
+		"filename": "strings/char.dpl",
+		"input": [],
+		"output": 97
+	},
+	{
+		"name": "long_char_shift",
+		"description" : "char with 8 characters, and shift it's bits to access one of the middle values",
+		"filename": "strings/long_char_shift.dpl",
+		"input": [],
+		"output": 102
+	},
+	{
+		"name": "long_char",
+		"description" : "char with 8 characters, return first one",
+		"filename": "strings/long_char.dpl",
+		"input": [],
+		"output": 97
+	},
+	{
+		"name": "long_str_shift",
+		"description" : "long string, access one character in the middle",
+		"filename": "strings/long_str_shift.dpl",
+		"input": [],
+		"output": 50
+	},
+	{
+		"name": "str_shift",
+		"description" : "access a character in the middle of a short string",
+		"filename": "strings/str_shift.dpl",
+		"input": [],
+		"output": 98
+	},
+	{
+		"name": "str",
+		"description" : "declare a short string, return it's first character",
+		"filename": "strings/str.dpl",
+		"input": [],
+		"output": 97
 	}
 ]

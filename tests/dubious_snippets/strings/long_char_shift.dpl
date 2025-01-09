@@ -1,0 +1,4 @@
+fn main(): int {
+	let a: char = 'abcdefgh';
+	return (a : int) >> (5*8); // 'f' = 102
+}
