@@ -121,32 +121,56 @@ fn main() {
     generate(&ast, &asm_output_file);
     if !args.output_asm {
         // nasm -f elf64 out.s -o out.o
-        Command::new("nasm")
-            .args([
-                "-f",
-                "elf64",
-                format!("{}", asm_output_file).as_str(),
-                "-o",
-                format!("{}.o", &args.output_file).as_str(),
-            ])
-            .output()
-            .expect("Failed to compile assembly file");
+		let nasm_output = Command::new("nasm")
+			.args([
+			"-f",
+			"elf64",
+			format!("{}", asm_output_file).as_str(),
+			"-o",
+			format!("{}.o", &args.output_file).as_str(),
+			])
+			.output()
+			.expect("Failed to execute nasm");
 
-        // ld out.o -o out
-        Command::new("ld")
-            .args([
-                format!("{}.o", &args.output_file).as_str(),
-                "-o",
-                format!("{}", &args.output_file).as_str(),
-            ])
-            .output()
-            .expect("Failed to link object file");
+		if !nasm_output.status.success() {
+			eprintln!(
+			"nasm failed with error:\n{}",
+			String::from_utf8_lossy(&nasm_output.stderr)
+			);
+			std::process::exit(1);
+		}
+
+		// ld out.o -o out
+		let ld_output = Command::new("ld")
+			.args([
+			format!("{}.o", &args.output_file).as_str(),
+			"-o",
+			format!("{}", &args.output_file).as_str(),
+			])
+			.output()
+			.expect("Failed to execute ld");
+
+		if !ld_output.status.success() {
+			eprintln!(
+			"ld failed with error:\n{}",
+			String::from_utf8_lossy(&ld_output.stderr)
+			);
+			std::process::exit(1);
+		}
 
 		// rm out.o
-		Command::new("rm")
+		let rm_output = Command::new("rm")
 			.args([format!("{}.o", &args.output_file).as_str()])
 			.output()
-			.expect("Failed to remove intermediary object file");
+			.expect("Failed to execute rm");
+
+		if !rm_output.status.success() {
+			eprintln!(
+			"rm failed with error:\n{}",
+			String::from_utf8_lossy(&rm_output.stderr)
+			);
+			std::process::exit(1);
+		}
 	
 
         // This turns the elf64 into a flat binary file

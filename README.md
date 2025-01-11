@@ -1,26 +1,30 @@
 # Dubious-Programming-Language
 
-Partially based on https://norasandler.com/2017/11/29/Write-a-Compiler.html
+Partially based on https://norasandler.com/2017/11/29/Write-a-Compiler.html.
+
+A simple compiler for the Dubious programming language (DPL).
+
+### Priority features
 
 - TODO: Helpful compiler error messages at the code generation stage (make &lt;T>TokenWithDebugInfo generic?)
 - TODO: Structs, enums, unions
 - TODO: better checker error messages
-- TODO: make generator write comments in asm file
-- TODO: register allocation
-- TODO: default function parameters ?
-- TODO: kwargs ?
-- TODO: improve #include
 - TODO: heap memory stuff
 - TODO: std library
-- TODO: inline asm ?
-- TODO: nasm fails silently. ld too probably. Should instead print a message with the error if that happens
+- TODO: inline asm
 - TODO: vscode syntax highlighting
-- TODO: Give the option to generate LLVM IR instead of x86_64
 - TODO: floating point arithmetic
 - TODO: Wiki
 - TODO: support escape characters
+- TODO: namespaces for functions, constants, structs, enums, unions
 
-A simple compiler for the Dubious programming language (DPL).
+### Optional
+
+- TODO: register allocation ?
+- TODO: default function parameters ?
+- TODO: kwargs ?
+- TODO: Give the option to generate LLVM IR instead of x86_64
+- TODO: improve #include
 
 # Usage
 
@@ -196,8 +200,6 @@ This also means that `str` are actually chunked into groups of 8 characters,
 which is important to keep in mind when indexing them. I.e., `let a: str = "abcdefghij"`
 will give you `a[0] == 'abcdefgh'` and `a[1] == 'ij'`. Finer access is obtained through
 casting to int and bitwise manipulation.
-
-- TODO: str and char tests
 
 Physically in memory, structs are just like arrays where each entry can have
 a different type. When instantiating a struct, we get a pointer to the first
