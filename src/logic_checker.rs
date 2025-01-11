@@ -27,7 +27,6 @@ fn type_expression(expr: &Expression, context: &Context) -> Type {
                 Atom::Literal(Literal::Char(_)) => Type::Char,
                 Atom::Literal(Literal::Hex(_)) => Type::Int,
                 Atom::Literal(Literal::Binary(_)) => Type::Int,
-                Atom::Literal(Literal::String(_)) => Type::Array(Box::new(Type::Char)),
                 Atom::Variable(v) => {
                     // Check that the variable is in scope
                     if let Some(var_type) = context.variables.get(v) {

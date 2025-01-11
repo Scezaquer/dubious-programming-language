@@ -28,8 +28,7 @@ pub enum Literal {
     Float(f64),
     Hex(i64),
     Binary(i64),
-    Char(String),
-    String(String),
+    Char(String)
 }
 
 /// Represents an atom in the AST.
@@ -294,8 +293,7 @@ impl std::fmt::Display for Literal {
             Literal::Float(fl) => write!(f, "{}", fl),
             Literal::Hex(h) => write!(f, "0x{:x}", h),
             Literal::Binary(b) => write!(f, "0b{:b}", b),
-            Literal::Char(c) => write!(f, "'{}'", c),
-            Literal::String(s) => write!(f, "\"{}\"", s), // TODO: this may be fucked
+            Literal::Char(c) => write!(f, "'{}'", c)
         }
     }
 }

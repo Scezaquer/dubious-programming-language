@@ -1,5 +1,3 @@
-use std::mem;
-
 use crate::ast_build::{
 	AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Program, Statement, Type, UnOp
 };
