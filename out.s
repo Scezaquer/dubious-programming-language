@@ -13,30 +13,18 @@ main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
-    mov rax, '7890'
+    mov rax, 'a'
     push rax
-    mov rax, 'yz123456'
+    mov rax, 1
     push rax
-    mov rax, 'qrstuvwx'
+    mov rax, rsp	; Move the address of the struct to rax
     push rax
-    mov rax, 'ijklmnop'
+    mov rax, [rbp-24]
     push rax
-    mov rax, 'abcdefgh'
-    push rax
-    mov rax, rsp	; Move the address of the array to rax
-    push rax
-    mov rax, 2
-    mov rcx, rax
-    mov rax, rbp
-	sub rax, 48
+    mov rcx, 0
 	mov rax, [rax]
     mov rax, [rax + rcx * 8]
-    push rax
-    mov rax, 24
-    pop rcx
-    xchg rax, rcx
-    shr rax, cl
-    add rsp, 48		;pop local variables before return
+    add rsp, 24		;pop local variables before return
     pop rbx		;restore rbx for caller function
     pop rbp		;restore base pointer
     ret

@@ -43,7 +43,6 @@ pub enum Atom {
     ArrayAccess(String, Vec<Expression>), // identifier[exp1, exp2, ...]
     Array(Vec<Expression>, i64),          // Array literal with a given number of dimensions
 	StructInstance(String, Vec<Expression>), // Struct instance with a given number of fields
-	MemberAccess(String, Box<Atom>)
 }
 
 // In let bindings, the left hand side of the assignment
@@ -161,7 +160,7 @@ pub enum Expression {
     UnaryOp(Box<Expression>, UnOp),
     BinaryOp(Box<Expression>, Box<Expression>, BinOp),
     Assignment(AssignmentIdentifier, Box<Expression>, AssignmentOp),
-    TypeCast(Box<Expression>, Type),
+    TypeCast(Box<Expression>, Type)
 }
 
 /// Gets the binary operator corresponding to the token.
@@ -190,6 +189,7 @@ fn get_bin_operator_from_token(token: &TokenWithDebugInfo) -> BinOp {
             Operator::LogicalAnd => BinOp::LogicalAnd,
             Operator::LogicalXor => BinOp::LogicalXor,
             Operator::LogicalOr => BinOp::LogicalOr,
+			Operator::MemberAccess => BinOp::MemberAccess,
             _ => BinOp::NotABinaryOp,
         },
         _ => BinOp::NotABinaryOp,
@@ -507,14 +507,6 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
 					}
 				}
 				return Atom::StructInstance(s.to_string(), fields);
-			} else if let TokenWithDebugInfo {
-                internal_tok: Token::Dot,
-                ..
-            } = next_tok {
-				// Member access
-				tokens.next();
-				let member = parse_atom(tokens);
-				return Atom::MemberAccess(s.to_string(), Box::new(member));
 			}
 
             // Variable

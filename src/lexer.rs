@@ -46,6 +46,7 @@ pub enum Operator {
     BitwiseXorAssign,   // ^=
     BitwiseOrAssign,    // |=
 	Comma,              // ,
+	MemberAccess,       // .
 }
 
 /// All the tokens that the lexer can recognize.
@@ -78,8 +79,7 @@ pub enum Token {
     LBracket,
     RBracket,
     Keyword(String),
-    EOF,
-	Dot
+    EOF
 }
 
 /// A token with extra debug information to print more useful error messages.
@@ -240,9 +240,6 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
         } else if rest.starts_with("]") {
             tok = Token::RBracket;
             pos += 1;
-        } else if rest.starts_with(".") {
-			tok = Token::Dot;
-			pos += 1;
 		} else if let Some(caps) = bin_re.captures(rest) {
 			tok = Token::BinLiteral(i64::from_str_radix(caps.get(0).unwrap().as_str().strip_prefix("0b").unwrap(), 2).unwrap());
 			pos += caps.get(0).unwrap().end();
@@ -307,6 +304,7 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
                 "~" => Operator::BitwiseNot,
                 "^" => Operator::BitwiseXor,
 				"," => Operator::Comma,
+				"." => Operator::MemberAccess,
                 _ => unreachable!(),
             };
             tok = Token::Operator(op);

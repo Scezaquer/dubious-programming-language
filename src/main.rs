@@ -92,14 +92,16 @@ fn main() {
         dbg!(&tokens);
     }
 
-    let ast = parse(&tokens);
+    let mut ast = parse(&tokens);
 
+	ast = check_program(&ast);
+
+	
     if args.ast {
         dbg!(&ast);
         println!("{}", ast);
     }
 
-	check_program(&ast);
 
     // We make a .s file if the user wants to see the assembly code,
     // otherwise don't use any extension.

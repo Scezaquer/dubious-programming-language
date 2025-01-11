@@ -168,7 +168,7 @@ beginning of the list, while list[list[int]] would be a pointer to a list which
 itself contains pointers to int lists. Useful to keep distinct.
 
 I explicitely don't allow C nonsense like arr[3] being equivalent to 3[arr].
-Array indexation must be of the form `identifier[id1, id2, ...]`
+Array indexation must be of the form `identifier[exp1, exp2, ...]`
 
 TODO: test array implementation thoroughly. 
 - Test 0 autofill
@@ -227,5 +227,9 @@ let a: S = S{
 ```
 
 - TODO: mixing member access and array access should be broken (something.attribute[0] doesn't work)
-- TODO: nested structs don't work yet
+- TODO: Can't change struct members after initialization
 - TODO: make tests for structs
+
+
+expr.identifier is an expression
+expr[expr, expr, ...] is valid array access syntax

@@ -1,5 +1,5 @@
 use crate::ast_build::{
-    AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Program, Statement, Struct, UnOp
+    AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Literal, Program, Statement, Struct, UnOp
 };
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -124,7 +124,7 @@ fn generate_atom(file: &mut File, atom: &Atom, context: &mut Context) {
 			// Move the address of the struct to rax
 			writeln!(file, "    mov rax, rsp	; Move the address of the struct to rax").unwrap();
 		}
-		Atom::MemberAccess(id, member) => {
+		/*Atom::MemberAccess(id, member) => {
 			let member = member.as_ref();
 			match member{
 				Atom::Variable(name) => {
@@ -149,7 +149,7 @@ fn generate_atom(file: &mut File, atom: &Atom, context: &mut Context) {
 				}
 				_ => { panic!("Expected a variable, got {:?}", member); }
 			}
-		}
+		}*/
         //_ => unimplemented!(),
     }
 }
@@ -254,8 +254,44 @@ fn generate_expression(file: &mut File, expression: &Expression, context: &mut C
         }
         Expression::BinaryOp(left, right, bin_op) => {
             generate_expression(file, left, context);
-            writeln!(file, "    push rax").unwrap();
-            generate_expression(file, right, context);
+			if bin_op != &BinOp::MemberAccess {
+				writeln!(file, "    push rax").unwrap();
+            	generate_expression(file, right, context);
+			} else {
+				if let Expression::Atom(Atom::Literal(Literal::Int(i))) = right.as_ref() {
+					writeln!(file, "    mov rcx, {}", i).unwrap();
+					writeln!(file, "    mov rax, [rax + rcx * 8]").unwrap();
+					return;
+				} else {
+					panic!("Unreachable code, something went very wrong");
+				}
+				// let member = right.as_ref();
+				// match member{
+				// 	&Expression::Atom(Atom::Variable(name)) => {
+				// 		let var_address = context.var_map.get(id).expect(format!("Undeclared variable {}", id).as_str()).clone();
+
+				// 		let var_type = context.var_types.get(id).expect(format!("Undeclared variable {}", id).as_str());
+
+				// 		writeln!(file, "    mov rcx, {}", context.structs.get(var_type).unwrap().get(name).unwrap()).unwrap();
+				// 		writeln!(file, "    mov rax, rbp").unwrap();
+				// 		if var_address < 0 {
+				// 			writeln!(file, "	sub rax, {}", var_address.abs()).unwrap();
+				// 		} else {
+				// 			writeln!(file, "	add rax, {}", var_address).unwrap();
+				// 		}
+				// 		// At this stage, the value at address rax is a pointer to the beginning of the array
+				// 		writeln!(file, "	mov rax, [rax]").unwrap();
+				// 		writeln!(file, "    mov rax, [rax + rcx * 8]").unwrap();
+				// 		return;
+				// 	}
+				// 	Atom::MemberAccess(id, sub_member) => {
+				// 		panic!("Nested struct members are not supported yet");
+				// 	}
+				// 	_ => { panic!("Expected a variable, got {:?}", member); }
+				// }
+			}
+
+
             writeln!(file, "    pop rcx").unwrap();
             writeln!(file, "    xchg rax, rcx").unwrap();
             match bin_op {

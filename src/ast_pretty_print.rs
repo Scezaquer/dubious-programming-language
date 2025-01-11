@@ -182,7 +182,6 @@ impl std::fmt::Display for Atom {
 				}
 				write!(f, "}}")
 			}
-			Atom::MemberAccess(id, member) => write!(f, "{}.{}", id, member),
 		}
 	}
 }
