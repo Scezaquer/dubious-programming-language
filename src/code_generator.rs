@@ -124,32 +124,6 @@ fn generate_atom(file: &mut File, atom: &Atom, context: &mut Context) {
 			// Move the address of the struct to rax
 			writeln!(file, "    mov rax, rsp	; Move the address of the struct to rax").unwrap();
 		}
-		/*Atom::MemberAccess(id, member) => {
-			let member = member.as_ref();
-			match member{
-				Atom::Variable(name) => {
-					let var_address = context.var_map.get(id).expect(format!("Undeclared variable {}", id).as_str()).clone();
-
-					let var_type = context.var_types.get(id).expect(format!("Undeclared variable {}", id).as_str());
-
-					writeln!(file, "    mov rcx, {}", context.structs.get(var_type).unwrap().get(name).unwrap()).unwrap();
-					writeln!(file, "    mov rax, rbp").unwrap();
-					if var_address < 0 {
-						writeln!(file, "	sub rax, {}", var_address.abs()).unwrap();
-					} else {
-						writeln!(file, "	add rax, {}", var_address).unwrap();
-					}
-					// At this stage, the value at address rax is a pointer to the beginning of the array
-					writeln!(file, "	mov rax, [rax]").unwrap();
-					writeln!(file, "    mov rax, [rax + rcx * 8]").unwrap();
-					return;
-				}
-				Atom::MemberAccess(id, sub_member) => {
-					panic!("Nested struct members are not supported yet");
-				}
-				_ => { panic!("Expected a variable, got {:?}", member); }
-			}
-		}*/
         //_ => unimplemented!(),
     }
 }
@@ -265,30 +239,6 @@ fn generate_expression(file: &mut File, expression: &Expression, context: &mut C
 				} else {
 					panic!("Unreachable code, something went very wrong");
 				}
-				// let member = right.as_ref();
-				// match member{
-				// 	&Expression::Atom(Atom::Variable(name)) => {
-				// 		let var_address = context.var_map.get(id).expect(format!("Undeclared variable {}", id).as_str()).clone();
-
-				// 		let var_type = context.var_types.get(id).expect(format!("Undeclared variable {}", id).as_str());
-
-				// 		writeln!(file, "    mov rcx, {}", context.structs.get(var_type).unwrap().get(name).unwrap()).unwrap();
-				// 		writeln!(file, "    mov rax, rbp").unwrap();
-				// 		if var_address < 0 {
-				// 			writeln!(file, "	sub rax, {}", var_address.abs()).unwrap();
-				// 		} else {
-				// 			writeln!(file, "	add rax, {}", var_address).unwrap();
-				// 		}
-				// 		// At this stage, the value at address rax is a pointer to the beginning of the array
-				// 		writeln!(file, "	mov rax, [rax]").unwrap();
-				// 		writeln!(file, "    mov rax, [rax + rcx * 8]").unwrap();
-				// 		return;
-				// 	}
-				// 	Atom::MemberAccess(id, sub_member) => {
-				// 		panic!("Nested struct members are not supported yet");
-				// 	}
-				// 	_ => { panic!("Expected a variable, got {:?}", member); }
-				// }
 			}
 
 

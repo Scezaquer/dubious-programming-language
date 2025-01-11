@@ -89,41 +89,11 @@ fn type_expression(expr: &Expression, context: &Context) -> (Expression, Type) {
             }
         }
         Expression::BinaryOp(lhs, rhs, op) => {
-            // Treat member access separately from the other operators, otherwise
-            // we try to typecheck both sides, but the rhs isn't defined as a
-            // separate variable so it crashes
-            /*if let BinOp::MemberAccess = op {
-                if let Expression::Atom(Atom::Variable(lhs)) = lhs.as_ref() {
-                    if let Some(t) = context.variables.get(lhs) {
-                        // Check that T is a struct
-                        if let Type::Struct(s) = t {
-                            if let Expression::Atom(Atom::Variable(rhs)) = rhs.as_ref() {
-                                let (_, unordered_list) = context
-                                    .structs
-                                    .get(s)
-                                    .expect(format!("Undefined struct {}", t).as_str());
-
-                                if let Some(t) = unordered_list.get(rhs) {
-                                    return t.clone();
-                                } else {
-                                    panic!("Struct '{}' does not have member '{}'", lhs, rhs);
-                                }
-                            } else {
-                                panic!("Member access must be on a variable");
-                            }
-                        } else {
-                            panic!("Type {} is not a struct, members access is undefined", t)
-                        }
-                    } else {
-                        panic!("Struct '{}' not in scope", lhs);
-                    }
-                } else {
-                    panic!("Member access must be on a variable");
-                }
-            }*/
-
             let (lhs_expr, lhs_type) = type_expression(lhs, context);
 
+			// Treat member access separately from the other operators, otherwise
+            // we try to typecheck both sides, but the rhs isn't defined as a
+            // separate variable so it crashes
 			if let BinOp::MemberAccess = op {
 				if let Type::Struct(s) = lhs_type.clone() {
 					if let Expression::Atom(Atom::Variable(attribute)) = rhs.as_ref() {
