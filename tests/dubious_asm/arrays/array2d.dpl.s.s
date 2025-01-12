@@ -37,20 +37,31 @@ main:
     push rax	;pushing array dimensions onto stack
     mov rax, 3
     push rax	;pushing array dimensions onto stack
-    mov rcx, 0
+    mov rax, [rbp-80]
+    push rax
+    mov rax, 0
+    push rax
+    mov rax, 3
+    pop rcx
+    xchg rax, rcx
+    imul rax, rcx
+    push rax
     mov rax, 1
-    mov rdx, [rbp-96]
-    imul rcx, rdx
-    add rcx, rax
+    pop rcx
+    xchg rax, rcx
+    add rax, rcx
+    push rax
+    mov rax, 3
+    pop rcx
+    xchg rax, rcx
+    imul rax, rcx
+    push rax
     mov rax, 2
-    mov rdx, [rbp-88]
-    imul rcx, rdx
-    add rcx, rax
-	;Move the base address of the array to rax
-    mov rax, rbp
-	sub rax, 80
-	mov rax, [rax]
-    mov rax, [rax + rcx * 8]
+    pop rcx
+    xchg rax, rcx
+    add rax, rcx
+    pop rcx
+    mov rax, [rcx + rax * 8]
     add rsp, 96		;pop local variables before return
     pop rbx		;restore rbx for caller function
     pop rbp		;restore base pointer

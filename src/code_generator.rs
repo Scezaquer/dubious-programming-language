@@ -44,60 +44,6 @@ fn generate_atom(file: &mut File, atom: &Atom, context: &mut Context) {
 			writeln!(file, "    call {}", name).unwrap();
 			writeln!(file, "    add rsp, {}	;pop arguments", args.len() * 8).unwrap();	// Pop arguments from stack
 		}
-		Atom::ArrayAccess(variable, indices) => {
-			let var_address = context.var_map.get(variable).expect(format!("Undeclared variable {}", variable).as_str()).clone();
-
-			// TODO: Insert runtime checks for array bounds
-			// Don't forget multi-dimensional array bounds:
-			// if i >= dim1 || j >= dim2 || k >= dim3 || ... { panic!() }
-			// if i < 0 || j < 0 || k < 0 || ... { panic!() }
-			// Yes, this will make the code slower, but it's better than undefined behavior
-
-			if indices.len() == 1 {
-				generate_expression(file, &indices[0], context);
-				writeln!(file, "    mov rcx, rax").unwrap();
-				writeln!(file, "    mov rax, rbp").unwrap();
-				if var_address < 0 {
-					writeln!(file, "	sub rax, {}", var_address.abs()).unwrap();
-				} else {
-					writeln!(file, "	add rax, {}", var_address).unwrap();
-				}
-				// At this stage, the value at address rax is a pointer to the beginning of the array
-				writeln!(file, "	mov rax, [rax]").unwrap();
-				writeln!(file, "    mov rax, [rax + rcx * 8]").unwrap();
-				return;
-			} else if indices.len() == *context.dimensions.get(variable).expect(format!("Undeclared array {}", variable).as_str()) {
-				// Indexing a multi-dimensional array
-				// Calculate the address of the element arr[i, j, k, ...] = arr + ((i * dim1 + j) * dim2 + k) * dim3 + ...
-				// Use rcx as accumulator
-				writeln!(file, "    mov rcx, 0").unwrap();
-				let mut current_dim = 0;
-				for index in indices.iter() {
-					generate_expression(file, index, context);
-					// get the dimension from the stack into rdx
-					let dim = context.var_map.get(&format!("{}:dim{}", variable, current_dim)).expect(format!("Undeclared array {}", variable).as_str());
-					writeln!(file, "    mov rdx, [rbp{}{}]", if var_address < 0 { "" } else { "+" }, dim).unwrap();
-					
-					// rcx = rcx * dim + rax
-					writeln!(file, "    imul rcx, rdx").unwrap();
-					writeln!(file, "    add rcx, rax").unwrap();
-					current_dim += 1;
-				}
-				// Move the base address of the array to rax
-				writeln!(file, "	;Move the base address of the array to rax").unwrap();
-				writeln!(file, "    mov rax, rbp").unwrap();
-				if var_address < 0 {
-					writeln!(file, "	sub rax, {}", var_address.abs()).unwrap();
-				} else {
-					writeln!(file, "	add rax, {}", var_address).unwrap();
-				}
-				// At this stage, the value at address rax is a pointer to the beginning of the array
-				writeln!(file, "	mov rax, [rax]").unwrap();
-				writeln!(file, "    mov rax, [rax + rcx * 8]").unwrap();
-			} else {
-				panic!("Incorrect number of indices for array access: expected {}, got {}", context.dimensions.get(variable).expect(format!("Undeclared array {}", variable).as_str()), indices.len());
-			}
-		}
 		Atom::Array(expressions, _) => {
 				// TODO: Push array's dimensions on the stack upon creation, refer 
 				// back to them when accessing the array
@@ -352,6 +298,15 @@ fn generate_expression(file: &mut File, expression: &Expression, context: &mut C
 		Expression::TypeCast(expr, t) => {
 			// Unsure if I should be doing something here or nah
 			generate_expression(file, expr, context);
+		}
+		Expression::ArrayAccess(variable, indices) => {
+			generate_expression(file, variable, context);
+			let index = indices.get(0).expect("Array access without index");
+
+			writeln!(file, "    push rax").unwrap();
+			generate_expression(file, index, context);
+			writeln!(file, "    pop rcx").unwrap();
+			writeln!(file, "    mov rax, [rcx + rax * 8]").unwrap();
 		}
     }
 }

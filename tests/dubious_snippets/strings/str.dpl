@@ -1,4 +1,4 @@
-fn main(): int {
+fn main(): char {
 	let a: str = "abc";
 	return a[0];
 }

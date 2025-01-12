@@ -40,7 +40,6 @@ pub enum Atom {
     Expression(Box<Expression>),
     Variable(String),
     FunctionCall(String, Vec<Expression>),
-    ArrayAccess(String, Vec<Expression>), // identifier[exp1, exp2, ...]
     Array(Vec<Expression>, i64),          // Array literal with a given number of dimensions
 	StructInstance(String, Vec<Expression>), // Struct instance with a given number of fields
 }
@@ -160,7 +159,8 @@ pub enum Expression {
     UnaryOp(Box<Expression>, UnOp),
     BinaryOp(Box<Expression>, Box<Expression>, BinOp),
     Assignment(AssignmentIdentifier, Box<Expression>, AssignmentOp),
-    TypeCast(Box<Expression>, Type)
+    TypeCast(Box<Expression>, Type),
+	ArrayAccess(Box<Expression>, Vec<Expression>),
 }
 
 /// Gets the binary operator corresponding to the token.
@@ -451,7 +451,7 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
                     }
                 }
                 return Atom::FunctionCall(s.to_string(), args);
-            } else if let TokenWithDebugInfo {
+            } /*else if let TokenWithDebugInfo {
                 internal_tok: Token::LBracket,
                 ..
             } = next_tok
@@ -479,7 +479,7 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
                     }
                 }
                 return Atom::ArrayAccess(s.to_string(), args);
-            } else if let TokenWithDebugInfo {
+            }*/ else if let TokenWithDebugInfo {
                 internal_tok: Token::LBrace,
                 ..
             } = next_tok 
@@ -692,7 +692,7 @@ fn parse_expression_with_precedence(
     let mut next_if_assignment = tokens.clone();
 
     // Check if the current token is a unary operator for this precedence level
-    let mut next = tokens.clone().next().unwrap();
+    let next = tokens.clone().next().unwrap();
     let mut expr;
 
     if precedence_table[precedence_level]
@@ -709,6 +709,36 @@ fn parse_expression_with_precedence(
         expr =
             parse_expression_with_precedence(&mut tokens, precedence_level - 1, precedence_table);
     }
+
+	let mut next = tokens.clone().next().unwrap();
+	// Array access
+	if let TokenWithDebugInfo {
+		internal_tok: Token::LBracket,
+		..
+	} = next {
+		tokens.next();
+		let mut args = Vec::new();
+		loop {
+			let next_tok = tokens.clone().next().unwrap();
+			if let TokenWithDebugInfo {
+				internal_tok: Token::RBracket,
+				..
+			} = next_tok
+			{
+				tokens.next();
+				break;
+			} else if let TokenWithDebugInfo {
+				internal_tok: Token::Comma,
+				..
+			} = next_tok
+			{
+				tokens.next();
+			} else {
+				args.push(parse_expression(&mut tokens));
+			}
+		}
+		expr = Expression::ArrayAccess(Box::new(expr), args);
+	}
 
     // Now handle binary and assignment operators for the current precedence level
     next = tokens.clone().next().unwrap();

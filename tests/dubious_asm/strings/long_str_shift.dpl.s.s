@@ -25,12 +25,11 @@ main:
     push rax
     mov rax, rsp	; Move the address of the array to rax
     push rax
+    mov rax, [rbp-48]
+    push rax
     mov rax, 3
-    mov rcx, rax
-    mov rax, rbp
-	sub rax, 48
-	mov rax, [rax]
-    mov rax, [rax + rcx * 8]
+    pop rcx
+    mov rax, [rcx + rax * 8]
     push rax
     mov rax, 24
     pop rcx

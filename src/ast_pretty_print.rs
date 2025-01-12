@@ -141,6 +141,16 @@ impl std::fmt::Display for Expression {
 			Expression::BinaryOp(lhs, rhs, op) => write!(f, "({} {} {})", lhs, rhs, op),
 			Expression::Assignment(var, expr, op) => write!(f, "{} {} {}", var, op, expr),
 			Expression::TypeCast(expr, t) => write!(f, "({} : {})", expr, t),
+			Expression::ArrayAccess(var, indices) => {
+				write!(f, "{}[", var)?;
+				for (i, index) in indices.iter().enumerate() {
+					write!(f, "{}", index)?;
+					if i < indices.len() - 1 {
+						write!(f, ", ")?;
+					}
+				}
+				write!(f, "]")
+			}
 		}
 	}
 }
@@ -161,7 +171,6 @@ impl std::fmt::Display for Atom {
 				}
 				write!(f, ")")
 			},
-			Atom::ArrayAccess(var, index) => write!(f, "{}[{:?}]", var, index),
 			Atom::Array(elements, _) => {
 				write!(f, "[")?;
 				for (i, element) in elements.iter().enumerate() {

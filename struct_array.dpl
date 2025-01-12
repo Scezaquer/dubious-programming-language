@@ -1,0 +1,9 @@
+struct S {
+	first_attribute: array[int];
+	second_attribute: char;
+}
+
+fn main(): int {
+	let a: S = S{ [3, 4, 5], 'a' };
+	return a.first_attribute[1];
+}

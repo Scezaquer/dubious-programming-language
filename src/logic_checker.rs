@@ -17,6 +17,7 @@ struct Context {
     variables: HashMap<String, Type>,
     functions: HashMap<String, Type>,
     structs: HashMap<String, (Vec<(String, Type)>, HashMap<String, Type>)>,
+    array_dims: HashMap<String, Vec<Expression>>,
 }
 
 fn type_expression(expr: &Expression, context: &Context) -> (Expression, Type) {
@@ -39,10 +40,10 @@ fn type_expression(expr: &Expression, context: &Context) -> (Expression, Type) {
                 Atom::Array(expressions, i) => {
                     // Check all expressions are of the same type
                     let mut array_type = None;
-					let mut new_expressions = Vec::new();
+                    let mut new_expressions = Vec::new();
                     for expr in expressions {
                         let (new_expr, expr_type) = type_expression(expr, context);
-						new_expressions.push(new_expr);
+                        new_expressions.push(new_expr);
                         if let Some(t) = &array_type {
                             if *t != expr_type {
                                 panic!("Array elements are not of the same type");
@@ -51,14 +52,19 @@ fn type_expression(expr: &Expression, context: &Context) -> (Expression, Type) {
                             array_type = Some(expr_type);
                         }
                     }
-                    (Expression::Atom(Atom::Array(new_expressions, *i)), Type::Array(Box::new(array_type.unwrap())))
+                    (
+                        Expression::Atom(Atom::Array(new_expressions, *i)),
+                        Type::Array(Box::new(array_type.unwrap())),
+                    )
                 }
                 Atom::FunctionCall(_, _) => (expr.clone(), Type::Int), // TODO: function return type, check arguments
-                Atom::ArrayAccess(_, _) => (expr.clone(), Type::Int),  // TODO: array type
                 Atom::Expression(expr) => {
-					let sub_expr = type_expression(expr, context);
-					(Expression::Atom(Atom::Expression(Box::new(sub_expr.0))), sub_expr.1)
-				}
+                    let sub_expr = type_expression(expr, context);
+                    (
+                        Expression::Atom(Atom::Expression(Box::new(sub_expr.0))),
+                        sub_expr.1,
+                    )
+                }
                 Atom::StructInstance(id, exprs) => {
                     if let Some((ordered_list, _)) = context.structs.get(id) {
                         if exprs.len() != ordered_list.len() {
@@ -70,10 +76,10 @@ fn type_expression(expr: &Expression, context: &Context) -> (Expression, Type) {
                             );
                         }
 
-						let mut new_exprs = Vec::new();
+                        let mut new_exprs = Vec::new();
                         for (expr, (_, t)) in exprs.iter().zip(ordered_list.iter()) {
                             let (new_expr, expr_type) = type_expression(expr, context);
-							new_exprs.push(new_expr);
+                            new_exprs.push(new_expr);
                             if *t != expr_type {
                                 panic!(
                                     "Struct member type '{}' does not match expression type '{}'",
@@ -81,7 +87,10 @@ fn type_expression(expr: &Expression, context: &Context) -> (Expression, Type) {
                                 );
                             }
                         }
-                        (Expression::Atom(Atom::StructInstance(id.to_string(), new_exprs)), Type::Struct(id.clone()))
+                        (
+                            Expression::Atom(Atom::StructInstance(id.to_string(), new_exprs)),
+                            Type::Struct(id.clone()),
+                        )
                     } else {
                         panic!("Struct '{}' not in scope", id);
                     }
@@ -91,32 +100,46 @@ fn type_expression(expr: &Expression, context: &Context) -> (Expression, Type) {
         Expression::BinaryOp(lhs, rhs, op) => {
             let (lhs_expr, lhs_type) = type_expression(lhs, context);
 
-			// Treat member access separately from the other operators, otherwise
+            // Treat member access separately from the other operators, otherwise
             // we try to typecheck both sides, but the rhs isn't defined as a
             // separate variable so it crashes
-			if let BinOp::MemberAccess = op {
-				if let Type::Struct(s) = lhs_type.clone() {
-					if let Expression::Atom(Atom::Variable(attribute)) = rhs.as_ref() {
-						let (ordered_list, unordered_list) = context
-							.structs
-							.get(&s)
-							.expect(format!("Undefined struct {}", lhs_type).as_str());
+            if let BinOp::MemberAccess = op {
+                if let Type::Struct(s) = lhs_type.clone() {
+                    if let Expression::Atom(Atom::Variable(attribute)) = rhs.as_ref() {
+                        let (ordered_list, unordered_list) = context
+                            .structs
+                            .get(&s)
+                            .expect(format!("Undefined struct {}", lhs_type).as_str());
 
-						if let Some(t) = unordered_list.get(attribute) {
-							// Slow but whatever. Don't make structs with a bajillion members,
-							// or if you do change this to a hashmap
-							let index = ordered_list.iter().position(|(attr, _)| attr == attribute).expect("Attribute not found in ordered list") as i64;
-							return (Expression::BinaryOp(Box::new(lhs_expr), Box::new(Expression::Atom(Atom::Literal(Literal::Int(index)))), op.clone()), t.clone());
-						} else {
-							panic!("Struct '{}' does not have member '{}'", lhs, rhs);
-						}
-					} else {
-						panic!("Member access must be on a variable");
-					}
-				} else {
-					panic!("Type {} is not a struct, members access is undefined", lhs_type)
-				}
-			}
+                        if let Some(t) = unordered_list.get(attribute) {
+                            // Slow but whatever. Don't make structs with a bajillion members,
+                            // or if you do change this to a hashmap
+                            let index = ordered_list
+                                .iter()
+                                .position(|(attr, _)| attr == attribute)
+                                .expect("Attribute not found in ordered list")
+                                as i64;
+                            return (
+                                Expression::BinaryOp(
+                                    Box::new(lhs_expr),
+                                    Box::new(Expression::Atom(Atom::Literal(Literal::Int(index)))),
+                                    op.clone(),
+                                ),
+                                t.clone(),
+                            );
+                        } else {
+                            panic!("Struct '{}' does not have member '{}'", lhs, rhs);
+                        }
+                    } else {
+                        panic!("Member access must be on a variable");
+                    }
+                } else {
+                    panic!(
+                        "Type {} is not a struct, members access is undefined",
+                        lhs_type
+                    )
+                }
+            }
 
             let (rhs_expr, rhs_type) = type_expression(rhs, context);
 
@@ -168,7 +191,10 @@ fn type_expression(expr: &Expression, context: &Context) -> (Expression, Type) {
                     panic!("Invalid binary operation")
                 }
             };
-			(Expression::BinaryOp(Box::new(lhs_expr), Box::new(rhs_expr), op.clone()), binop_type)
+            (
+                Expression::BinaryOp(Box::new(lhs_expr), Box::new(rhs_expr), op.clone()),
+                binop_type,
+            )
         }
         Expression::UnaryOp(expr, op) => {
             let (new_expr, expr_type) = type_expression(expr, context);
@@ -206,7 +232,10 @@ fn type_expression(expr: &Expression, context: &Context) -> (Expression, Type) {
                     panic!("Invalid unary operation")
                 }
             };
-			(Expression::UnaryOp(Box::new(new_expr), op.clone()), unop_type)
+            (
+                Expression::UnaryOp(Box::new(new_expr), op.clone()),
+                unop_type,
+            )
         }
         Expression::Assignment(var, expr, op) => {
             match var {
@@ -215,7 +244,10 @@ fn type_expression(expr: &Expression, context: &Context) -> (Expression, Type) {
                         let (new_expr, expr_type) = type_expression(expr, context);
 
                         if *var_type == expr_type {
-                            (Expression::Assignment(var.clone(), Box::new(new_expr), op.clone()), expr_type)
+                            (
+                                Expression::Assignment(var.clone(), Box::new(new_expr), op.clone()),
+                                expr_type,
+                            )
                         } else {
                             panic!("Invalid types for assignment")
                         }
@@ -235,17 +267,71 @@ fn type_expression(expr: &Expression, context: &Context) -> (Expression, Type) {
             let (new_expr, _) = type_expression(expr, context);
             (new_expr, t.clone())
         }
+        Expression::ArrayAccess(expr, indices) => {
+            let (new_expr, expr_type) = type_expression(expr, context);
+
+            if let Type::Array(element_type) = expr_type {
+                let mut new_indices = Vec::new();
+                for index in indices {
+                    let (new_index, index_type) = type_expression(index, context);
+                    if index_type != Type::Int {
+                        panic!("Array index is not an integer");
+                    }
+                    new_indices.push(new_index);
+                }
+
+                // if array i has dimensions [dim1, dim2, dim3, ...] and we want to access element (i, j, k, ...)
+                // ((i * dim1 + j) * dim2 + k) * dim3 + ...
+
+				let new_index;
+
+                if indices.len() > 1 {
+                    let array_name = if let Expression::Atom(Atom::Variable(ref name)) = new_expr {
+                        name.clone()
+                    } else {
+                        panic!("Multidimensional array access must be on a variable");
+                    };
+                    let dims = context
+                        .array_dims
+                        .get(&array_name)
+                        .expect("Array dimensions not found");
+                    new_index = dims.iter().zip(new_indices.iter()).fold(
+                        Expression::Atom(Atom::Literal(Literal::Int(0))),
+                        |acc, (dim, idx)| {
+                            Expression::BinaryOp(
+                                Box::new(Expression::BinaryOp(
+                                    Box::new(acc),
+                                    Box::new(dim.clone()),
+                                    BinOp::Multiply,
+                                )),
+                                Box::new(idx.clone()),
+                                BinOp::Add,
+                            )
+                        },
+                    );
+                } else {
+                    new_index = new_indices[0].clone();
+                }
+
+                (
+                    Expression::ArrayAccess(Box::new(new_expr), vec![new_index]),
+                    element_type.as_ref().clone(),
+                )
+            } else {
+                panic!("Array access on non-array type");
+            }
+        }
     }
 }
 
 fn type_statement(statement: &Statement, context: &Context) -> (Statement, Type) {
     match statement {
         Statement::Expression(expr) => {
-			let (new_expr, expr_type) = type_expression(expr, context);
+            let (new_expr, expr_type) = type_expression(expr, context);
             return (Statement::Expression(new_expr), expr_type);
         }
         Statement::Return(expr) => {
-			let (new_expr, expr_type) = type_expression(expr, context);
+            let (new_expr, expr_type) = type_expression(expr, context);
             return (Statement::Return(new_expr), expr_type);
         }
         Statement::If(condition, if_body, else_body) => {
@@ -259,17 +345,30 @@ fn type_statement(statement: &Statement, context: &Context) -> (Statement, Type)
                 if if_body_type != else_body_type {
                     panic!("If and else branches have different types");
                 }
-				return (Statement::If(new_condition, Box::new(new_if_body), Some(Box::new(new_else_body))), if_body_type);
+                return (
+                    Statement::If(
+                        new_condition,
+                        Box::new(new_if_body),
+                        Some(Box::new(new_else_body)),
+                    ),
+                    if_body_type,
+                );
             }
-            return (Statement::If(new_condition, Box::new(new_if_body), None), if_body_type);
+            return (
+                Statement::If(new_condition, Box::new(new_if_body), None),
+                if_body_type,
+            );
         }
         Statement::While(condition, body) => {
             let (new_condition, condition_type) = type_expression(condition, context);
             if condition_type != Type::Int {
                 panic!("Condition in while statement is not a boolean");
             }
-			let (new_body, body_type) = type_statement(body, context);
-            return (Statement::While(new_condition, Box::new(new_body)), body_type);
+            let (new_body, body_type) = type_statement(body, context);
+            return (
+                Statement::While(new_condition, Box::new(new_body)),
+                body_type,
+            );
         }
         Statement::For(init, condition, increment, body) => {
             let (new_init, _) = type_expression(init, context);
@@ -279,17 +378,20 @@ fn type_statement(statement: &Statement, context: &Context) -> (Statement, Type)
                 panic!("Condition in for statement is not a boolean");
             }
             let (new_increment, _) = type_expression(increment, context);
-			let (new_body, body_type) = type_statement(body, context);
-			return (Statement::For(new_init, new_condition, new_increment, Box::new(new_body)), body_type);
+            let (new_body, body_type) = type_statement(body, context);
+            return (
+                Statement::For(new_init, new_condition, new_increment, Box::new(new_body)),
+                body_type,
+            );
         }
         Statement::Compound(statements) => {
             let mut new_context = context.clone();
             let mut last_type = Type::Void;
-			let mut new_statements = Vec::new();
+            let mut new_statements = Vec::new();
             for statement in statements {
                 let (new_statement, statement_type) = type_statement(statement, &new_context);
-				new_statements.push(new_statement);
-				last_type = statement_type;
+                new_statements.push(new_statement);
+                last_type = statement_type;
                 if let Statement::Let(name, _, var_type) = statement {
                     let mut flag = true;
                     let mut name = name;
@@ -302,18 +404,21 @@ fn type_statement(statement: &Statement, context: &Context) -> (Statement, Type)
                         }
                     }
 
-					if let AssignmentIdentifier::Array(var_name, _) = name {
-						new_context
-                        .variables
-                        .insert(var_name.to_string(), var_type.clone());
-					} else {
-						new_context
-                        .variables
-                        .insert(name.to_string(), var_type.clone());
-					}
+                    if let AssignmentIdentifier::Array(var_name, dimensions) = name {
+                        new_context
+                            .variables
+                            .insert(var_name.to_string(), var_type.clone());
+                        new_context
+                            .array_dims
+                            .insert(var_name.to_string(), dimensions.clone());
+                    } else {
+                        new_context
+                            .variables
+                            .insert(name.to_string(), var_type.clone());
+                    }
                 }
             }
-			return (Statement::Compound(new_statements), last_type);
+            return (Statement::Compound(new_statements), last_type);
         }
         Statement::Let(id, expr, var_type) => {
             let t = var_type.clone();
@@ -323,7 +428,7 @@ fn type_statement(statement: &Statement, context: &Context) -> (Statement, Type)
                 let mut var_type = var_type;
 
                 let mut flag = true;
-				let original_id = id.clone();
+                let original_id = id.clone();
                 while flag {
                     if let AssignmentIdentifier::Dereference(inner) = id {
                         if let Type::Pointer(t) = var_type {
@@ -343,22 +448,25 @@ fn type_statement(statement: &Statement, context: &Context) -> (Statement, Type)
                         var_type, expr_type
                     );
                 }
-				return (Statement::Let(original_id, Some(new_expr), var_type.clone()), t);
+                return (
+                    Statement::Let(original_id, Some(new_expr), var_type.clone()),
+                    t,
+                );
             }
             return (Statement::Let(id.clone(), None, var_type.clone()), t);
         }
         Statement::Break => return (statement.clone(), Type::Void),
         Statement::Continue => return (statement.clone(), Type::Void),
         Statement::Loop(body) => {
-			let (new_body, body_type) = type_statement(body, context);
-			return (Statement::Loop(Box::new(new_body)), body_type);
+            let (new_body, body_type) = type_statement(body, context);
+            return (Statement::Loop(Box::new(new_body)), body_type);
         }
         Statement::Dowhile(expr, body) => {
             let (new_expr, expr_type) = type_expression(expr, context);
             if expr_type != Type::Int {
                 panic!("Condition in do while statement is not a boolean");
             }
-			let (new_body, body_type) = type_statement(body, context);
+            let (new_body, body_type) = type_statement(body, context);
             return (Statement::Dowhile(new_expr, Box::new(new_body)), body_type);
         }
     }
@@ -370,6 +478,7 @@ fn typechecking(ast: &Ast) -> Ast {
         variables: HashMap::new(),
         functions: HashMap::new(),
         structs: HashMap::new(),
+        array_dims: HashMap::new(),
     };
 
     for constant in constants {
@@ -379,7 +488,8 @@ fn typechecking(ast: &Ast) -> Ast {
             panic!("Constant '{}' is declared more than once", name);
         }
 
-        let (_, expr_type) = type_expression(&Expression::Atom(Atom::Literal(lit.clone())), &context);
+        let (_, expr_type) =
+            type_expression(&Expression::Atom(Atom::Literal(lit.clone())), &context);
         if *var_type != expr_type {
             panic!("Constant type does not match expression type");
         } else {
@@ -394,12 +504,12 @@ fn typechecking(ast: &Ast) -> Ast {
             panic!("Struct '{}' is declared more than once", id);
         }
 
-		let mut member_names = HashSet::new();
-		for (name, _) in members {
-			if !member_names.insert(name) {
-			panic!("Struct '{}' has duplicate member '{}'", id, name);
-			}
-		}
+        let mut member_names = HashSet::new();
+        for (name, _) in members {
+            if !member_names.insert(name) {
+                panic!("Struct '{}' has duplicate member '{}'", id, name);
+            }
+        }
 
         let mut unordered_lookup_table = HashMap::new();
         let mut ordered_members = Vec::new();
@@ -418,7 +528,7 @@ fn typechecking(ast: &Ast) -> Ast {
         context.functions.insert(name.clone(), return_type.clone());
     }
 
-	let mut new_functions = Vec::new();
+    let mut new_functions = Vec::new();
 
     for function in functions {
         let Function::Function(name, params, body, return_type) = function;
@@ -436,11 +546,18 @@ fn typechecking(ast: &Ast) -> Ast {
                 name, return_type, body_type
             );
         }
-		new_functions.push(Function::Function(name.clone(), params.clone(), new_body, return_type.clone()));
+        new_functions.push(Function::Function(
+            name.clone(),
+            params.clone(),
+            new_body,
+            return_type.clone(),
+        ));
     }
 
-	let new_ast = Ast{ program: Program::Program(new_functions, constants.clone(), structs.clone()) };
-	return new_ast;
+    let new_ast = Ast {
+        program: Program::Program(new_functions, constants.clone(), structs.clone()),
+    };
+    return new_ast;
 }
 
 pub fn check_program(ast: &Ast) -> Ast {

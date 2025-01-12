@@ -17,6 +17,7 @@ A simple compiler for the Dubious programming language (DPL).
 - TODO: Wiki
 - TODO: support escape characters
 - TODO: namespaces for functions, constants, structs, enums, unions
+- TODO: Reassignment for struct members, array elements and pointer dereference
 
 ### Optional
 
@@ -167,8 +168,12 @@ it's just syntactic sugar for that. Technically arr2d is a pointer to the
 beginning of the list, while list[list[int]] would be a pointer to a list which
 itself contains pointers to int lists. Useful to keep distinct.
 
-I explicitely don't allow C nonsense like arr[3] being equivalent to 3[arr].
-Array indexation must be of the form `identifier[exp1, exp2, ...]`
+Array indexation must be of the form `expr[exp1, exp2, ...]`. If `expr` is
+anything other than a variable (like the return value of a function, or a struct
+member), it may only be indexed through flat indexing. To use multidimensional
+indexing, create a variable, give it the array, and index that instead. This
+is because all arrays are internally flat, so the compiler needs the programmer
+to explicitely say what he wants the dimensions to be in a let statement.
 
 TODO: test array implementation thoroughly. 
 - Test 0 autofill
@@ -182,6 +187,7 @@ TODO: array literals are glitched as fuck if you do weird dimension things. So
 don't. Ideally stick to either rectangular or 1/2d arrays. If you do something
 else, you're on your own, and expect fucked up indexing behavior.
 TODO: make arr.len a variable accessible in code
+TODO: Can't change elements in arrays yet
 
 Type `str` is an alias of type `array[char]`. Type `bool` is an alias of type `int`
 
@@ -203,8 +209,7 @@ casting to int and bitwise manipulation.
 
 Physically in memory, structs are just like arrays where each entry can have
 a different type. When instantiating a struct, we get a pointer to the first
-attribute. This means that array-style indexing should work for structs (should it?
-currently it does but breaks typechecking. TODO: Fix)
+attribute.
 
 ```
 struct S {
@@ -226,10 +231,5 @@ let a: S = S{
 	};
 ```
 
-- TODO: mixing member access and array access should be broken (something.attribute[0] doesn't work)
 - TODO: Can't change struct members after initialization
 - TODO: make tests for structs
-
-
-expr.identifier is an expression
-expr[expr, expr, ...] is valid array access syntax
