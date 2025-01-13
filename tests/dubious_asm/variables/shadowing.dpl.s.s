@@ -25,6 +25,7 @@ main:
     pop rcx
     xchg rax, rcx
     add rax, rcx
+
     mov [rbp-16], rax
     add rsp, 8		;end of block, pop local variables
     mov rax, [rbp-16]
@@ -33,6 +34,7 @@ main:
     pop rcx
     xchg rax, rcx
     add rax, rcx
+
     mov [rbp-16], rax
     mov rax, [rbp-16]
     add rsp, 16		;pop local variables before return

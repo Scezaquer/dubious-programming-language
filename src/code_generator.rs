@@ -1,5 +1,5 @@
 use crate::ast_build::{
-    AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Literal, Program, Statement, Struct, UnOp
+    AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Literal, Program, ReassignmentIdentifier, Statement, Struct, UnOp
 };
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -269,31 +269,57 @@ fn generate_expression(file: &mut File, expression: &Expression, context: &mut C
         Expression::Assignment(variable, expr, op) => {
 			generate_expression(file, expr, context);
 			
-			let mut number_of_dereferences = 0;
 			let mut variable = variable;
-			while let AssignmentIdentifier::Dereference(new_expr) = variable {
+			let mut str = String::new();
+			let mut dereference = false;
+
+			while let ReassignmentIdentifier::Dereference(new_expr) = variable {
 				variable = new_expr;
-				number_of_dereferences += 1;
+				str = format!("    mov rax, [rax]\n{}", str);
+				dereference = true;
 			}
 
-			if let AssignmentIdentifier::Variable(variable) = variable {
-				let var_address = context.var_map.get(variable);
-				let dereference = number_of_dereferences > 0;
-				while number_of_dereferences > 0 {
-					writeln!(file, "    mov rax, [rax]").unwrap();
-					number_of_dereferences -= 1;
-				}
+			writeln!(file, "{}", str).unwrap();
 
-				if let Some(var_address) = var_address {
-					generate_assignment(op, file, var_address, dereference);
-					return;
-				}
+			loop {
+				match variable {
+					ReassignmentIdentifier::Variable(var) => {
+						let var_address = context.var_map.get(var);
 
-				if let Some(_) = context.constants.get(variable) {
-					panic!("Cannot assign to a constant variable");
+						if let Some(var_address) = var_address {
+							generate_assignment(op, file, var_address, dereference);
+							return;
+						}
+
+						if let Some(_) = context.constants.get(var) {
+							panic!("Cannot assign to a constant variable");
+						}
+						panic!("Undeclared variable {:?}", var);
+					},
+					ReassignmentIdentifier::Array(_, _) => todo!(),
+					ReassignmentIdentifier::MemberAccess(_, _) => todo!(),
+					ReassignmentIdentifier::Dereference(_) => todo!(),
 				}
-				panic!("Undeclared variable {:?}", variable);
 			}
+
+			// if let ReassignmentIdentifier::Variable(variable) = variable {
+			// 	let var_address = context.var_map.get(variable);
+			// 	let dereference = number_of_dereferences > 0;
+			// 	while number_of_dereferences > 0 {
+			// 		writeln!(file, "    mov rax, [rax]").unwrap();
+			// 		number_of_dereferences -= 1;
+			// 	}
+
+			// 	if let Some(var_address) = var_address {
+			// 		generate_assignment(op, file, var_address, dereference);
+			// 		return;
+			// 	}
+
+			// 	if let Some(_) = context.constants.get(variable) {
+			// 		panic!("Cannot assign to a constant variable");
+			// 	}
+			// 	panic!("Undeclared variable {:?}", variable);
+			// }
         }
 		Expression::TypeCast(expr, t) => {
 			// Unsure if I should be doing something here or nah

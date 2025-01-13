@@ -4,12 +4,12 @@
 // TODO: Check that the return type of a function matches the type of the return statement in every branch
 // TODO: is there ambiguity between function and variable names?
 
-use crate::ast_build::Constant;
+use crate::ast_build::{Constant, ReassignmentIdentifier};
 use crate::ast_build::{
     AssignmentIdentifier, Ast, Atom, BinOp, Expression, Function, Literal, Program, Statement,
     Type, UnOp,
 };
-use core::net;
+use core::{net, panic};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
@@ -239,7 +239,7 @@ fn type_expression(expr: &Expression, context: &Context) -> (Expression, Type) {
         }
         Expression::Assignment(var, expr, op) => {
             match var {
-                AssignmentIdentifier::Variable(v) => {
+                ReassignmentIdentifier::Variable(v) => {
                     if let Some(var_type) = context.variables.get(v) {
                         let (new_expr, expr_type) = type_expression(expr, context);
 
@@ -255,12 +255,16 @@ fn type_expression(expr: &Expression, context: &Context) -> (Expression, Type) {
                         panic!("Variable '{}' not in scope", v)
                     }
                 }
-                AssignmentIdentifier::Array(_, _) => {
+                ReassignmentIdentifier::Array(_, _) => {
                     panic!("Array assignment is not implemented") // TODO
                 }
-                AssignmentIdentifier::Dereference(_) => {
+                ReassignmentIdentifier::Dereference(_) => {
                     panic!("Dereference assignment is not implemented") // TODO
                 }
+				ReassignmentIdentifier::MemberAccess(_, _) => {
+					panic!("Member access assignment is not implemented") // TODO
+				}
+
             }
         }
         Expression::TypeCast(expr, t) => {

@@ -28,7 +28,7 @@ pub enum Literal {
     Float(f64),
     Hex(i64),
     Binary(i64),
-    Char(String)
+    Char(String),
 }
 
 /// Represents an atom in the AST.
@@ -40,8 +40,8 @@ pub enum Atom {
     Expression(Box<Expression>),
     Variable(String),
     FunctionCall(String, Vec<Expression>),
-    Array(Vec<Expression>, i64),          // Array literal with a given number of dimensions
-	StructInstance(String, Vec<Expression>), // Struct instance with a given number of fields
+    Array(Vec<Expression>, i64), // Array literal with a given number of dimensions
+    StructInstance(String, Vec<Expression>), // Struct instance with a given number of fields
 }
 
 // In let bindings, the left hand side of the assignment
@@ -50,6 +50,17 @@ pub enum AssignmentIdentifier {
     Variable(String),
     Dereference(Box<AssignmentIdentifier>),
     Array(String, Vec<Expression>), // identifier[dim1, dim2, ...]
+}
+
+// In assignments, the left hand side of the assignment. This is NOT the same
+// as AssignmentIdentifier, as it can be more complex.
+// struct.member = ... is a ReassignmentIdentifier, but not an AssignmentIdentifier
+#[derive(Debug, Clone)]
+pub enum ReassignmentIdentifier {
+    Variable(String),
+    Dereference(Box<ReassignmentIdentifier>),
+    Array(Box<ReassignmentIdentifier>, Vec<Expression>),
+    MemberAccess(Box<ReassignmentIdentifier>, String),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -61,7 +72,7 @@ pub enum Type {
     Pointer(Box<Type>),
     Array(Box<Type>), // array[type]. Strings are array[char]
     Function(Box<Type>, Vec<Type>),
-	Struct(String),
+    Struct(String),
 }
 
 /// Represents a unary operator in the AST.
@@ -158,9 +169,9 @@ pub enum Expression {
     Atom(Atom),
     UnaryOp(Box<Expression>, UnOp),
     BinaryOp(Box<Expression>, Box<Expression>, BinOp),
-    Assignment(AssignmentIdentifier, Box<Expression>, AssignmentOp),
+    Assignment(ReassignmentIdentifier, Box<Expression>, AssignmentOp),
     TypeCast(Box<Expression>, Type),
-	ArrayAccess(Box<Expression>, Vec<Expression>),
+    ArrayAccess(Box<Expression>, Vec<Expression>),
 }
 
 /// Gets the binary operator corresponding to the token.
@@ -189,7 +200,7 @@ fn get_bin_operator_from_token(token: &TokenWithDebugInfo) -> BinOp {
             Operator::LogicalAnd => BinOp::LogicalAnd,
             Operator::LogicalXor => BinOp::LogicalXor,
             Operator::LogicalOr => BinOp::LogicalOr,
-			Operator::MemberAccess => BinOp::MemberAccess,
+            Operator::MemberAccess => BinOp::MemberAccess,
             _ => BinOp::NotABinaryOp,
         },
         _ => BinOp::NotABinaryOp,
@@ -270,13 +281,15 @@ pub enum Function {
 /// Constants can only be assigned on declaration, and can only be assigned a literal,
 /// so they're not terribly useful as of now. They're basically static globals.
 #[derive(Debug, Clone)]
-pub enum Constant {  //TODO: should be a struct instead of enum
+pub enum Constant {
+    //TODO: should be a struct instead of enum
     Constant(String, Literal, Type),
 }
 
 /// Represents a program in the AST.
 #[derive(Debug, Clone)]
-pub enum Program {	//TODO: should be a struct instead of enum
+pub enum Program {
+    //TODO: should be a struct instead of enum
     Program(Vec<Function>, Vec<Constant>, Vec<Struct>),
 }
 
@@ -293,7 +306,7 @@ impl std::fmt::Display for Literal {
             Literal::Float(fl) => write!(f, "{}", fl),
             Literal::Hex(h) => write!(f, "0x{:x}", h),
             Literal::Binary(b) => write!(f, "0b{:b}", b),
-            Literal::Char(c) => write!(f, "'{}'", c)
+            Literal::Char(c) => write!(f, "'{}'", c),
         }
     }
 }
@@ -422,7 +435,7 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
             ..
         } => {
             let next_tok = tokens.clone().next().unwrap();
-			// TODO: Make this if-else chain into match statement
+            // TODO: Make this if-else chain into match statement
             if let TokenWithDebugInfo {
                 internal_tok: Token::LParen,
                 ..
@@ -451,7 +464,8 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
                     }
                 }
                 return Atom::FunctionCall(s.to_string(), args);
-            } /*else if let TokenWithDebugInfo {
+            }
+            /*else if let TokenWithDebugInfo {
                 internal_tok: Token::LBracket,
                 ..
             } = next_tok
@@ -479,35 +493,36 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
                     }
                 }
                 return Atom::ArrayAccess(s.to_string(), args);
-            }*/ else if let TokenWithDebugInfo {
+            }*/
+            else if let TokenWithDebugInfo {
                 internal_tok: Token::LBrace,
                 ..
-            } = next_tok 
-			{
-				// Struct instance
-				tokens.next();
-				let mut fields = Vec::new();
-				loop {
-					let next_tok = tokens.clone().next().unwrap();
-					if let TokenWithDebugInfo {
-						internal_tok: Token::RBrace,
-						..
-					} = next_tok
-					{
-						tokens.next();
-						break;
-					} else if let TokenWithDebugInfo {
-						internal_tok: Token::Comma,
-						..
-					} = next_tok
-					{
-						tokens.next();
-					} else {
-						fields.push(parse_expression(&mut tokens));
-					}
-				}
-				return Atom::StructInstance(s.to_string(), fields);
-			}
+            } = next_tok
+            {
+                // Struct instance
+                tokens.next();
+                let mut fields = Vec::new();
+                loop {
+                    let next_tok = tokens.clone().next().unwrap();
+                    if let TokenWithDebugInfo {
+                        internal_tok: Token::RBrace,
+                        ..
+                    } = next_tok
+                    {
+                        tokens.next();
+                        break;
+                    } else if let TokenWithDebugInfo {
+                        internal_tok: Token::Comma,
+                        ..
+                    } = next_tok
+                    {
+                        tokens.next();
+                    } else {
+                        fields.push(parse_expression(&mut tokens));
+                    }
+                }
+                return Atom::StructInstance(s.to_string(), fields);
+            }
 
             // Variable
             return Atom::Variable(s.to_string());
@@ -566,6 +581,94 @@ fn parse_assignment_identifier(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Ass
         }
         _ => error_unexpected_token("valid assignment identifier", tok),
     }
+}
+
+fn parse_reassignment_identifier(
+    mut tokens: &mut Iter<TokenWithDebugInfo>,
+) -> ReassignmentIdentifier {
+    let tok = tokens.next().unwrap();
+
+    let mut acc = match tok {
+        TokenWithDebugInfo {
+            internal_tok: Token::Operator(Operator::Multiply),
+            ..
+        } => {
+            ReassignmentIdentifier::Dereference(Box::new(parse_reassignment_identifier(&mut tokens)))
+        }
+        TokenWithDebugInfo {
+            internal_tok: Token::Identifier(s),
+            ..
+        } => ReassignmentIdentifier::Variable(s.to_string()),
+        _ => error_unexpected_token("valid assignment identifier", tok),
+    };
+
+    loop {
+        let next_tok = tokens.clone().next().unwrap();
+        match next_tok {
+            TokenWithDebugInfo {
+                internal_tok:
+                    Token::Operator(
+                        Operator::Assign
+                        | Operator::AddAssign
+                        | Operator::SubtractAssign
+                        | Operator::MultiplyAssign
+                        | Operator::DivideAssign
+                        | Operator::ModulusAssign
+                        | Operator::LeftShiftAssign
+                        | Operator::RightShiftAssign
+                        | Operator::BitwiseAndAssign
+                        | Operator::BitwiseXorAssign
+                        | Operator::BitwiseOrAssign,
+                    ),
+                ..
+            } => break,
+            TokenWithDebugInfo {
+                internal_tok: Token::LBracket,
+                ..
+            } => {
+                tokens.next();
+                let mut args = Vec::new();
+                loop {
+                    let next_tok = tokens.clone().next().unwrap();
+                    if let TokenWithDebugInfo {
+                        internal_tok: Token::RBracket,
+                        ..
+                    } = next_tok
+                    {
+                        tokens.next();
+                        break;
+                    } else if let TokenWithDebugInfo {
+                        internal_tok: Token::Comma,
+                        ..
+                    } = next_tok
+                    {
+                        tokens.next();
+                    } else {
+                        args.push(parse_expression(&mut tokens));
+                    }
+                }
+                acc = ReassignmentIdentifier::Array(Box::new(acc), args);
+            }
+            TokenWithDebugInfo {
+                internal_tok: Token::Operator(Operator::MemberAccess),
+                ..
+            } => {
+                tokens.next();
+                let next_tok = tokens.next().unwrap();
+                if let TokenWithDebugInfo {
+                    internal_tok: Token::Identifier(s),
+                    ..
+                } = next_tok
+                {
+                    acc = ReassignmentIdentifier::MemberAccess(Box::new(acc), s.to_string());
+                } else {
+                    error_unexpected_token("identifier", next_tok);
+                }
+            }
+            _ => error_unexpected_token("valid assignment identifier", next_tok),
+        }
+    }
+    return acc;
 }
 
 fn find_arr_dims(array: &Atom) -> Option<Vec<i64>> {
@@ -710,35 +813,36 @@ fn parse_expression_with_precedence(
             parse_expression_with_precedence(&mut tokens, precedence_level - 1, precedence_table);
     }
 
-	let mut next = tokens.clone().next().unwrap();
-	// Array access
-	if let TokenWithDebugInfo {
-		internal_tok: Token::LBracket,
-		..
-	} = next {
-		tokens.next();
-		let mut args = Vec::new();
-		loop {
-			let next_tok = tokens.clone().next().unwrap();
-			if let TokenWithDebugInfo {
-				internal_tok: Token::RBracket,
-				..
-			} = next_tok
-			{
-				tokens.next();
-				break;
-			} else if let TokenWithDebugInfo {
-				internal_tok: Token::Comma,
-				..
-			} = next_tok
-			{
-				tokens.next();
-			} else {
-				args.push(parse_expression(&mut tokens));
-			}
-		}
-		expr = Expression::ArrayAccess(Box::new(expr), args);
-	}
+    let mut next = tokens.clone().next().unwrap();
+    // Array access
+    if let TokenWithDebugInfo {
+        internal_tok: Token::LBracket,
+        ..
+    } = next
+    {
+        tokens.next();
+        let mut args = Vec::new();
+        loop {
+            let next_tok = tokens.clone().next().unwrap();
+            if let TokenWithDebugInfo {
+                internal_tok: Token::RBracket,
+                ..
+            } = next_tok
+            {
+                tokens.next();
+                break;
+            } else if let TokenWithDebugInfo {
+                internal_tok: Token::Comma,
+                ..
+            } = next_tok
+            {
+                tokens.next();
+            } else {
+                args.push(parse_expression(&mut tokens));
+            }
+        }
+        expr = Expression::ArrayAccess(Box::new(expr), args);
+    }
 
     // Now handle binary and assignment operators for the current precedence level
     next = tokens.clone().next().unwrap();
@@ -762,7 +866,7 @@ fn parse_expression_with_precedence(
             ); // Parse next term
 
             // Re-parse the left hand side of the assignment expression
-            let assignment_identifier = parse_assignment_identifier(&mut next_if_assignment);
+            let assignment_identifier = parse_reassignment_identifier(&mut next_if_assignment);
             expr = Expression::Assignment(assignment_identifier, Box::new(next_term), op);
         } else {
             let next_term = parse_expression_with_precedence(
@@ -813,7 +917,7 @@ fn parse_expression_with_precedence(
 /// 15. Assignment (a = b) Add assignment (a += b) Subtract assignment (a -= b) Multiply assignment (a *= b) Divide assignment (a /= b) Modulus assignment (a %= b) Left shift assignment (a <<= b) Right shift assignment (a >>= b) Bitwise and assignment (a &= b) Bitwise xor assignment (a ^= b) Bitwise or assignment (a |= b)
 fn build_precedence_table() -> Vec<PrecedenceLevel> {
     vec![
-		PrecedenceLevel {
+        PrecedenceLevel {
             binary_ops: vec![],
             unary_ops: vec![],
             assignment_ops: vec![],
@@ -1000,7 +1104,7 @@ fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Type {
             }
             return Type::Function(Box::new(return_type), params);
         }
-		TokenWithDebugInfo {
+        TokenWithDebugInfo {
             internal_tok: Token::Identifier(id),
             ..
         } => Type::Struct(id.to_string()), // TODO: test in typechecker if struct exists
@@ -1411,8 +1515,8 @@ fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
 
 #[derive(Debug, Clone)]
 pub struct Struct {
-	pub id: String,
-	pub members: Vec<(String, Type)>,
+    pub id: String,
+    pub members: Vec<(String, Type)>,
 }
 
 fn parse_struct(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Struct {
@@ -1496,7 +1600,7 @@ pub fn parse(tokens: &Vec<TokenWithDebugInfo>) -> Ast {
     let mut tokens = tokens.iter();
     let mut functions = Vec::new();
     let mut constants = Vec::new();
-	let mut structs = Vec::new();
+    let mut structs = Vec::new();
 
     // Parse functions until there are no more tokens
     loop {

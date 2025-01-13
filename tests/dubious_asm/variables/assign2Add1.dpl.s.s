@@ -21,6 +21,7 @@ main:
     pop rcx
     xchg rax, rcx
     add rax, rcx
+
     mov [rbp-8], rax
     mov rax, [rbp-8]
     add rsp, 8		;pop local variables before return

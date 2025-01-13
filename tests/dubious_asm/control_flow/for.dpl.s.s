@@ -18,6 +18,7 @@ main:
     push rax
     ;for statement
     mov rax, 0
+
     mov [rbp-8], rax
 for_start_0:
     mov rax, [rbp-8]
@@ -36,10 +37,12 @@ for_start_0:
     pop rcx
     xchg rax, rcx
     add rax, rcx
+
     mov [rbp-16], rax
     add rsp, 0		;end of block, pop local variables
     mov rax, [rbp-8]
     inc rax
+
     mov [rbp-8], rax
     jmp for_start_0
 for_end_0:

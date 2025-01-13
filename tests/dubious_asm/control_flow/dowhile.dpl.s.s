@@ -23,6 +23,7 @@ dowhile_start_0:
     pop rcx
     xchg rax, rcx
     add rax, rcx
+
     mov [rbp-8], rax
     add rsp, 0		;end of block, pop local variables
     mov rax, [rbp-8]

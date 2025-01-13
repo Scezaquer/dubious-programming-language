@@ -15,6 +15,7 @@ main:
     mov rbp, rsp	;set base pointer
     push 0
     mov rax, 4
+
     mov [rbp-8], rax
     mov rax, [rbp-8]
     add rsp, 8		;pop local variables before return

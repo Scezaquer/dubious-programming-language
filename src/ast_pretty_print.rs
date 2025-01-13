@@ -1,5 +1,5 @@
 use crate::ast_build::{
-	AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Program, Statement, Type, UnOp
+	AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Program, ReassignmentIdentifier, Statement, Type, UnOp
 };
 
 impl std::fmt::Display for Ast {
@@ -129,6 +129,17 @@ impl std::fmt::Display for AssignmentIdentifier {
 			AssignmentIdentifier::Variable(var) => write!(f, "{}", var),
 			AssignmentIdentifier::Dereference(var) => write!(f, "*{}", var),
 			AssignmentIdentifier::Array(var, index) => write!(f, "{}[{:?}]", var, index),
+		}
+	}
+}
+
+impl std::fmt::Display for ReassignmentIdentifier {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			ReassignmentIdentifier::Variable(var) => write!(f, "{}", var),
+			ReassignmentIdentifier::Dereference(var) => write!(f, "*{}", var),
+			ReassignmentIdentifier::Array(var, index) => write!(f, "{}[{:?}]", var, index),
+			ReassignmentIdentifier::MemberAccess(var, member) => write!(f, "{}.{}", var, member),
 		}
 	}
 }
