@@ -1,0 +1,10 @@
+struct S {
+	first_attribute: int;
+	second_attribute: char;
+}
+
+fn main(): int {
+	let a: S = S{ 1, 'a' };
+	a.second_attribute = 'b';
+	return a.second_attribute : int;
+}

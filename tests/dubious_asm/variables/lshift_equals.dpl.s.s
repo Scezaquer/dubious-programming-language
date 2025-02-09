@@ -16,7 +16,6 @@ main:
     mov rax, 6
     push rax
     mov rax, 4
-
     mov rcx, rax
     mov rax, [rbp-8]
     shl rax, cl

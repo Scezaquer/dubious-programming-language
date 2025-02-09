@@ -58,9 +58,9 @@ pub enum AssignmentIdentifier {
 #[derive(Debug, Clone)]
 pub enum ReassignmentIdentifier {
     Variable(String),
-    Dereference(Box<ReassignmentIdentifier>),
-    Array(Box<ReassignmentIdentifier>, Vec<Expression>),
-    MemberAccess(Box<ReassignmentIdentifier>, String),
+    Dereference(Box<Expression>),
+    Array(Box<Expression>, Vec<Expression>),
+    MemberAccess(Box<Expression>, Box<Expression>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -583,92 +583,23 @@ fn parse_assignment_identifier(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Ass
     }
 }
 
-fn parse_reassignment_identifier(
-    mut tokens: &mut Iter<TokenWithDebugInfo>,
-) -> ReassignmentIdentifier {
-    let tok = tokens.next().unwrap();
+fn parse_reassignment_identifier(expr: Expression) -> ReassignmentIdentifier {
+    // pub enum ReassignmentIdentifier {
+    // 	Variable(String),
+    // 	Dereference(Box<Expression>),
+    // 	Array(Box<Expression>, Vec<Expression>),
+    // 	MemberAccess(Box<Expression>, Box<Expression>),
+    // }
 
-    let mut acc = match tok {
-        TokenWithDebugInfo {
-            internal_tok: Token::Operator(Operator::Multiply),
-            ..
-        } => {
-            ReassignmentIdentifier::Dereference(Box::new(parse_reassignment_identifier(&mut tokens)))
+    match expr {
+        Expression::Atom(Atom::Variable(s)) => ReassignmentIdentifier::Variable(s),
+        Expression::UnaryOp(expr, UnOp::Dereference) => ReassignmentIdentifier::Dereference(expr),
+        Expression::ArrayAccess(expr, args) => ReassignmentIdentifier::Array(expr, args),
+        Expression::BinaryOp(expr1, expr2, BinOp::MemberAccess) => {
+            ReassignmentIdentifier::MemberAccess(expr1, expr2)
         }
-        TokenWithDebugInfo {
-            internal_tok: Token::Identifier(s),
-            ..
-        } => ReassignmentIdentifier::Variable(s.to_string()),
-        _ => error_unexpected_token("valid assignment identifier", tok),
-    };
-
-    loop {
-        let next_tok = tokens.clone().next().unwrap();
-        match next_tok {
-            TokenWithDebugInfo {
-                internal_tok:
-                    Token::Operator(
-                        Operator::Assign
-                        | Operator::AddAssign
-                        | Operator::SubtractAssign
-                        | Operator::MultiplyAssign
-                        | Operator::DivideAssign
-                        | Operator::ModulusAssign
-                        | Operator::LeftShiftAssign
-                        | Operator::RightShiftAssign
-                        | Operator::BitwiseAndAssign
-                        | Operator::BitwiseXorAssign
-                        | Operator::BitwiseOrAssign,
-                    ),
-                ..
-            } => break,
-            TokenWithDebugInfo {
-                internal_tok: Token::LBracket,
-                ..
-            } => {
-                tokens.next();
-                let mut args = Vec::new();
-                loop {
-                    let next_tok = tokens.clone().next().unwrap();
-                    if let TokenWithDebugInfo {
-                        internal_tok: Token::RBracket,
-                        ..
-                    } = next_tok
-                    {
-                        tokens.next();
-                        break;
-                    } else if let TokenWithDebugInfo {
-                        internal_tok: Token::Comma,
-                        ..
-                    } = next_tok
-                    {
-                        tokens.next();
-                    } else {
-                        args.push(parse_expression(&mut tokens));
-                    }
-                }
-                acc = ReassignmentIdentifier::Array(Box::new(acc), args);
-            }
-            TokenWithDebugInfo {
-                internal_tok: Token::Operator(Operator::MemberAccess),
-                ..
-            } => {
-                tokens.next();
-                let next_tok = tokens.next().unwrap();
-                if let TokenWithDebugInfo {
-                    internal_tok: Token::Identifier(s),
-                    ..
-                } = next_tok
-                {
-                    acc = ReassignmentIdentifier::MemberAccess(Box::new(acc), s.to_string());
-                } else {
-                    error_unexpected_token("identifier", next_tok);
-                }
-            }
-            _ => error_unexpected_token("valid assignment identifier", next_tok),
-        }
+        _ => panic!("Invalid reassignment identifier. Only modifiable lvalues are allowed."),
     }
-    return acc;
 }
 
 fn find_arr_dims(array: &Atom) -> Option<Vec<i64>> {
@@ -787,13 +718,6 @@ fn parse_expression_with_precedence(
         return Expression::Atom(parse_atom(&mut tokens));
     }
 
-    // In case we are actually in an assignment expression the left hand side
-    // has some special rules, so it is parsed separately in parse_assignment_identifier.
-    // We start by assuming we are not in an assignment expression, and if it turns out
-    // we are, we will change the expr variable to an Assignment expression.
-    // In the meantime we keep a copy of the tokens iterator to be able to backtrack
-    let mut next_if_assignment = tokens.clone();
-
     // Check if the current token is a unary operator for this precedence level
     let next = tokens.clone().next().unwrap();
     let mut expr;
@@ -866,7 +790,7 @@ fn parse_expression_with_precedence(
             ); // Parse next term
 
             // Re-parse the left hand side of the assignment expression
-            let assignment_identifier = parse_reassignment_identifier(&mut next_if_assignment);
+            let assignment_identifier = parse_reassignment_identifier(expr);
             expr = Expression::Assignment(assignment_identifier, Box::new(next_term), op);
         } else {
             let next_term = parse_expression_with_precedence(

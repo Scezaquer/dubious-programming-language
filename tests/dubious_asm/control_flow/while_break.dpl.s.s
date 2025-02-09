@@ -33,7 +33,6 @@ while_start_0:
     pop rcx
     xchg rax, rcx
     add rax, rcx
-
     mov [rbp-8], rax
     jmp while_end_0	;break statement
     add rsp, 0		;end of block, pop local variables

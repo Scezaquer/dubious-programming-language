@@ -16,7 +16,6 @@ main:
     mov rax, 6
     push rax
     mov rax, 3
-
     xor [rbp-8], rax
     mov rax, [rbp-8]
     add rsp, 8		;pop local variables before return

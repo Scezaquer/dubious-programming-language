@@ -4,12 +4,12 @@
 // TODO: Check that the return type of a function matches the type of the return statement in every branch
 // TODO: is there ambiguity between function and variable names?
 
-use crate::ast_build::{Constant, ReassignmentIdentifier};
 use crate::ast_build::{
     AssignmentIdentifier, Ast, Atom, BinOp, Expression, Function, Literal, Program, Statement,
     Type, UnOp,
 };
-use core::{net, panic};
+use crate::ast_build::{Constant, ReassignmentIdentifier};
+use core::panic;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
@@ -185,7 +185,9 @@ fn type_expression(expr: &Expression, context: &Context) -> (Expression, Type) {
                     }
                 }
                 BinOp::MemberAccess => {
-                    panic!("Unreachable code")
+                    panic!(
+                        "Unreachable code, member access is turned into array-like access earlier"
+                    )
                 }
                 BinOp::NotABinaryOp => {
                     panic!("Invalid binary operation")
@@ -238,33 +240,63 @@ fn type_expression(expr: &Expression, context: &Context) -> (Expression, Type) {
             )
         }
         Expression::Assignment(var, expr, op) => {
+            let (new_rhs, rhs_type) = type_expression(expr, context);
+            let (new_lhs, lhs_type);
             match var {
                 ReassignmentIdentifier::Variable(v) => {
                     if let Some(var_type) = context.variables.get(v) {
-                        let (new_expr, expr_type) = type_expression(expr, context);
-
-                        if *var_type == expr_type {
-                            (
-                                Expression::Assignment(var.clone(), Box::new(new_expr), op.clone()),
-                                expr_type,
-                            )
-                        } else {
-                            panic!("Invalid types for assignment")
-                        }
+                        lhs_type = var_type.clone();
+                        new_lhs = ReassignmentIdentifier::Variable(v.clone());
                     } else {
                         panic!("Variable '{}' not in scope", v)
                     }
                 }
-                ReassignmentIdentifier::Array(_, _) => {
-                    panic!("Array assignment is not implemented") // TODO
+                ReassignmentIdentifier::Array(arr, idxs) => {
+                    let lhs_expr;
+                    (lhs_expr, lhs_type) = type_expression(
+                        &Expression::ArrayAccess(arr.clone(), idxs.clone()),
+                        context,
+                    );
+                    if let Expression::ArrayAccess(e1, e2) = lhs_expr {
+                        new_lhs = ReassignmentIdentifier::Array(e1, e2);
+                    } else {
+                        panic!("Unreachable code")
+                    }
                 }
-                ReassignmentIdentifier::Dereference(_) => {
-                    panic!("Dereference assignment is not implemented") // TODO
+                ReassignmentIdentifier::Dereference(expr) => {
+                    let (new_expr, expr_type) = type_expression(expr, context);
+                    if let Type::Pointer(t) = expr_type {
+                        lhs_type = *t;
+                        new_lhs = ReassignmentIdentifier::Dereference(Box::new(new_expr));
+                    } else {
+                        panic!("Dereferencing a non-pointer type");
+                    }
                 }
-				ReassignmentIdentifier::MemberAccess(_, _) => {
-					panic!("Member access assignment is not implemented") // TODO
-				}
+                ReassignmentIdentifier::MemberAccess(obj, mbr) => {
+					let lhs_expr;
+                    (lhs_expr, lhs_type) = type_expression(
+                        &Expression::BinaryOp(
+                            Box::new(*obj.clone()),
+                            Box::new(*mbr.clone()),
+                            BinOp::MemberAccess,
+                        ),
+                        context,
+                    );
+					if let Expression::BinaryOp(e1, e2, BinOp::MemberAccess) = lhs_expr {
+						new_lhs = ReassignmentIdentifier::Array(e1, vec!(*e2));
+					} else {
+						panic!("Unreachable code")
+					}
+                }
+            }
 
+            if lhs_type == rhs_type {
+                (
+                    Expression::Assignment(new_lhs, Box::new(new_rhs), op.clone()),
+                    lhs_type,
+                )
+            } else {
+                panic!("Assignment types do not match")
             }
         }
         Expression::TypeCast(expr, t) => {
@@ -287,7 +319,7 @@ fn type_expression(expr: &Expression, context: &Context) -> (Expression, Type) {
                 // if array i has dimensions [dim1, dim2, dim3, ...] and we want to access element (i, j, k, ...)
                 // ((i * dim1 + j) * dim2 + k) * dim3 + ...
 
-				let new_index;
+                let new_index;
 
                 if indices.len() > 1 {
                     let array_name = if let Expression::Atom(Atom::Variable(ref name)) = new_expr {

@@ -23,7 +23,6 @@ loop_start_0:
     pop rcx
     xchg rax, rcx
     add rax, rcx
-
     mov [rbp-8], rax
     ;if statement
     mov rax, [rbp-8]

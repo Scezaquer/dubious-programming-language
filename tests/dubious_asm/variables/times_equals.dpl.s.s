@@ -16,7 +16,6 @@ main:
     mov rax, 3
     push rax
     mov rax, 2
-
     mov rcx, [rbp-8]
     imul rax, rcx
     mov [rbp-8], rax

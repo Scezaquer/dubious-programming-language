@@ -1,5 +1,6 @@
 use crate::ast_build::{
-    AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Literal, Program, ReassignmentIdentifier, Statement, Struct, UnOp
+    AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Literal,
+    Program, ReassignmentIdentifier, Statement, Struct, UnOp,
 };
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -24,64 +25,95 @@ fn generate_atom(file: &mut File, atom: &Atom, context: &mut Context) {
         }
         Atom::Variable(variable) => {
             let var_address = context.var_map.get(variable);
-			if let Some(var_address) = var_address {
-				writeln!(file, "    mov rax, [rbp{}{}]", if *var_address < 0 { "" } else { "+" }, var_address).unwrap();
-				return;
-			}
-			
-			let constant = context.constants.get(variable).expect(format!("Undeclared variable {}", variable).as_str());
-			writeln!(file, "    mov rax, {}", constant).unwrap();
+            if let Some(var_address) = var_address {
+                writeln!(
+                    file,
+                    "    mov rax, [rbp{}{}]",
+                    if *var_address < 0 { "" } else { "+" },
+                    var_address
+                )
+                .unwrap();
+                return;
+            }
+
+            let constant = context
+                .constants
+                .get(variable)
+                .expect(format!("Undeclared variable {}", variable).as_str());
+            writeln!(file, "    mov rax, {}", constant).unwrap();
         }
         Atom::Expression(expression) => {
             generate_expression(file, expression, context);
         }
-		Atom::FunctionCall(name, args) => {
-			writeln!(file, "	;push function arguments to the stack in reverse order").unwrap();
-			for arg in args.iter().rev() {		// Push arguments in reverse order (C convention)
-				generate_expression(file, arg, context);
-				writeln!(file, "    push rax").unwrap();
-			}
-			writeln!(file, "    call {}", name).unwrap();
-			writeln!(file, "    add rsp, {}	;pop arguments", args.len() * 8).unwrap();	// Pop arguments from stack
-		}
-		Atom::Array(expressions, _) => {
-				// TODO: Push array's dimensions on the stack upon creation, refer 
-				// back to them when accessing the array
+        Atom::FunctionCall(name, args) => {
+            writeln!(
+                file,
+                "	;push function arguments to the stack in reverse order"
+            )
+            .unwrap();
+            for arg in args.iter().rev() {
+                // Push arguments in reverse order (C convention)
+                generate_expression(file, arg, context);
+                writeln!(file, "    push rax").unwrap();
+            }
+            writeln!(file, "    call {}", name).unwrap();
+            writeln!(file, "    add rsp, {}	;pop arguments", args.len() * 8).unwrap();
+            // Pop arguments from stack
+        }
+        Atom::Array(expressions, _) => {
+            // TODO: Push array's dimensions on the stack upon creation, refer
+            // back to them when accessing the array
 
-				// Push expressions on stack in reverse order
-				for expr in expressions.iter().rev() {
-					generate_expression(file, expr, context);
-					writeln!(file, "    push rax").unwrap();
-					context.stack_index -= 8;
-					context.len += 1;
-				}
-				// Move the address of the array to rax
-				writeln!(file, "    mov rax, rsp	; Move the address of the array to rax").unwrap();
-			}
-		Atom::StructInstance(_, members) => {
-			// Like an array, but with named fields
-			// Push expressions on stack in reverse order
-			for expr in members.iter().rev() {
-				generate_expression(file, expr, context);
-				writeln!(file, "    push rax").unwrap();
-				context.stack_index -= 8;
-				context.len += 1;
-			}
-			// Move the address of the struct to rax
-			writeln!(file, "    mov rax, rsp	; Move the address of the struct to rax").unwrap();
-		}
-        //_ => unimplemented!(),
+            // Push expressions on stack in reverse order
+            for expr in expressions.iter().rev() {
+                generate_expression(file, expr, context);
+                writeln!(file, "    push rax").unwrap();
+                context.stack_index -= 8;
+                context.len += 1;
+            }
+            // Move the address of the array to rax
+            writeln!(
+                file,
+                "    mov rax, rsp	; Move the address of the array to rax"
+            )
+            .unwrap();
+        }
+        Atom::StructInstance(_, members) => {
+            // Like an array, but with named fields
+            // Push expressions on stack in reverse order
+            for expr in members.iter().rev() {
+                generate_expression(file, expr, context);
+                writeln!(file, "    push rax").unwrap();
+                context.stack_index -= 8;
+                context.len += 1;
+            }
+            // Move the address of the struct to rax
+            writeln!(
+                file,
+                "    mov rax, rsp	; Move the address of the struct to rax"
+            )
+            .unwrap();
+        } //_ => unimplemented!(),
     }
 }
 
 /// Generates the assembly code for an assignment operation
-fn generate_assignment(op: &AssignmentOp, file: &mut File, var_address: &i64, pointer_dereference: bool) {
-	let write_address;
-	if pointer_dereference {
-		write_address = format!("[rax]");
-	} else {
-		write_address = format!("[rbp{}{}]", if *var_address < 0 { "" } else { "+" }, var_address);
-	}
+fn generate_assignment(
+    op: &AssignmentOp,
+    file: &mut File,
+    var_address: &i64,
+    pointer_dereference: bool,
+) {
+    let write_address;
+    if pointer_dereference {
+        write_address = format!("[r8]");
+    } else {
+        write_address = format!(
+            "[rbp{}{}]",
+            if *var_address < 0 { "" } else { "+" },
+            var_address
+        );
+    }
     match op {
         AssignmentOp::Assign => {
             writeln!(file, "    mov {}, rax", write_address).unwrap();
@@ -93,35 +125,35 @@ fn generate_assignment(op: &AssignmentOp, file: &mut File, var_address: &i64, po
             writeln!(file, "    sub {}, rax", write_address).unwrap();
         }
         AssignmentOp::MultiplyAssign => {
-			writeln!(file, "    mov rcx, {}", write_address).unwrap();
-			writeln!(file, "    imul rax, rcx").unwrap();
-			writeln!(file, "    mov {}, rax", write_address).unwrap();
+            writeln!(file, "    mov rcx, {}", write_address).unwrap();
+            writeln!(file, "    imul rax, rcx").unwrap();
+            writeln!(file, "    mov {}, rax", write_address).unwrap();
         }
         AssignmentOp::DivideAssign => {
-			writeln!(file, "    mov rcx, rax").unwrap();
-			writeln!(file, "    mov rax, {}", write_address).unwrap();
-			writeln!(file, "    cqo").unwrap();
-			writeln!(file, "    idiv rcx").unwrap();
-			writeln!(file, "    mov {}, rax", write_address).unwrap();
+            writeln!(file, "    mov rcx, rax").unwrap();
+            writeln!(file, "    mov rax, {}", write_address).unwrap();
+            writeln!(file, "    cqo").unwrap();
+            writeln!(file, "    idiv rcx").unwrap();
+            writeln!(file, "    mov {}, rax", write_address).unwrap();
         }
         AssignmentOp::ModulusAssign => {
-			writeln!(file, "    mov rcx, rax").unwrap();
-			writeln!(file, "    mov rax, {}", write_address).unwrap();
-			writeln!(file, "    cqo").unwrap();
-			writeln!(file, "    idiv rcx").unwrap();
-			writeln!(file, "    mov {}, rdx", write_address).unwrap();
+            writeln!(file, "    mov rcx, rax").unwrap();
+            writeln!(file, "    mov rax, {}", write_address).unwrap();
+            writeln!(file, "    cqo").unwrap();
+            writeln!(file, "    idiv rcx").unwrap();
+            writeln!(file, "    mov {}, rdx", write_address).unwrap();
         }
         AssignmentOp::LeftShiftAssign => {
-			writeln!(file, "    mov rcx, rax").unwrap();
-			writeln!(file, "    mov rax, {}", write_address).unwrap();
-			writeln!(file, "    shl rax, cl").unwrap();
-			writeln!(file, "    mov {}, rax", write_address).unwrap();
+            writeln!(file, "    mov rcx, rax").unwrap();
+            writeln!(file, "    mov rax, {}", write_address).unwrap();
+            writeln!(file, "    shl rax, cl").unwrap();
+            writeln!(file, "    mov {}, rax", write_address).unwrap();
         }
         AssignmentOp::RightShiftAssign => {
-			writeln!(file, "    mov rcx, rax").unwrap();
-			writeln!(file, "    mov rax, {}", write_address).unwrap();
-			writeln!(file, "    shr rax, cl").unwrap();
-			writeln!(file, "    mov {}, rax", write_address).unwrap();
+            writeln!(file, "    mov rcx, rax").unwrap();
+            writeln!(file, "    mov rax, {}", write_address).unwrap();
+            writeln!(file, "    shr rax, cl").unwrap();
+            writeln!(file, "    mov {}, rax", write_address).unwrap();
         }
         AssignmentOp::BitwiseAndAssign => {
             writeln!(file, "    and {}, rax", write_address).unwrap();
@@ -174,19 +206,18 @@ fn generate_expression(file: &mut File, expression: &Expression, context: &mut C
         }
         Expression::BinaryOp(left, right, bin_op) => {
             generate_expression(file, left, context);
-			if bin_op != &BinOp::MemberAccess {
-				writeln!(file, "    push rax").unwrap();
-            	generate_expression(file, right, context);
-			} else {
-				if let Expression::Atom(Atom::Literal(Literal::Int(i))) = right.as_ref() {
-					writeln!(file, "    mov rcx, {}", i).unwrap();
-					writeln!(file, "    mov rax, [rax + rcx * 8]").unwrap();
-					return;
-				} else {
-					panic!("Unreachable code, something went very wrong");
-				}
-			}
-
+            if bin_op != &BinOp::MemberAccess {
+                writeln!(file, "    push rax").unwrap();
+                generate_expression(file, right, context);
+            } else {
+                if let Expression::Atom(Atom::Literal(Literal::Int(i))) = right.as_ref() {
+                    writeln!(file, "    mov rcx, {}", i).unwrap();
+                    writeln!(file, "    mov rax, [rax + rcx * 8]").unwrap();
+                    return;
+                } else {
+                    panic!("Unreachable code, something went very wrong");
+                }
+            }
 
             writeln!(file, "    pop rcx").unwrap();
             writeln!(file, "    xchg rax, rcx").unwrap();
@@ -266,141 +297,126 @@ fn generate_expression(file: &mut File, expression: &Expression, context: &mut C
                 _ => unimplemented!(),
             }
         }
-        Expression::Assignment(variable, expr, op) => {
-			generate_expression(file, expr, context);
-			
-			let mut variable = variable;
-			let mut str = String::new();
-			let mut dereference = false;
+        Expression::Assignment(lvalue, expr, op) => {
+            generate_expression(file, expr, context);
 
-			while let ReassignmentIdentifier::Dereference(new_expr) = variable {
-				variable = new_expr;
-				str = format!("    mov rax, [rax]\n{}", str);
-				dereference = true;
-			}
+			match lvalue {
+				ReassignmentIdentifier::Variable(s) => {
+					let var_address = context.var_map.get(s);
+					if let Some(var_address) = var_address {
+						generate_assignment(op, file, var_address, false);
+						return;
+					}
 
-			writeln!(file, "{}", str).unwrap();
-
-			loop {
-				match variable {
-					ReassignmentIdentifier::Variable(var) => {
-						let var_address = context.var_map.get(var);
-
-						if let Some(var_address) = var_address {
-							generate_assignment(op, file, var_address, dereference);
-							return;
-						}
-
-						if let Some(_) = context.constants.get(var) {
-							panic!("Cannot assign to a constant variable");
-						}
-						panic!("Undeclared variable {:?}", var);
-					},
-					ReassignmentIdentifier::Array(_, _) => todo!(),
-					ReassignmentIdentifier::MemberAccess(_, _) => todo!(),
-					ReassignmentIdentifier::Dereference(_) => todo!(),
+					if let Some(_) = context.constants.get(s) {
+						panic!("Cannot assign to a constant variable");
+					}
+					panic!("Undeclared variable {:?}", s);
+				}
+				ReassignmentIdentifier::Array(variable, indices) => {
+					writeln!(file, "    push rax").unwrap();
+					generate_expression(file, variable, context);
+					writeln!(file, "    push rax").unwrap();
+					generate_expression(file, &indices[0], context);
+					writeln!(file, "    mov r8, rax").unwrap();
+					writeln!(file, "    imul r8, 8").unwrap();
+					writeln!(file, "    pop rax").unwrap();
+					writeln!(file, "    add r8, rax").unwrap();
+					writeln!(file, "    pop rax").unwrap();
+					generate_assignment(op, file, &0, true);
+				}
+				ReassignmentIdentifier::MemberAccess(_, _) => {
+					panic!("Unreachable code, member access is turned into array access much earlier");
+				}
+				ReassignmentIdentifier::Dereference(v) => {
+					writeln!(file, "    push rax").unwrap();
+					generate_expression(file, v, context);
+					writeln!(file, "    mov r8, rax").unwrap();
+					writeln!(file, "    pop rax").unwrap();
+					generate_assignment(op, file, &0, true);
 				}
 			}
-
-			// if let ReassignmentIdentifier::Variable(variable) = variable {
-			// 	let var_address = context.var_map.get(variable);
-			// 	let dereference = number_of_dereferences > 0;
-			// 	while number_of_dereferences > 0 {
-			// 		writeln!(file, "    mov rax, [rax]").unwrap();
-			// 		number_of_dereferences -= 1;
-			// 	}
-
-			// 	if let Some(var_address) = var_address {
-			// 		generate_assignment(op, file, var_address, dereference);
-			// 		return;
-			// 	}
-
-			// 	if let Some(_) = context.constants.get(variable) {
-			// 		panic!("Cannot assign to a constant variable");
-			// 	}
-			// 	panic!("Undeclared variable {:?}", variable);
-			// }
         }
-		Expression::TypeCast(expr, t) => {
-			// Unsure if I should be doing something here or nah
-			generate_expression(file, expr, context);
-		}
-		Expression::ArrayAccess(variable, indices) => {
-			generate_expression(file, variable, context);
-			let index = indices.get(0).expect("Array access without index");
+        Expression::TypeCast(expr, _) => {
+            // Unsure if I should be doing something here or nah
+            generate_expression(file, expr, context);
+        }
+        Expression::ArrayAccess(variable, indices) => {
+            generate_expression(file, variable, context);
+            let index = indices.get(0).expect("Array access without index");
 
-			writeln!(file, "    push rax").unwrap();
-			generate_expression(file, index, context);
-			writeln!(file, "    pop rcx").unwrap();
-			writeln!(file, "    mov rax, [rcx + rax * 8]").unwrap();
-		}
+            writeln!(file, "    push rax").unwrap();
+            generate_expression(file, index, context);
+            writeln!(file, "    pop rcx").unwrap();
+            writeln!(file, "    mov rax, [rcx + rax * 8]").unwrap();
+        }
     }
 }
 
 /// Context struct to keep track of local variables and stack index
 struct Context {
-	/// HashMap to store the variables and their addresses
+    /// HashMap to store the variables and their addresses
     var_map: HashMap<String, i64>,
-	/// HashMap to store the var types
-	var_types: HashMap<String, String>,
-	/// Set of constant variables
-	constants: HashSet<String>,
-	/// Structs
-	structs: HashMap<String, HashMap<String, i64>>,
-	/// Stack index to keep track of the stack pointer
+    /// HashMap to store the var types
+    var_types: HashMap<String, String>,
+    /// Set of constant variables
+    constants: HashSet<String>,
+    /// Structs
+    structs: HashMap<String, HashMap<String, i64>>,
+    /// Stack index to keep track of the stack pointer
     stack_index: i64,
-	/// HashSet to store the variables that were declared in the current block
+    /// HashSet to store the variables that were declared in the current block
     local_variables: HashSet<String>,
-	/// Label a continue statement should jump to
+    /// Label a continue statement should jump to
     continue_label: Option<String>,
-	/// Label a break statement should jump to
+    /// Label a break statement should jump to
     break_label: Option<String>,
-	/// Length of the context (in number of 64 bit words)
-	len: usize,
-	/// Arrays number of dimensions
-	dimensions: HashMap<String, usize>,
+    /// Length of the context (in number of 64 bit words)
+    len: usize,
+    /// Arrays number of dimensions
+    dimensions: HashMap<String, usize>,
 }
 
 impl Context {
     fn new() -> Context {
         Context {
             var_map: HashMap::new(),
-			var_types: HashMap::new(),
-			constants: HashSet::new(),
-			structs: HashMap::new(),
+            var_types: HashMap::new(),
+            constants: HashSet::new(),
+            structs: HashMap::new(),
             stack_index: 0,
             local_variables: HashSet::new(),
             continue_label: None,
             break_label: None,
-			len: 0,
-			dimensions: HashMap::new(),
+            len: 0,
+            dimensions: HashMap::new(),
         }
     }
 
-	/// Create a new context from the last context
-	/// 
-	/// This clones all the info from the last context except the local variables
+    /// Create a new context from the last context
+    ///
+    /// This clones all the info from the last context except the local variables
     fn from_last_context(context: &Context) -> Context {
         Context {
             var_map: context.var_map.clone(),
-			var_types: context.var_types.clone(),
-			constants: context.constants.clone(),
-			structs: context.structs.clone(),
+            var_types: context.var_types.clone(),
+            constants: context.constants.clone(),
+            structs: context.structs.clone(),
             stack_index: context.stack_index.clone(),
             local_variables: HashSet::new(),
             continue_label: context.continue_label.clone(),
             break_label: context.break_label.clone(),
-			len: 0,
-			dimensions: context.dimensions.clone(),
+            len: 0,
+            dimensions: context.dimensions.clone(),
         }
     }
 
-	/// Insert a variable into the context
+    /// Insert a variable into the context
     fn insert(&mut self, key: String, value: i64, var_type: String) {
         self.var_map.insert(key.clone(), value);
-		self.var_types.insert(key.clone(), var_type);
+        self.var_types.insert(key.clone(), var_type);
         self.local_variables.insert(key);
-		self.len += 1;
+        self.len += 1;
     }
 }
 
@@ -415,7 +431,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
         for statement in statements.iter() {
             match statement {
                 Statement::Return(expression) => {
-                    generate_expression(file, expression,  &mut context);
+                    generate_expression(file, expression, &mut context);
                     // Pop all the variables from the stack
                     writeln!(
                         file,
@@ -435,45 +451,52 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                         generate_expression(file, expr, &mut context);
                     }
 
-					// Dereference the variable if it is a pointer
-					let mut number_of_dereferences = 0;
-					let mut variable = variable;
-					while let AssignmentIdentifier::Dereference(new_expr) = variable {
-						variable = new_expr;
-						number_of_dereferences += 1;
-					}
+                    // Dereference the variable if it is a pointer
+                    let mut number_of_dereferences = 0;
+                    let mut variable = variable;
+                    while let AssignmentIdentifier::Dereference(new_expr) = variable {
+                        variable = new_expr;
+                        number_of_dereferences += 1;
+                    }
 
-					if let Some(_) = expr {
-						writeln!(file, "    push rax").unwrap();
-					} else {
-						writeln!(file, "    push 0").unwrap();	// Undefined variables default to 0
-					}
-					context.stack_index -= 8;
+                    if let Some(_) = expr {
+                        writeln!(file, "    push rax").unwrap();
+                    } else {
+                        writeln!(file, "    push 0").unwrap(); // Undefined variables default to 0
+                    }
+                    context.stack_index -= 8;
 
-					while number_of_dereferences > 0 {
-						writeln!(file, "    push rsp").unwrap();
-						number_of_dereferences -= 1;
-						context.stack_index -= 8;
-						context.len += 1;
-					}
-					
-					if let AssignmentIdentifier::Variable(variable) = variable {
-						context.insert(variable.clone(), context.stack_index, var_type.to_string());
-					} else if let AssignmentIdentifier::Array(variable, dimensions) = variable {
-						context.insert(variable.clone(), context.stack_index, var_type.to_string());
+                    while number_of_dereferences > 0 {
+                        writeln!(file, "    push rsp").unwrap();
+                        number_of_dereferences -= 1;
+                        context.stack_index -= 8;
+                        context.len += 1;
+                    }
 
-						let mut dimensions = dimensions.clone();
-						context.dimensions.insert(variable.clone(), dimensions.len());
-						// Push the dimensions on the stack
-						while let Some(expr) = dimensions.pop() {
-							generate_expression(file, &expr, &mut context);
-							writeln!(file, "    push rax	;pushing array dimensions onto stack").unwrap();
-							context.stack_index -= 8;
-							context.insert(format!("{}:dim{}", variable, dimensions.len()), context.stack_index, "int".to_string());
-						}
-					} else {
-						panic!("Expected a variable or an array, got {:?}", variable);
-					}
+                    if let AssignmentIdentifier::Variable(variable) = variable {
+                        context.insert(variable.clone(), context.stack_index, var_type.to_string());
+                    } else if let AssignmentIdentifier::Array(variable, dimensions) = variable {
+                        context.insert(variable.clone(), context.stack_index, var_type.to_string());
+
+                        let mut dimensions = dimensions.clone();
+                        context
+                            .dimensions
+                            .insert(variable.clone(), dimensions.len());
+                        // Push the dimensions on the stack
+                        while let Some(expr) = dimensions.pop() {
+                            generate_expression(file, &expr, &mut context);
+                            writeln!(file, "    push rax	;pushing array dimensions onto stack")
+                                .unwrap();
+                            context.stack_index -= 8;
+                            context.insert(
+                                format!("{}:dim{}", variable, dimensions.len()),
+                                context.stack_index,
+                                "int".to_string(),
+                            );
+                        }
+                    } else {
+                        panic!("Expected a variable or an array, got {:?}", variable);
+                    }
                 }
                 Statement::Compound(_) => {
                     generate_compound_statement(file, statement, &context);
@@ -575,8 +598,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     } else {
                         panic!("Continue statement outside of loop");
                     }
-                }
-                //_ => unimplemented!(),
+                } //_ => unimplemented!(),
             }
         }
     } else {
@@ -596,14 +618,14 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
 fn generate_function(file: &mut File, function: &Function, context: &Context) {
     let mut context = Context::from_last_context(context);
 
-    let Function::Function(name, params, statement, return_type) = function;
+    let Function::Function(name, params, statement, _) = function;
 
-	context.stack_index = 24;	// Skip rbp, rbx and the return address
-	for param in params.iter() {
-		context.insert(param.0.clone(), context.stack_index, param.1.to_string());
-		context.stack_index += 8;
-	}
-	context.stack_index = 0;
+    context.stack_index = 24; // Skip rbp, rbx and the return address
+    for param in params.iter() {
+        context.insert(param.0.clone(), context.stack_index, param.1.to_string());
+        context.stack_index += 8;
+    }
+    context.stack_index = 0;
 
     writeln!(file, "").unwrap();
     writeln!(file, "global {}", name).unwrap();
@@ -612,14 +634,18 @@ fn generate_function(file: &mut File, function: &Function, context: &Context) {
     writeln!(file, "    push rbx		;functions should preserve rbx").unwrap();
     writeln!(file, "    mov rbp, rsp	;set base pointer").unwrap();
     generate_compound_statement(file, statement, &context);
-	writeln!(file, "    pop rbx			;restore rbx for caller function").unwrap();
-	writeln!(file, "    pop rbp			;restore base pointer").unwrap();
-	writeln!(file, "    ret				;return by default if no return statement was reached").unwrap();
+    writeln!(file, "    pop rbx			;restore rbx for caller function").unwrap();
+    writeln!(file, "    pop rbp			;restore base pointer").unwrap();
+    writeln!(
+        file,
+        "    ret				;return by default if no return statement was reached"
+    )
+    .unwrap();
 }
 
 fn generate_constant(file: &mut File, constant: &Constant) {
-	let Constant::Constant(name, constant, _) = constant;
-	writeln!(file, "    {} equ {}", name, constant).unwrap();
+    let Constant::Constant(name, constant, _) = constant;
+    writeln!(file, "    {} equ {}", name, constant).unwrap();
 }
 
 /// Generates the assembly code for the given AST
@@ -629,7 +655,7 @@ pub fn generate(ast: &Ast, out_path: &str) {
 
     // Post-order traversal of the AST to generate x86_64 (+nasm pseudo-instructions)
 
-	// TODO: structs
+    // TODO: structs
     let Program::Program(function_vector, const_vector, structs) = &ast.program;
     writeln!(file, "[BITS 64]").unwrap();
     writeln!(file, "section .text").unwrap();
@@ -641,26 +667,29 @@ pub fn generate(ast: &Ast, out_path: &str) {
     writeln!(file, "    mov rax, 60").unwrap(); // Exit syscall
     writeln!(file, "    syscall").unwrap();
 
-	let mut context = Context::new();
+    let mut context = Context::new();
 
-	for constant in const_vector.iter() {
-		generate_constant(&mut file, constant);
-		let Constant::Constant(name, _, _) = constant;
-		if let Some(_) = context.var_map.get(name) {
-			panic!("Variable {} already declared as a constant. Constants cannot be declared twice", name);
-		}
-		context.constants.insert(name.clone());
-	}
+    for constant in const_vector.iter() {
+        generate_constant(&mut file, constant);
+        let Constant::Constant(name, _, _) = constant;
+        if let Some(_) = context.var_map.get(name) {
+            panic!(
+                "Variable {} already declared as a constant. Constants cannot be declared twice",
+                name
+            );
+        }
+        context.constants.insert(name.clone());
+    }
 
-	for struct_ in structs.iter() {
-		let Struct{ id, members} = struct_;
-		let mut member_names = HashMap::new();
-		for (i, member) in members.iter().enumerate() {
-			let (name, _) = member;
-			member_names.insert(name.clone(), i as i64);
-		}
-		context.structs.insert(id.clone(), member_names);
-	}
+    for struct_ in structs.iter() {
+        let Struct { id, members } = struct_;
+        let mut member_names = HashMap::new();
+        for (i, member) in members.iter().enumerate() {
+            let (name, _) = member;
+            member_names.insert(name.clone(), i as i64);
+        }
+        context.structs.insert(id.clone(), member_names);
+    }
 
     for function in function_vector.iter() {
         generate_function(&mut file, function, &context);

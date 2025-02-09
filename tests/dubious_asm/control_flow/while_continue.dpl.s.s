@@ -35,7 +35,6 @@ while_start_0:
     pop rcx
     xchg rax, rcx
     add rax, rcx
-
     mov [rbp-8], rax
     jmp while_start_0	;continue statement
     mov rax, [rbp-16]
@@ -44,7 +43,6 @@ while_start_0:
     pop rcx
     xchg rax, rcx
     add rax, rcx
-
     mov [rbp-16], rax
     add rsp, 0		;end of block, pop local variables
     jmp while_start_0

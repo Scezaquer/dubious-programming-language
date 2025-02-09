@@ -61,13 +61,11 @@ end_1:
     add rsp, 0		;end of block, pop local variables
 end_0:
     mov rax, 2
-
     sub [rbp-8], rax
     push 0
     push 0
     ;for statement
     mov rax, 0
-
     mov [rbp-40], rax
 for_start_0:
     mov rax, [rbp-40]
@@ -86,18 +84,14 @@ for_start_0:
     pop rcx
     xchg rax, rcx
     add rax, rcx
-
     mov [rbp-32], rax
     mov rax, [rbp-24]
-
     mov [rbp-16], rax
     mov rax, [rbp-32]
-
     mov [rbp-24], rax
     add rsp, 0		;end of block, pop local variables
     mov rax, [rbp-40]
     inc rax
-
     mov [rbp-40], rax
     jmp for_start_0
 for_end_0:
