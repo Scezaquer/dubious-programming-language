@@ -1,0 +1,13 @@
+struct S {
+	first_attribute: int;
+	second_attribute: char;
+}
+
+fn main(): int {
+	let arr: array[S] = [
+		S{ 1, 'a' },
+		S{ 2, 'b' },
+		S{ 3, 'c' }
+	];
+	return arr[1].second_attribute : int;
+}

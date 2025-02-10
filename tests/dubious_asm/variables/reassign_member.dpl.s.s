@@ -17,7 +17,7 @@ main:
     push rax
     mov rax, 1
     push rax
-    mov rax, rsp	; Move the address of the struct to rax
+    mov rax, rsp	; Move the address of the array to rax
     push rax
     mov rax, 'b'
     push rax

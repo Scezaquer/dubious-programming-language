@@ -233,3 +233,6 @@ let a: S = S{
 
 - TODO: Can't change struct members after initialization
 - TODO: make tests for structs
+
+Reassignments can only have a variable, a dereferenced address, an array element
+or a struct member as left hand side.

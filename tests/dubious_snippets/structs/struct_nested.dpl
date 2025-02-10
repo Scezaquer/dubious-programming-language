@@ -1,0 +1,15 @@
+struct S {
+	first_attribute: int;
+	second_attribute: char;
+}
+
+struct S2 {
+	child: S;
+	some_data: int;
+}
+
+fn main(): int {
+	let a: S = S{ 1, 'a' };
+	let b: S2 = S2{ a, 2 };
+	return b.child.first_attribute;
+}

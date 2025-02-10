@@ -1,0 +1,25 @@
+struct S {
+	first_attribute: int;
+	some_data: array[*int];
+}
+
+struct S2 {
+	child: S;
+	some_attribute: char;
+}
+
+
+fn main(): int {
+	let *ptr1 : *int = 0;
+	let *ptr2 : *int = 1;
+	let *ptr3 : *int = 2;
+	let a: S = S{ 1, [ptr1, ptr2, ptr3] };
+	let b: S2 = S2{ a, 'b' };
+
+	// reassign a dereferenced pointer in an array which is the member of a
+	// struct which is the member of an other struct. If this works, reassignments
+	// should be good to go
+
+	*b.child.some_data[1] += 2;
+	return *b.child.some_data[1];
+}

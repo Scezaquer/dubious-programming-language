@@ -5,6 +5,5 @@ struct S {
 
 fn main(): int {
 	let a: S = S{ 1, 'a' };
-	//a.first_attribute = 0;
-	return a.first_attribute : int;
+	return a.first_attribute;
 }

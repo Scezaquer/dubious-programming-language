@@ -60,17 +60,101 @@ fn generate_atom(file: &mut File, atom: &Atom, context: &mut Context) {
             writeln!(file, "    add rsp, {}	;pop arguments", args.len() * 8).unwrap();
             // Pop arguments from stack
         }
-        Atom::Array(expressions, _) => {
-            // TODO: Push array's dimensions on the stack upon creation, refer
-            // back to them when accessing the array
+        Atom::Array(expressions, _) | Atom::StructInstance(_, expressions) => {
+			// Careful, this section of the code is technical because we want
+			// to be able to define arrays of structs such that
+			//  [
+			// 		S{a, b},
+			// 		S{c, d}
+			//	]
+			// is a valid array of structs. Typically, the expressions in the
+			// array would be evaluated and pushed on the stack in reverse order
+			// such that the stack for [a, b, c] would look like
+			// 	| c |
+			// 	| b |
+			// 	| a | <- rsp, we get a ptr to this
+			//
+			// However, when evaluating structs, we push their values on the stack
+			// as we evaluate them. This is a big problem, because now, the stack
+			// for [S{a, b}, S{c, d}] would actually look like
+			// 	| d |
+			// 	| c |
+			//  | ptr(S{c, d}) |
+			// 	| b |
+			// 	| a |
+			//  | ptr(S{a, b}) | <- rsp, we get a ptr to this
+			// But if we try to access arr[1], we would get rsp-8, which is the
+			// address of the first attribute of the first struct, not the address
+			// of the second struct.
 
-            // Push expressions on stack in reverse order
-            for expr in expressions.iter().rev() {
-                generate_expression(file, expr, context);
-                writeln!(file, "    push rax").unwrap();
-                context.stack_index -= 8;
-                context.len += 1;
-            }
+			// To solve this, we need to push the values of the structs first,
+			// and then the ptrs to the structs. This way, we get a stack that
+			// looks like
+			// 	| d |
+			// 	| c |
+			// 	| b |
+			// 	| a |
+			//  | ptr(S{c, d}) |
+			//  | ptr(S{a, b}) | <- rsp, we get a ptr to this
+			// Where array indexing works as expected.
+
+			// Now aditionally, we note that since structs work in the same way,
+			// we must correctly handle the cases where some expressions push
+			// to the stack, and some don't, all in the same array-like structure.
+			// This is what leads to the complexity of this section of the code.
+
+			// Everything is pushed in reverse order
+
+			let mut stack_index = context.stack_index;
+			let mut stack_indices = vec![];
+			for expr in expressions.iter().rev() {
+				// If the expression is a struct or an array, we need to push the
+				// values on the stack first
+				if matches!(expr, Expression::Atom(Atom::StructInstance(_, _)) | Expression::Atom(Atom::Array(_, _))) {
+					generate_expression(file, expr, context);
+					stack_indices.push(stack_index - context.stack_index);
+					stack_index = context.stack_index;
+				}
+			}
+
+			let sum = stack_indices.iter().sum::<i64>(); // Size of all the structs values together
+
+			if sum != 0 {
+				writeln!(file, "    mov rax, rsp").unwrap();
+				writeln!(file, "    add rax, {}", sum).unwrap();
+
+				if !matches!(expressions[0], Expression::Atom(Atom::StructInstance(_, _)) | Expression::Atom(Atom::Array(_, _))){
+					writeln!(file, "    push rax").unwrap();
+					context.stack_index -= 8;
+					context.len += 1;
+				}
+			}
+
+			let mut iterator = stack_indices.iter();
+			for expr in expressions.iter().rev() {
+				if matches!(expr, Expression::Atom(Atom::StructInstance(_, _)) | Expression::Atom(Atom::Array(_, _))) {
+					let i = iterator.next().unwrap();
+					writeln!(file, "    sub rax, {}", i).unwrap();
+					writeln!(file, "    push rax").unwrap(); // If generate_expression pushes stuff, this is broken. Same for StructInstance
+					context.stack_index -= 8;
+					context.len += 1;
+				} else {
+					// Here we assume that generate_expression doesn't push anything
+					// If it does, this is broken
+					generate_expression(file, expr, context);
+					if sum != 0 {	// If structs and non structs are mixed, we need to save the last rax so that we don't lose count of the structs
+						writeln!(file, "    pop rcx").unwrap();
+						writeln!(file, "    sub rsp, 8").unwrap();
+					}
+					writeln!(file, "    push rax").unwrap(); // If generate_expression pushes stuff, this is broken. Same for StructInstance
+					if sum != 0 {
+						writeln!(file, "    mov rax, rcx").unwrap();
+					}
+					context.stack_index -= 8;
+					context.len += 1;
+				}
+			}
+
             // Move the address of the array to rax
             writeln!(
                 file,
@@ -78,22 +162,6 @@ fn generate_atom(file: &mut File, atom: &Atom, context: &mut Context) {
             )
             .unwrap();
         }
-        Atom::StructInstance(_, members) => {
-            // Like an array, but with named fields
-            // Push expressions on stack in reverse order
-            for expr in members.iter().rev() {
-                generate_expression(file, expr, context);
-                writeln!(file, "    push rax").unwrap();
-                context.stack_index -= 8;
-                context.len += 1;
-            }
-            // Move the address of the struct to rax
-            writeln!(
-                file,
-                "    mov rax, rsp	; Move the address of the struct to rax"
-            )
-            .unwrap();
-        } //_ => unimplemented!(),
     }
 }
 
@@ -300,42 +368,44 @@ fn generate_expression(file: &mut File, expression: &Expression, context: &mut C
         Expression::Assignment(lvalue, expr, op) => {
             generate_expression(file, expr, context);
 
-			match lvalue {
-				ReassignmentIdentifier::Variable(s) => {
-					let var_address = context.var_map.get(s);
-					if let Some(var_address) = var_address {
-						generate_assignment(op, file, var_address, false);
-						return;
-					}
+            match lvalue {
+                ReassignmentIdentifier::Variable(s) => {
+                    let var_address = context.var_map.get(s);
+                    if let Some(var_address) = var_address {
+                        generate_assignment(op, file, var_address, false);
+                        return;
+                    }
 
-					if let Some(_) = context.constants.get(s) {
-						panic!("Cannot assign to a constant variable");
-					}
-					panic!("Undeclared variable {:?}", s);
-				}
-				ReassignmentIdentifier::Array(variable, indices) => {
-					writeln!(file, "    push rax").unwrap();
-					generate_expression(file, variable, context);
-					writeln!(file, "    push rax").unwrap();
-					generate_expression(file, &indices[0], context);
-					writeln!(file, "    mov r8, rax").unwrap();
-					writeln!(file, "    imul r8, 8").unwrap();
-					writeln!(file, "    pop rax").unwrap();
-					writeln!(file, "    add r8, rax").unwrap();
-					writeln!(file, "    pop rax").unwrap();
-					generate_assignment(op, file, &0, true);
-				}
-				ReassignmentIdentifier::MemberAccess(_, _) => {
-					panic!("Unreachable code, member access is turned into array access much earlier");
-				}
-				ReassignmentIdentifier::Dereference(v) => {
-					writeln!(file, "    push rax").unwrap();
-					generate_expression(file, v, context);
-					writeln!(file, "    mov r8, rax").unwrap();
-					writeln!(file, "    pop rax").unwrap();
-					generate_assignment(op, file, &0, true);
-				}
-			}
+                    if let Some(_) = context.constants.get(s) {
+                        panic!("Cannot assign to a constant variable");
+                    }
+                    panic!("Undeclared variable {:?}", s);
+                }
+                ReassignmentIdentifier::Array(variable, indices) => {
+                    writeln!(file, "    push rax").unwrap();
+                    generate_expression(file, variable, context);
+                    writeln!(file, "    push rax").unwrap();
+                    generate_expression(file, &indices[0], context);
+                    writeln!(file, "    mov r8, rax").unwrap();
+                    writeln!(file, "    imul r8, 8").unwrap();
+                    writeln!(file, "    pop rax").unwrap();
+                    writeln!(file, "    add r8, rax").unwrap();
+                    writeln!(file, "    pop rax").unwrap();
+                    generate_assignment(op, file, &0, true);
+                }
+                ReassignmentIdentifier::MemberAccess(_, _) => {
+                    panic!(
+                        "Unreachable code, member access is turned into array access much earlier"
+                    );
+                }
+                ReassignmentIdentifier::Dereference(v) => {
+                    writeln!(file, "    push rax").unwrap();
+                    generate_expression(file, v, context);
+                    writeln!(file, "    mov r8, rax").unwrap();
+                    writeln!(file, "    pop rax").unwrap();
+                    generate_assignment(op, file, &0, true);
+                }
+            }
         }
         Expression::TypeCast(expr, _) => {
             // Unsure if I should be doing something here or nah

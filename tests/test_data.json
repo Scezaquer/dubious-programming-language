@@ -294,6 +294,13 @@
 		"output": 98
 	},
 	{
+		"name": "reassign_mixed",
+		"description": "Reassign a dereferenced pointer in an array which is a member of a struct which is a member of an other struct. If this works, reassignments should be good to go",
+		"filename": "variables/reassign_mixed.dpl",
+		"input": [],
+		"output": 3
+	},
+	{
         "name": "else_if_chain",
         "description": "Chain of else ifs",
         "filename": "control_flow/else_if_chain.dpl",
@@ -544,5 +551,47 @@
 		"filename": "strings/str.dpl",
 		"input": [],
 		"output": 97
+	},
+	{
+		"name": "struct",
+		"description": "Struct",
+		"filename": "structs/struct.dpl",
+		"input": [],
+		"output": 1
+	},
+	{
+		"name": "struct_nested",
+		"description": "Nested structs",
+		"filename": "structs/struct_nested.dpl",
+		"input": [],
+		"output": 1
+	},
+	{
+		"name": "struct_array",
+		"description": "Struct with array member",
+		"filename": "structs/struct_array.dpl",
+		"input": [],
+		"output": 4
+	},
+	{
+		"name": "struct_array2",
+		"description": "Cast struct member to int",
+		"filename": "structs/struct_array2.dpl",
+		"input": [],
+		"output": 98
+	},
+	{
+		"name": "array_of_structs",
+		"description": "Array containing structs",
+		"filename": "structs/array_of_structs.dpl",
+		"input": [],
+		"output": 98
+	},
+	{
+		"name": "array_of_structs_literals",
+		"description": "Array of struct literals",
+		"filename": "structs/array_of_structs_literals.dpl",
+		"input": [],
+		"output": 98
 	}
 ]
