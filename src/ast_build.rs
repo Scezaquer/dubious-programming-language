@@ -270,6 +270,7 @@ pub enum Statement {
     Compound(Vec<Statement>),
     Break,
     Continue,
+	Asm(String),
 }
 
 /// Represents a function in the AST.
@@ -1229,7 +1230,16 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
                 statement = Statement::Break;
             } else if k == "continue" {
                 statement = Statement::Continue;
-            } else {
+            } else if k == "asm" {
+				let mut asm = String::new();
+				let next_tok = tokens.next().unwrap();
+				if let TokenWithDebugInfo { internal_tok: Token::StringLiteral(s), .. } = next_tok {
+					asm.push_str(format!("{}{}", s, "\n").as_str());
+					statement = Statement::Asm(asm);
+				} else {
+					error_unexpected_token("string literal", next_tok);
+				}
+			} else {
                 error_unexpected_token("valid keyword token", tok);
             }
         }
@@ -1603,7 +1613,6 @@ pub fn parse(tokens: &Vec<TokenWithDebugInfo>) -> Ast {
     let mut constants = Vec::new();
     let mut structs = Vec::new();
 	let mut enums = Vec::new();
-	//let mut unions = Vec::new();
 
     // Parse functions until there are no more tokens
     loop {

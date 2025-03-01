@@ -628,5 +628,12 @@
 		"filename": "structs/enum_struct.dpl",
 		"input": [],
 		"output": 0
+	},
+	{
+		"name": "inline_asm",
+		"description": "Inline assembly",
+		"filename": "inline_asm/inline_asm.dpl",
+		"input": [],
+		"output": 3
 	}
 ]

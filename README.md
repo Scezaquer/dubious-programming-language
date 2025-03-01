@@ -11,13 +11,15 @@ A simple compiler for the Dubious programming language (DPL).
 - TODO: better checker error messages
 - TODO: heap memory stuff
 - TODO: std library
-- TODO: inline asm
 - TODO: vscode syntax highlighting
 - TODO: floating point arithmetic
 - TODO: Wiki
 - TODO: support escape characters
 - TODO: namespaces for functions, constants, structs, enums, unions
 - TODO: Reassignment for struct members, array elements and pointer dereference
+- TODO: Generic types
+- TODO: Void pointers?  Im not entirely sure I need it as I can already freely cast anything to anything but that would make for more explicit code. This may be an alternative/complementary to generics, but I feel like it would be worse
+- TODO: let strings be defined over multiple lines like "hello "\n"world" in code would evaluate to the literal "hello world"
 
 ### Optional
 
@@ -128,6 +130,8 @@ Maybe i'll need some byte-level fine grain control on memory at some point tho?
 I can work around it by combining some binary operations to get that but it's a little
 impractical (and requires more cpu cycles of course, but at this point, does it even matter). I'll see.
 
+## Arrays
+
 TODO: N dimensional arrays (on stack):
 
 ```
@@ -189,6 +193,8 @@ else, you're on your own, and expect fucked up indexing behavior.
 TODO: make arr.len a variable accessible in code
 TODO: Can't change elements in arrays yet
 
+## Strings
+
 Type `str` is an alias of type `array[char]`. Type `bool` is an alias of type `int`
 
 The `char` type is different from usual. Since all data types are 64 bits, it
@@ -207,6 +213,8 @@ which is important to keep in mind when indexing them. I.e., `let a: str = "abcd
 will give you `a[0] == 'abcdefgh'` and `a[1] == 'ij'`. Finer access is obtained through
 casting to int and bitwise manipulation.
 
+## Structs
+
 Physically in memory, structs are just like arrays where each entry can have
 a different type. When instantiating a struct, we get a pointer to the first
 attribute.
@@ -219,7 +227,7 @@ struct S {
 
 fn main(): int {
 	let a: S = S{ 1, 'a' };
-	return a.first_attribute; // This should be the same as a[0]. TODO: a[1] return 97 but should actually complain because char != int
+	return a.first_attribute;
 }
 ```
 
@@ -231,10 +239,28 @@ let a: S = S{
 	};
 ```
 
-- TODO: Can't change struct members after initialization
-- TODO: make tests for structs
-
 Reassignments can only have a variable, a dereferenced address, an array element
 or a struct member as left hand side.
 
-TODO: Do arrays of structs work?
+## Enums
+
+Enums are discrete types whose value can be one of in a list of user-defiend values.
+
+```
+enum E { // Define the enum and give it 3 possible values
+	LOW,	// internally, this is 0
+	MEDIUM,	// 1
+	HIGH	// 2
+}
+
+fn main(): int{
+	let var : E = E.LOW;
+	var = E.MEDIUM;
+	return var : int;	// returns E.MEDIUM casted as an int, so 1.
+}
+```
+
+
+## Inline asm
+
+You can inline asm with the `asm [string literal]` statement. It will simply take the string literal and paste it in the asm at the corresponding spot. This is a compile-time operation, so the string literal has to be fully defined at compile time, meaning a variable containing a string doesn't work, and neither do hypothetical string formatting operations.

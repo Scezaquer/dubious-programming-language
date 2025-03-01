@@ -666,7 +666,10 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     } else {
                         panic!("Continue statement outside of loop");
                     }
-                } //_ => unimplemented!(),
+                }
+				Statement::Asm(asm) => {
+					writeln!(file, "{}", asm).unwrap();
+				}
             }
         }
     } else {

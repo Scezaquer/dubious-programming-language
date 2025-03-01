@@ -1,0 +1,6 @@
+fn main(): void {
+	asm "
+	mov rdi, 3 ; hello :) this is inline asm
+    mov rax, 60
+    syscall";
+}

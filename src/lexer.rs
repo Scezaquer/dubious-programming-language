@@ -171,7 +171,7 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
     let large_operator_re = Regex::new(r"^(==|!=|<=|>=|&&|\|\||\+\+|--|<<=|>>=|<<|>>|\+=|-=|\*=|\/=|%=|&=|\^=|\|=|\^\^)").unwrap();
 
     // Keywords are any of the following strings: if else while for return
-    let keyword_re = Regex::new(r"^(if|else|do|while|for|loop|return|fn|let|break|continue|const|struct|union|enum)").unwrap();
+    let keyword_re = Regex::new(r"^(if|else|do|while|for|loop|return|fn|let|break|continue|const|struct|union|enum|asm)").unwrap();
 
 	let whitespace_re = Regex::new(r"^[^\S\n]+").unwrap();
 

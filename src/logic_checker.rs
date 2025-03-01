@@ -571,6 +571,7 @@ fn type_statement(statement: &Statement, context: &Context) -> (Statement, Type)
             let (new_body, body_type) = type_statement(body, context);
             return (Statement::Dowhile(new_expr, Box::new(new_body)), body_type);
         }
+		Statement::Asm(_) => return (statement.clone(), Type::Void),
     }
 }
 

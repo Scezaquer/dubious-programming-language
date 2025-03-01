@@ -137,6 +137,7 @@ impl std::fmt::Display for Statement {
 			}
 			Statement::Break => write!(f, "break;"),
 			Statement::Continue => write!(f, "continue;"),
+			Statement::Asm(asm) => write!(f, "{}", asm),
 		}
 	}
 }
