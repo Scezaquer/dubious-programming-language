@@ -1,0 +1,11 @@
+enum E {
+	LOW,
+	MEDIUM,
+	HIGH
+}
+
+fn main(): int {
+	let a: E = E.HIGH;
+	a = E.MEDIUM;
+	return a : int;
+}

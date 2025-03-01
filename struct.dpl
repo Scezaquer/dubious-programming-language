@@ -1,9 +1,0 @@
-struct S {
-	first_attribute: int;
-	second_attribute: char;
-}
-
-fn main(): int {
-	let a: S = S{ 1, 'a' };
-	return a.first_attribute;
-}

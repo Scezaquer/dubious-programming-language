@@ -511,6 +511,13 @@
 		"output": 0
 	},
 	{
+		"name": "array_reassign",
+		"description": "Reassign an element of an array",
+		"filename": "arrays/array_reassign.dpl",
+		"input": [],
+		"output": 4
+	},
+	{
 		"name": "char",
 		"description" : "char type declaration with single character and cast to int to return",
 		"filename": "strings/char.dpl",
@@ -593,5 +600,33 @@
 		"filename": "structs/array_of_structs_literals.dpl",
 		"input": [],
 		"output": 98
+	},
+	{
+		"name": "enums",
+		"description": "Enums",
+		"filename": "structs/enum.dpl",
+		"input": [],
+		"output": 2
+	},
+	{
+		"name": "enum_reassign",
+		"description": "Reassign enum",
+		"filename": "structs/enum_reassign.dpl",
+		"input": [],
+		"output": 1
+	},
+	{
+		"name": "enum_array",
+		"description": "Array of enums",
+		"filename": "structs/enum_array.dpl",
+		"input": [],
+		"output": 3
+	},
+	{
+		"name": "enum_struct",
+		"description": "Enum in struct",
+		"filename": "structs/enum_struct.dpl",
+		"input": [],
+		"output": 0
 	}
 ]

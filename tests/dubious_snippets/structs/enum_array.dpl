@@ -1,0 +1,11 @@
+enum E {
+	LOW,
+	MEDIUM,
+	HIGH
+}
+
+fn main(): int {
+	let a[3]: array[E] = [E.LOW, E.MEDIUM, E.MEDIUM];
+	a[1] = E.HIGH;
+	return a[1] : int + a[2] : int; // Should return E.HIGH + E.MEDIUM = 2 + 1 = 3
+}

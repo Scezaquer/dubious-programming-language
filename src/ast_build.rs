@@ -73,6 +73,7 @@ pub enum Type {
     Array(Box<Type>), // array[type]. Strings are array[char]
     Function(Box<Type>, Vec<Type>),
     Struct(String),
+	Enum(String),
 }
 
 /// Represents a unary operator in the AST.
@@ -290,7 +291,7 @@ pub enum Constant {
 #[derive(Debug, Clone)]
 pub enum Program {
     //TODO: should be a struct instead of enum
-    Program(Vec<Function>, Vec<Constant>, Vec<Struct>),
+    Program(Vec<Function>, Vec<Constant>, Vec<Struct>, Vec<Enum>),
 }
 
 /// Represents the abstract syntax tree (AST) of a program.
@@ -1031,7 +1032,8 @@ fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Type {
         TokenWithDebugInfo {
             internal_tok: Token::Identifier(id),
             ..
-        } => Type::Struct(id.to_string()), // TODO: test in typechecker if struct exists
+        } => Type::Struct(id.to_string()), 	// Here we assume that the identifier is a struct name, but it could also be an enum, or just not exist
+										   	// in case there is no such struct/enum. We check for this in logic_checker.rs (check_if_struct_or_enum)
         _ => error_unexpected_token("valid type token", tok),
     }
 }
@@ -1519,12 +1521,89 @@ fn parse_struct(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Struct {
     return Struct { id, members };
 }
 
+#[derive(Debug, Clone)]
+pub struct Enum {
+	pub id: String,
+	pub variants: Vec<String>,
+}
+
+fn parse_enum(tokens: &mut Iter<TokenWithDebugInfo>) -> Enum {
+	let tok = tokens.next().unwrap();
+
+	if let TokenWithDebugInfo {
+		internal_tok: Token::Keyword(ref k),
+		..
+	} = tok {
+		if k != "enum" {
+			error_unexpected_token("enum keyword", tok)
+		}
+	} else {
+		error_unexpected_token("enum keyword", tok)
+	}
+
+	let tok = tokens.next().unwrap();
+	let id = match tok {
+		TokenWithDebugInfo {
+			internal_tok: Token::Identifier(id),
+			..
+		} => id.clone(),
+		TokenWithDebugInfo { .. } => error_unexpected_token("identifier", tok),
+	};
+
+	let tok = tokens.next().unwrap();
+	if !matches!(
+		tok,
+		TokenWithDebugInfo {
+			internal_tok: Token::LBrace,
+			..
+		}
+	) {
+		error_unexpected_token("opening brace", tok);
+	}
+
+	let mut variants = Vec::new();
+
+	loop {
+		let tok = tokens.next().unwrap();
+
+		if let TokenWithDebugInfo {
+			internal_tok: Token::Identifier(id),
+			..
+		} = tok {
+			variants.push(id.clone());
+			let next_tok = tokens.next().unwrap();
+
+			if let TokenWithDebugInfo {
+				internal_tok: Token::Comma,
+				..
+			} = next_tok {
+				continue;
+			} else if let TokenWithDebugInfo {
+				internal_tok: Token::RBrace,
+				..
+			} = next_tok {
+				break;
+			} else {
+				error_unexpected_token("comma or closing brace", next_tok);
+			}
+
+		} else {
+			error_unexpected_token("identifier", tok);
+		}
+	}
+
+	return Enum { id, variants };
+}
+
+
 /// Parses an abstract syntax tree (AST) from a list of tokens.
 pub fn parse(tokens: &Vec<TokenWithDebugInfo>) -> Ast {
     let mut tokens = tokens.iter();
     let mut functions = Vec::new();
     let mut constants = Vec::new();
     let mut structs = Vec::new();
+	let mut enums = Vec::new();
+	//let mut unions = Vec::new();
 
     // Parse functions until there are no more tokens
     loop {
@@ -1537,24 +1616,20 @@ pub fn parse(tokens: &Vec<TokenWithDebugInfo>) -> Ast {
             TokenWithDebugInfo {
                 internal_tok: Token::Keyword(ref k),
                 ..
-            } if k == "fn" => functions.push(parse_function(&mut tokens)),
-            TokenWithDebugInfo {
-                internal_tok: Token::Keyword(ref k),
-                ..
-            } if k == "const" => constants.push(parse_const(&mut tokens)),
-            TokenWithDebugInfo {
-                internal_tok: Token::Keyword(ref k),
-                ..
-            } if k == "struct" => structs.push(parse_struct(&mut tokens)),
-            TokenWithDebugInfo { .. } => error_unexpected_token(
-                "function, constant, struct, enum or union declaration",
-                next_tok,
-            ),
+            } => {
+				if k == "fn" {functions.push(parse_function(&mut tokens))}
+				else if k == "const" {constants.push(parse_const(&mut tokens))}
+				else if k == "struct" {structs.push(parse_struct(&mut tokens))}
+				else if k == "enum" {enums.push(parse_enum(&mut tokens))}
+				else if k == "union" {todo!("union")}
+				else {error_unexpected_token("function, constant, struct, enum or union declaration", next_tok)}
+			}
+			_ => error_unexpected_token("function, constant, struct, enum or union declaration", next_tok),
         }
     }
 
     let ast = Ast {
-        program: Program::Program(functions, constants, structs),
+        program: Program::Program(functions, constants, structs, enums),
     };
     return ast;
 }

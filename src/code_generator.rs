@@ -103,8 +103,6 @@ fn generate_atom(file: &mut File, atom: &Atom, context: &mut Context) {
 			// to the stack, and some don't, all in the same array-like structure.
 			// This is what leads to the complexity of this section of the code.
 
-			// Everything is pushed in reverse order
-
 			let mut stack_index = context.stack_index;
 			let mut stack_indices = vec![];
 			for expr in expressions.iter().rev() {
@@ -155,7 +153,7 @@ fn generate_atom(file: &mut File, atom: &Atom, context: &mut Context) {
 				}
 			}
 
-            // Move the address of the array to rax
+            // Move the address of the array/struct to rax
             writeln!(
                 file,
                 "    mov rax, rsp	; Move the address of the array to rax"
@@ -726,7 +724,7 @@ pub fn generate(ast: &Ast, out_path: &str) {
     // Post-order traversal of the AST to generate x86_64 (+nasm pseudo-instructions)
 
     // TODO: structs
-    let Program::Program(function_vector, const_vector, structs) = &ast.program;
+    let Program::Program(function_vector, const_vector, structs, _enums) = &ast.program;
     writeln!(file, "[BITS 64]").unwrap();
     writeln!(file, "section .text").unwrap();
     writeln!(file, "").unwrap();

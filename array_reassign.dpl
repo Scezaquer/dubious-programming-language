@@ -1,5 +1,0 @@
-fn main(): int {
-	let a[3]: array[int] = [0, 1, 2];
-	a[0] = 4;
-	return a[0];
-}

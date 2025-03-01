@@ -11,7 +11,7 @@ impl std::fmt::Display for Ast {
 impl std::fmt::Display for Program {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Program::Program(functions, constants, structs) => {
+			Program::Program(functions, constants, structs, enums) => {
 				for constant in constants {
 					writeln!(f, "{}", constant)?;
 				}
@@ -21,7 +21,24 @@ impl std::fmt::Display for Program {
 				for struct_ in structs {
 					writeln!(f, "{}", struct_)?;
 				}
+				for enum_ in enums {
+					writeln!(f, "{}", enum_)?;
+				}
 				Ok(())
+			}
+		}
+	}
+}
+
+impl std::fmt::Display for crate::ast_build::Enum {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match &self {
+			&crate::ast_build::Enum{ id, variants } => {
+				write!(f, "enum {} {{\n", id)?;
+				for variant in variants {
+					write!(f, "{},\n", variant)?;
+				}
+				write!(f, "}}")
 			}
 		}
 	}
@@ -88,6 +105,7 @@ impl std::fmt::Display for Type {
 				write!(f, ") -> {}", ret)
 			}
 			Type::Struct(id) => write!(f, "{}", id),
+			Type::Enum(id) => write!(f, "{}", id),
 		}
 	}
 }

@@ -1,0 +1,16 @@
+enum E {
+	LOW,
+	MEDIUM,
+	HIGH
+}
+
+struct S {
+	setting : E;
+	name : str
+}
+
+fn main(): int {
+	let a : S = S{E.MEDIUM, "hello :)"};
+	a.setting = E.LOW;
+	return a.setting : int;
+}

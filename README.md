@@ -236,3 +236,5 @@ let a: S = S{
 
 Reassignments can only have a variable, a dereferenced address, an array element
 or a struct member as left hand side.
+
+TODO: Do arrays of structs work?
