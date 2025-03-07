@@ -162,7 +162,7 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
 	// Hex literals are a sequence of 0-9 and a-f/A-F, prefixed by 0x
 	let hex_re = Regex::new(r"^0x[0-9a-fA-F]+").unwrap();
 
-	let bool_re = Regex::new(r"^(true|false)").unwrap();
+	let bool_re = Regex::new(r"^(true|false)$").unwrap();
 
     // (Short) operators are any of the following characters: + - * / % ^ & | ~ < > = ! . ,
     let operator_re = Regex::new(r"^[\+\-\*/%\^&~\|<>=!\.,]").unwrap();
@@ -171,7 +171,7 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
     let large_operator_re = Regex::new(r"^(==|!=|<=|>=|&&|\|\||\+\+|--|<<=|>>=|<<|>>|\+=|-=|\*=|\/=|%=|&=|\^=|\|=|\^\^)").unwrap();
 
     // Keywords are any of the following strings: if else while for return
-    let keyword_re = Regex::new(r"^(if|else|do|while|for|loop|return|fn|let|break|continue|const|struct|union|enum|asm)").unwrap();
+    let keyword_re = Regex::new(r"^(if|else|do|while|for|loop|return|fn|let|break|continue|const|struct|union|enum|asm)$").unwrap();
 
 	let whitespace_re = Regex::new(r"^[^\S\n]+").unwrap();
 
@@ -252,10 +252,7 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
         } else if let Some(caps) = int_re.captures(rest) {
             tok = Token::IntLiteral(caps.get(0).unwrap().as_str().parse().unwrap());
             pos += caps.get(0).unwrap().end();
-        } else if let Some(caps) = bool_re.captures(rest) {
-			tok = Token::BoolLiteral(caps.get(0).unwrap().as_str() == "true");
-			pos += caps.get(0).unwrap().end();
-		} else if let Some(caps) = char_re.captures(rest) {
+        } else if let Some(caps) = char_re.captures(rest) {
 			tok = Token::CharLiteral(caps.get(0).unwrap().as_str().strip_prefix("'").unwrap().strip_suffix("'").unwrap().to_string());
 			pos += caps.get(0).unwrap().end();
 		} else if let Some(caps) = string_re.captures(rest) {
@@ -309,12 +306,13 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
             };
             tok = Token::Operator(op);
             pos += caps.get(0).unwrap().end();
-        } else if let Some(caps) = keyword_re.captures(rest) {
-            tok = Token::Keyword(caps.get(0).unwrap().as_str().to_string());
-            pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = identifier_re.captures(rest) {
 			if primitive_type_re.is_match(caps.get(0).unwrap().as_str()) {
 				tok = Token::PrimitiveType(caps.get(0).unwrap().as_str().to_string());
+			} else if keyword_re.is_match(caps.get(0).unwrap().as_str()) {
+				tok = Token::Keyword(caps.get(0).unwrap().as_str().to_string());
+			} else if bool_re.is_match(caps.get(0).unwrap().as_str()) {
+				tok = Token::BoolLiteral(caps.get(0).unwrap().as_str() == "true");
 			} else {
 				tok = Token::Identifier(caps.get(0).unwrap().as_str().to_string());
 			}

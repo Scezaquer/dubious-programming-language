@@ -18,6 +18,7 @@ A simple compiler for the Dubious programming language (DPL).
 - TODO: namespaces for functions, constants, structs, enums, unions
 - TODO: Reassignment for struct members, array elements and pointer dereference
 - TODO: Generic types
+- TODO: re-separate bool from int
 - TODO: Void pointers?  Im not entirely sure I need it as I can already freely cast anything to anything but that would make for more explicit code. This may be an alternative/complementary to generics, but I feel like it would be worse
 - TODO: let strings be defined over multiple lines like "hello "\n"world" in code would evaluate to the literal "hello world"
 - TODO: if a string literal spans multiple lines it throws off the line displayed by error messages
@@ -286,4 +287,8 @@ fn ftoint(x : float) : int {
 
 In the example above, the asm is cast to int, which allows us to pass the typechecker by
 promising what the asm does just resolves to int, which in turn means the body of the
-function matches it's definition.
+function matches it's definition. I'd suggest you get REAL familiar with how the
+compiler works before using that feature, but in short: If the value your asm returns
+is a float, then the compiler will assume it is located in xmm0. If it is anything
+else; it will assume it is in rax. So write your asm such that the right stuff ends
+up in the right place.
