@@ -133,6 +133,13 @@
 		"output": 1
 	},
 	{
+		"name": "signed_multiplication",
+		"description": "Signed multiplication",
+		"filename": "basic_arithmetic/signed_multiplication.dpl",
+		"input": [],
+		"output": 2
+	},
+	{
         "name": "assign2",
         "description": "Creates variable a and assigns 2 to it",
         "filename": "variables/assign2.dpl",

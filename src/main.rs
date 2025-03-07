@@ -96,9 +96,7 @@ fn main() {
 
 	ast = check_program(&ast);
 
-	
     if args.ast {
-        dbg!(&ast);
         println!("{}", ast);
     }
 
@@ -160,6 +158,7 @@ fn main() {
 			std::process::exit(1);
 		}
 
+		// TODO: should probably check i'm not overwriting a file
 		// rm out.o
 		let rm_output = Command::new("rm")
 			.args([format!("{}.o", &args.output_file).as_str()])

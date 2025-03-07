@@ -1,0 +1,9 @@
+fn ftoint(x : float) : int {
+	x;	// Move x into xmm0
+	asm "	cvtsd2si rax, xmm0  ; Convert double in xmm0 to 64-bit integer in rax" : int;
+}
+
+fn inttof(x : int) : float {
+	x; // Move x into rax
+	asm "	cvtsi2sd xmm0, rax	; Convert 64-bit integer in rax to double in xmm0" : float;
+}

@@ -7,7 +7,6 @@ _start:
     mov rdi, rax
     mov rax, 60
     syscall
-    a equ 10
 
 global add_3
 add_3:
@@ -36,7 +35,7 @@ main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
-    mov rax, a
+    mov rax, [.a]
     push rax
 	;push function arguments to the stack in reverse order
     mov rax, 1
@@ -56,3 +55,4 @@ main:
     ret				;return by default if no return statement was reached
 
 section .data
+    .a: dq 10

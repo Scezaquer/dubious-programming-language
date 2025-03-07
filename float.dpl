@@ -1,0 +1,10 @@
+#include<cast.dpl>
+
+fn main() : int {
+	let a : float = 1.5;
+	let b : float = 0.5;
+	let c : float = a + b;
+	let i : int = 2;
+	c = inttof(i) + c;
+	return ftoint(c);
+}

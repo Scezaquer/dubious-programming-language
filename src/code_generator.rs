@@ -1,51 +1,80 @@
 use crate::ast_build::{
     AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Literal,
-    Program, ReassignmentIdentifier, Statement, Struct, UnOp,
+    Program, ReassignmentIdentifier, Statement, Struct, UnOp, Typed, Type
 };
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Write;
 use std::path;
 use std::sync::atomic::AtomicUsize;
+use lazy_static::lazy_static;
+use std::sync::Mutex;
 
 // Separate counters for branch and loop labels for break and continue statements
 /// Branch label counter for if statements
 static BRANCH_LABEL: AtomicUsize = AtomicUsize::new(0);
 /// Loop label counter for while, loop, and for statements
 static LOOP_LABEL: AtomicUsize = AtomicUsize::new(0);
+/// Loop label counter for floating point literals
+static FLOAT_LABEL: AtomicUsize = AtomicUsize::new(0);
+
+lazy_static! {
+    static ref FLOAT_LABEL_MAP: Mutex<HashMap<String, f64>> = {
+        let m = HashMap::new();
+        Mutex::new(m)
+    };
+}
 
 // TODO: test all of these one by one (pain)
 
 /// Generates the assembly code for an atom
-fn generate_atom(file: &mut File, atom: &Atom, context: &mut Context) {
+fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
     match atom {
-        Atom::Literal(constant) => {
-            // NOTE: change the std::fmt::Display trait for Constant in build_ast.rs in case it doesn't print the asm correctly
-            writeln!(file, "    mov rax, {}", constant).unwrap(); // TODO: Doesn't work for floats
+        Typed{expr: Atom::Literal(constant), ..} => {
+			if let Literal::Float(f) = constant.expr {
+                let label = format!(".float_{}", FLOAT_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst));
+
+                let mut float_label_map = FLOAT_LABEL_MAP.lock().unwrap();
+                float_label_map.insert(label.clone(), f);
+
+				writeln!(file, "    movsd xmm0, [{}]	; Load float into xmm0", label).unwrap();
+			} else {
+				// NOTE: change the std::fmt::Display trait for Constant in build_ast.rs in case it doesn't print the asm correctly
+				writeln!(file, "    mov rax, {}", constant).unwrap();
+			}
         }
-        Atom::Variable(variable) => {
+        Typed{expr: Atom::Variable(variable), type_} => {
             let var_address = context.var_map.get(variable);
+
+			let mut instruction = "mov";
+			let mut register = "rax";
+			if type_ == &Type::Float {
+				instruction = "movsd";
+				register = "xmm0";
+			}
+
             if let Some(var_address) = var_address {
                 writeln!(
                     file,
-                    "    mov rax, [rbp{}{}]",
+                    "    {} {}, [rbp{}{}]",
+					instruction,
+					register,
                     if *var_address < 0 { "" } else { "+" },
                     var_address
                 )
                 .unwrap();
-                return;
-            }
-
-            let constant = context
-                .constants
-                .get(variable)
-                .expect(format!("Undeclared variable {}", variable).as_str());
-            writeln!(file, "    mov rax, {}", constant).unwrap();
+            } else {
+				let constant = context
+                	.constants
+                	.get(variable)
+                	.expect(format!("Undeclared variable {}", variable).as_str());
+            	writeln!(file, "    {} {}, [.{}]", instruction, register, constant).unwrap();
+			}
         }
-        Atom::Expression(expression) => {
+        Typed{expr: Atom::Expression(expression), ..} => {
             generate_expression(file, expression, context);
         }
-        Atom::FunctionCall(name, args) => {
+        Typed{expr: Atom::FunctionCall(name, args), ..} => {
             writeln!(
                 file,
                 "	;push function arguments to the stack in reverse order"
@@ -54,13 +83,18 @@ fn generate_atom(file: &mut File, atom: &Atom, context: &mut Context) {
             for arg in args.iter().rev() {
                 // Push arguments in reverse order (C convention)
                 generate_expression(file, arg, context);
+
+				if arg.type_ == Type::Float {
+					writeln!(file, "    movq rax, xmm0").unwrap();
+				}
+
                 writeln!(file, "    push rax").unwrap();
             }
             writeln!(file, "    call {}", name).unwrap();
             writeln!(file, "    add rsp, {}	;pop arguments", args.len() * 8).unwrap();
             // Pop arguments from stack
         }
-        Atom::Array(expressions, _) | Atom::StructInstance(_, expressions) => {
+        Typed{expr: Atom::Array(expressions, _), ..} | Typed{expr: Atom::StructInstance(_, expressions), ..} => {
 			// Careful, this section of the code is technical because we want
 			// to be able to define arrays of structs such that
 			//  [
@@ -108,7 +142,7 @@ fn generate_atom(file: &mut File, atom: &Atom, context: &mut Context) {
 			for expr in expressions.iter().rev() {
 				// If the expression is a struct or an array, we need to push the
 				// values on the stack first
-				if matches!(expr, Expression::Atom(Atom::StructInstance(_, _)) | Expression::Atom(Atom::Array(_, _))) {
+				if matches!(expr, Typed{expr: Expression::Atom(Typed{expr: Atom::StructInstance(_, _) | Atom::Array(_, _), ..}), ..}) {
 					generate_expression(file, expr, context);
 					stack_indices.push(stack_index - context.stack_index);
 					stack_index = context.stack_index;
@@ -121,7 +155,7 @@ fn generate_atom(file: &mut File, atom: &Atom, context: &mut Context) {
 				writeln!(file, "    mov rax, rsp").unwrap();
 				writeln!(file, "    add rax, {}", sum).unwrap();
 
-				if !matches!(expressions[0], Expression::Atom(Atom::StructInstance(_, _)) | Expression::Atom(Atom::Array(_, _))){
+				if !matches!(expressions[0], Typed{expr: Expression::Atom(Typed{expr: Atom::StructInstance(_, _) | Atom::Array(_, _), ..}), ..}){
 					writeln!(file, "    push rax").unwrap();
 					context.stack_index -= 8;
 					context.len += 1;
@@ -130,7 +164,7 @@ fn generate_atom(file: &mut File, atom: &Atom, context: &mut Context) {
 
 			let mut iterator = stack_indices.iter();
 			for expr in expressions.iter().rev() {
-				if matches!(expr, Expression::Atom(Atom::StructInstance(_, _)) | Expression::Atom(Atom::Array(_, _))) {
+				if matches!(expr, Typed{expr: Expression::Atom(Typed{expr: Atom::StructInstance(_, _) | Atom::Array(_, _), ..}), ..}) {
 					let i = iterator.next().unwrap();
 					writeln!(file, "    sub rax, {}", i).unwrap();
 					writeln!(file, "    push rax").unwrap(); // If generate_expression pushes stuff, this is broken. Same for StructInstance
@@ -143,6 +177,9 @@ fn generate_atom(file: &mut File, atom: &Atom, context: &mut Context) {
 					if sum != 0 {	// If structs and non structs are mixed, we need to save the last rax so that we don't lose count of the structs
 						writeln!(file, "    pop rcx").unwrap();
 						writeln!(file, "    sub rsp, 8").unwrap();
+					}
+					if expr.type_ == Type::Float {
+						writeln!(file, "    movq rax, xmm0").unwrap();
 					}
 					writeln!(file, "    push rax").unwrap(); // If generate_expression pushes stuff, this is broken. Same for StructInstance
 					if sum != 0 {
@@ -169,6 +206,7 @@ fn generate_assignment(
     file: &mut File,
     var_address: &i64,
     pointer_dereference: bool,
+	type_: &Type,
 ) {
     let write_address;
     if pointer_dereference {
@@ -180,197 +218,391 @@ fn generate_assignment(
             var_address
         );
     }
-    match op {
-        AssignmentOp::Assign => {
-            writeln!(file, "    mov {}, rax", write_address).unwrap();
-        }
-        AssignmentOp::AddAssign => {
-            writeln!(file, "    add {}, rax", write_address).unwrap();
-        }
-        AssignmentOp::SubtractAssign => {
-            writeln!(file, "    sub {}, rax", write_address).unwrap();
-        }
-        AssignmentOp::MultiplyAssign => {
-            writeln!(file, "    mov rcx, {}", write_address).unwrap();
-            writeln!(file, "    imul rax, rcx").unwrap();
-            writeln!(file, "    mov {}, rax", write_address).unwrap();
-        }
-        AssignmentOp::DivideAssign => {
-            writeln!(file, "    mov rcx, rax").unwrap();
-            writeln!(file, "    mov rax, {}", write_address).unwrap();
-            writeln!(file, "    cqo").unwrap();
-            writeln!(file, "    idiv rcx").unwrap();
-            writeln!(file, "    mov {}, rax", write_address).unwrap();
-        }
-        AssignmentOp::ModulusAssign => {
-            writeln!(file, "    mov rcx, rax").unwrap();
-            writeln!(file, "    mov rax, {}", write_address).unwrap();
-            writeln!(file, "    cqo").unwrap();
-            writeln!(file, "    idiv rcx").unwrap();
-            writeln!(file, "    mov {}, rdx", write_address).unwrap();
-        }
-        AssignmentOp::LeftShiftAssign => {
-            writeln!(file, "    mov rcx, rax").unwrap();
-            writeln!(file, "    mov rax, {}", write_address).unwrap();
-            writeln!(file, "    shl rax, cl").unwrap();
-            writeln!(file, "    mov {}, rax", write_address).unwrap();
-        }
-        AssignmentOp::RightShiftAssign => {
-            writeln!(file, "    mov rcx, rax").unwrap();
-            writeln!(file, "    mov rax, {}", write_address).unwrap();
-            writeln!(file, "    shr rax, cl").unwrap();
-            writeln!(file, "    mov {}, rax", write_address).unwrap();
-        }
-        AssignmentOp::BitwiseAndAssign => {
-            writeln!(file, "    and {}, rax", write_address).unwrap();
-        }
-        AssignmentOp::BitwiseXorAssign => {
-            writeln!(file, "    xor {}, rax", write_address).unwrap();
-        }
-        AssignmentOp::BitwiseOrAssign => {
-            writeln!(file, "    or {}, rax", write_address).unwrap();
-        }
-        _ => unimplemented!(),
-    }
+
+	if type_ == &Type::Float {
+		match op {
+			AssignmentOp::Assign => {
+				writeln!(file, "    movq {}, xmm0", write_address).unwrap();
+			}
+			AssignmentOp::AddAssign => {
+				writeln!(file, "    addsd xmm0, {}", write_address).unwrap();
+				writeln!(file, "    movq {}, xmm0", write_address).unwrap();
+			}
+			AssignmentOp::SubtractAssign => {
+				writeln!(file, "    subsd xmm0, {}", write_address).unwrap();
+				writeln!(file, "    movq {}, xmm0", write_address).unwrap();
+			}
+			AssignmentOp::MultiplyAssign => {
+				writeln!(file, "    mulsd xmm0, {}", write_address).unwrap();
+				writeln!(file, "    movq {}, xmm0", write_address).unwrap();
+			}
+			AssignmentOp::DivideAssign => {
+				writeln!(file, "    divsd xmm0, {}", write_address).unwrap();
+				writeln!(file, "    movq {}, xmm0", write_address).unwrap();
+			}
+			AssignmentOp::ModulusAssign => {
+				writeln!(file, "    divsd xmm2, xmm0, {}  ; xmm2 = xmm0 / {}", write_address, write_address).unwrap();
+				writeln!(file, "	roundsd xmm2, xmm2, 0b0011  ; Round towards zero").unwrap();
+				writeln!(file, "	mulsd xmm2, {}         ; xmm2 = truncated(xmm0 / {}) * {}", write_address, write_address, write_address).unwrap();
+				writeln!(file, "	subsd xmm0, xmm2         ; xmm0 = xmm0 - xmm2 (remainder)").unwrap();
+				writeln!(file, "    movq {}, xmm0", write_address).unwrap();
+			}
+			AssignmentOp::LeftShiftAssign => {
+				panic!("Left shift not implemented for floats");
+			}
+			AssignmentOp::RightShiftAssign => {
+				panic!("Right shift not implemented for floats");
+			}
+			AssignmentOp::BitwiseAndAssign => {
+				panic!("Bitwise and not implemented for floats");
+			}
+			AssignmentOp::BitwiseXorAssign => {
+				panic!("Bitwise xor not implemented for floats");
+			}
+			AssignmentOp::BitwiseOrAssign => {
+				panic!("Bitwise or not implemented for floats");
+			}
+			AssignmentOp::NotAnAssignmentOp => {
+				panic!("Not an assignment op");
+			}
+		}
+	} else {
+		match op {
+			AssignmentOp::Assign => {
+				writeln!(file, "    mov {}, rax", write_address).unwrap();
+			}
+			AssignmentOp::AddAssign => {
+				writeln!(file, "    add {}, rax", write_address).unwrap();
+			}
+			AssignmentOp::SubtractAssign => {
+				writeln!(file, "    sub {}, rax", write_address).unwrap();
+			}
+			AssignmentOp::MultiplyAssign => {
+				writeln!(file, "    mov rcx, {}", write_address).unwrap();
+				writeln!(file, "    imul rax, rcx").unwrap();
+				writeln!(file, "    mov {}, rax", write_address).unwrap();
+			}
+			AssignmentOp::DivideAssign => {
+				writeln!(file, "    mov rcx, rax").unwrap();
+				writeln!(file, "    mov rax, {}", write_address).unwrap();
+				writeln!(file, "    cqo").unwrap();
+				writeln!(file, "    idiv rcx").unwrap();
+				writeln!(file, "    mov {}, rax", write_address).unwrap();
+			}
+			AssignmentOp::ModulusAssign => {
+				writeln!(file, "    mov rcx, rax").unwrap();
+				writeln!(file, "    mov rax, {}", write_address).unwrap();
+				writeln!(file, "    cqo").unwrap();
+				writeln!(file, "    idiv rcx").unwrap();
+				writeln!(file, "    mov {}, rdx", write_address).unwrap();
+			}
+			AssignmentOp::LeftShiftAssign => {
+				writeln!(file, "    mov rcx, rax").unwrap();
+				writeln!(file, "    mov rax, {}", write_address).unwrap();
+				writeln!(file, "    shl rax, cl").unwrap();
+				writeln!(file, "    mov {}, rax", write_address).unwrap();
+			}
+			AssignmentOp::RightShiftAssign => {
+				writeln!(file, "    mov rcx, rax").unwrap();
+				writeln!(file, "    mov rax, {}", write_address).unwrap();
+				writeln!(file, "    shr rax, cl").unwrap();
+				writeln!(file, "    mov {}, rax", write_address).unwrap();
+			}
+			AssignmentOp::BitwiseAndAssign => {
+				writeln!(file, "    and {}, rax", write_address).unwrap();
+			}
+			AssignmentOp::BitwiseXorAssign => {
+				writeln!(file, "    xor {}, rax", write_address).unwrap();
+			}
+			AssignmentOp::BitwiseOrAssign => {
+				writeln!(file, "    or {}, rax", write_address).unwrap();
+			}
+			AssignmentOp::NotAnAssignmentOp => {
+				panic!("Not an assignment op");
+			}
+		}
+	}
 }
 
 /// Generates the assembly code for an expression
-fn generate_expression(file: &mut File, expression: &Expression, context: &mut Context) {
+fn generate_expression(file: &mut File, expression: &Typed<Expression>, context: &mut Context) {
     match expression {
-        Expression::Atom(atom) => {
+        Typed{expr: Expression::Atom(atom), ..} => {
             generate_atom(file, atom, context);
         }
-        Expression::UnaryOp(expr, unop) => {
+        Typed{expr: Expression::UnaryOp(expr, unop), type_} => {
             generate_expression(file, expr, context);
-            match unop {
-                UnOp::UnaryMinus => {
-                    writeln!(file, "    neg rax").unwrap();
-                }
-                UnOp::BitwiseNot => {
-                    writeln!(file, "    not rax").unwrap();
-                }
-                UnOp::LogicalNot => {
-                    writeln!(file, "    not rax").unwrap();
-                }
-                UnOp::PreIncrement => {
-                    writeln!(file, "    inc rax").unwrap();
-                }
-                UnOp::PreDecrement => {
-                    writeln!(file, "    dec rax").unwrap();
-                }
-                UnOp::UnaryPlus => {
-                    // Do nothing
-                }
-                UnOp::Dereference => {
-                    writeln!(file, "    mov rax, [rax]").unwrap();
-                }
-                UnOp::AddressOf => {
-                    // Do nothing
-                }
-                _ => unimplemented!(),
-            }
+			if type_ == &Type::Float {
+				match unop {
+					UnOp::UnaryMinus => {
+						writeln!(file, "    pcmpeqd xmm1, xmm1	; xmm1 = all ones (0xFFFFFFFFFFFFFFFF)").unwrap();
+						writeln!(file, "    psllq xmm1, 63		; xmm1 = 0x8000000000000000 (sign bit mask)").unwrap();
+						writeln!(file, "    xorpd xmm0, xmm1	; Flip the sign bit of xmm0").unwrap();
+					}
+					UnOp::BitwiseNot => {
+						writeln!(file, "    pcmpeqd xmm1, xmm1	; xmm1 = all ones (0xFFFFFFFFFFFFFFFF)").unwrap();
+						writeln!(file, "    xorpd xmm0, xmm1	; Flip all the bits of xmm0").unwrap();
+					}
+					UnOp::LogicalNot => {
+						writeln!(file, "    pcmpeqd xmm1, xmm1	; xmm1 = all ones (0xFFFFFFFFFFFFFFFF)").unwrap();
+						writeln!(file, "    xorpd xmm0, xmm1	; Flip all the bits of xmm0").unwrap();
+					}
+					UnOp::PreIncrement => {
+						writeln!(file, "	movq xmm1, 0x3FF0000000000000  ; Bit pattern of 1.0 in IEEE 754").unwrap();
+						writeln!(file, "	addsd xmm0, xmm1").unwrap();
+					}
+					UnOp::PreDecrement => {
+						writeln!(file, "	movq xmm1, 0x3FF0000000000000  ; Bit pattern of 1.0 in IEEE 754").unwrap();
+						writeln!(file, "	subsd xmm0, xmm1").unwrap();
+					}
+					UnOp::UnaryPlus => {
+						// Do nothing
+					}
+					UnOp::Dereference => {
+						panic!("Cannot dereference a float");
+					}
+					UnOp::AddressOf => {
+						panic!("Cannot take the address of a float");
+					}
+					UnOp::NotAUnaryOp => {
+						panic!("Not a unary op");
+					}
+				}
+			} else {
+				match unop {
+					UnOp::UnaryMinus => {
+						writeln!(file, "    neg rax").unwrap();
+					}
+					UnOp::BitwiseNot => {
+						writeln!(file, "    not rax").unwrap();
+					}
+					UnOp::LogicalNot => {
+						writeln!(file, "    not rax").unwrap();
+					}
+					UnOp::PreIncrement => {
+						writeln!(file, "    inc rax").unwrap();
+					}
+					UnOp::PreDecrement => {
+						writeln!(file, "    dec rax").unwrap();
+					}
+					UnOp::UnaryPlus => {
+						// Do nothing
+					}
+					UnOp::Dereference => {
+						writeln!(file, "    mov rax, [rax]").unwrap();
+					}
+					UnOp::AddressOf => {
+						// Do nothing
+					}
+					UnOp::NotAUnaryOp => {
+						panic!("Not a unary op");
+					}
+				}
+			}
         }
-        Expression::BinaryOp(left, right, bin_op) => {
+        Typed{expr: Expression::BinaryOp(left, right, bin_op), type_} => {
+			let left_type = left.type_.clone();
             generate_expression(file, left, context);
             if bin_op != &BinOp::MemberAccess {
+				if left_type == Type::Float {
+					writeln!(file, "    movq rax, xmm0").unwrap();
+				}
                 writeln!(file, "    push rax").unwrap();
                 generate_expression(file, right, context);
             } else {
-                if let Expression::Atom(Atom::Literal(Literal::Int(i))) = right.as_ref() {
+                if let Expression::Atom(Typed{expr: Atom::Literal(Typed{expr: Literal::Int(i), ..}), ..}) = right.expr {
                     writeln!(file, "    mov rcx, {}", i).unwrap();
-                    writeln!(file, "    mov rax, [rax + rcx * 8]").unwrap();
+					if type_ == &Type::Float {
+						writeln!(file, "    movq xmm0, [rax + rcx * 8]").unwrap();
+					} else {
+                    	writeln!(file, "    mov rax, [rax + rcx * 8]").unwrap();
+					}
                     return;
                 } else {
                     panic!("Unreachable code, something went very wrong");
                 }
             }
 
-            writeln!(file, "    pop rcx").unwrap();
-            writeln!(file, "    xchg rax, rcx").unwrap();
-            match bin_op {
-                BinOp::Add => {
-                    writeln!(file, "    add rax, rcx").unwrap();
-                }
-                BinOp::Subtract => {
-                    writeln!(file, "    sub rax, rcx").unwrap();
-                }
-                BinOp::Multiply => {
-                    writeln!(file, "    imul rax, rcx").unwrap();
-                }
-                BinOp::Divide => {
-                    writeln!(file, "    cqo").unwrap();
-                    writeln!(file, "    idiv rcx").unwrap();
-                }
-                BinOp::Modulus => {
-                    writeln!(file, "    cqo").unwrap();
-                    writeln!(file, "    idiv rcx").unwrap();
-                    writeln!(file, "    mov rax, rdx").unwrap();
-                }
-                BinOp::LessThan => {
-                    writeln!(file, "    cmp rax, rcx").unwrap();
-                    writeln!(file, "    setl al").unwrap();
-                    writeln!(file, "    movzx rax, al").unwrap();
-                }
-                BinOp::GreaterThan => {
-                    writeln!(file, "    cmp rax, rcx").unwrap();
-                    writeln!(file, "    setg al").unwrap();
-                    writeln!(file, "    movzx rax, al").unwrap();
-                }
-                BinOp::Equal => {
-                    writeln!(file, "    cmp rax, rcx").unwrap();
-                    writeln!(file, "    sete al").unwrap();
-                    writeln!(file, "    movzx rax, al").unwrap();
-                }
-                BinOp::NotEqual => {
-                    writeln!(file, "    cmp rax, rcx").unwrap();
-                    writeln!(file, "    setne al").unwrap();
-                    writeln!(file, "    movzx rax, al").unwrap();
-                }
-                BinOp::LessOrEqualThan => {
-                    writeln!(file, "    cmp rax, rcx").unwrap();
-                    writeln!(file, "    setle al").unwrap();
-                    writeln!(file, "    movzx rax, al").unwrap();
-                }
-                BinOp::GreaterOrEqualThan => {
-                    writeln!(file, "    cmp rax, rcx").unwrap();
-                    writeln!(file, "    setge al").unwrap();
-                    writeln!(file, "    movzx rax, al").unwrap();
-                }
-                BinOp::BitwiseAnd => {
-                    writeln!(file, "    and rax, rcx").unwrap();
-                }
-                BinOp::BitwiseXor => {
-                    writeln!(file, "    xor rax, rcx").unwrap();
-                }
-                BinOp::BitwiseOr => {
-                    writeln!(file, "    or rax, rcx").unwrap();
-                }
-                BinOp::LogicalAnd => {
-                    writeln!(file, "    and rax, rcx").unwrap();
-                }
-                BinOp::LogicalOr => {
-                    writeln!(file, "    or rax, rcx").unwrap();
-                }
-                BinOp::LogicalXor => {
-                    writeln!(file, "    xor rax, rcx").unwrap();
-                }
-                BinOp::LeftShift => {
-                    writeln!(file, "    shl rax, cl").unwrap();
-                }
-                BinOp::RightShift => {
-                    writeln!(file, "    shr rax, cl").unwrap();
-                }
-                _ => unimplemented!(),
-            }
+			if type_ == &Type::Float {
+				writeln!(file, "	pop rcx").unwrap();
+				writeln!(file, "	movq xmm1, rcx").unwrap();
+				writeln!(file, "	movaps xmm2, xmm0").unwrap();
+				writeln!(file, "	movaps xmm0, xmm1").unwrap();
+				writeln!(file, "	movaps xmm1, xmm2").unwrap();
+
+				match bin_op {
+					BinOp::Add => {
+						writeln!(file, "	addsd xmm0, xmm1").unwrap();
+					}
+					BinOp::Subtract => {
+						writeln!(file, "	subsd xmm0, xmm1").unwrap();
+					}
+					BinOp::Multiply => {
+						writeln!(file, "	mulsd xmm0, xmm1").unwrap();
+					}
+					BinOp::Divide => {
+						writeln!(file, "	divsd xmm0, xmm1").unwrap();
+					}
+					BinOp::Modulus => {
+						writeln!(file, "	divsd xmm2, xmm0, xmm1  ; xmm2 = xmm0 / xmm1").unwrap();
+						writeln!(file, "	roundsd xmm2, xmm2, 0b0011  ; Round towards zero").unwrap();
+						writeln!(file, "	mulsd xmm2, xmm1         ; xmm2 = truncated(xmm0 / xmm1) * xmm1").unwrap();
+						writeln!(file, "	subsd xmm0, xmm2         ; xmm0 = xmm0 - xmm2 (remainder)").unwrap();
+					}
+					BinOp::LessThan => {
+						writeln!(file, "	ucomisd xmm0, xmm1").unwrap();
+						writeln!(file, "	setb al").unwrap();
+						writeln!(file, "	movzx rax, al").unwrap();
+					}
+					BinOp::GreaterThan => {
+						writeln!(file, "	ucomisd xmm0, xmm1").unwrap();
+						writeln!(file, "	seta al").unwrap();
+						writeln!(file, "	movzx rax, al").unwrap();
+					}
+					BinOp::Equal => {
+						writeln!(file, "	ucomisd xmm0, xmm1").unwrap();
+						writeln!(file, "	sete al").unwrap();
+						writeln!(file, "	movzx rax, al").unwrap();
+					}
+					BinOp::NotEqual => {
+						writeln!(file, "	ucomisd xmm0, xmm1").unwrap();
+						writeln!(file, "	setne al").unwrap();
+						writeln!(file, "	movzx rax, al").unwrap();
+					}
+					BinOp::LessOrEqualThan => {
+						writeln!(file, "	ucomisd xmm0, xmm1").unwrap();
+						writeln!(file, "	setbe al").unwrap();
+						writeln!(file, "	movzx rax, al").unwrap();
+					}
+					BinOp::GreaterOrEqualThan => {
+						writeln!(file, "	ucomisd xmm0, xmm1").unwrap();
+						writeln!(file, "	setae al").unwrap();
+						writeln!(file, "	movzx rax, al").unwrap();
+					}
+					BinOp::BitwiseAnd => {
+						writeln!(file, "	andpd xmm0, xmm1").unwrap();
+					}
+					BinOp::BitwiseXor => {
+						writeln!(file, "	xorpd xmm0, xmm1").unwrap();
+					}
+					BinOp::BitwiseOr => {
+						writeln!(file, "	orpd xmm0, xmm1").unwrap();
+					}
+					BinOp::LogicalAnd => {
+						panic!("Logical and not implemented for floats");
+					}
+					BinOp::LogicalOr => {
+						panic!("Logical or not implemented for floats");
+					}
+					BinOp::LogicalXor => {
+						panic!("Logical xor not implemented for floats");
+					}
+					BinOp::LeftShift => {
+						panic!("Left shift not implemented for floats");
+					}
+					BinOp::RightShift => {
+						panic!("Right shift not implemented for floats");
+					}
+					BinOp::MemberAccess => {
+						panic!("Member access not implemented for floats");
+					}
+					BinOp::NotABinaryOp => {
+						panic!("Not a binary op");
+					}
+				}
+			} else {
+				writeln!(file, "    pop rcx").unwrap();
+				writeln!(file, "    xchg rax, rcx").unwrap();
+				match bin_op {
+					BinOp::Add => {
+						writeln!(file, "    add rax, rcx").unwrap();
+					}
+					BinOp::Subtract => {
+						writeln!(file, "    sub rax, rcx").unwrap();
+					}
+					BinOp::Multiply => {
+						writeln!(file, "    imul rax, rcx").unwrap();
+					}
+					BinOp::Divide => {
+						writeln!(file, "    cqo").unwrap();
+						writeln!(file, "    idiv rcx").unwrap();
+					}
+					BinOp::Modulus => {
+						writeln!(file, "    cqo").unwrap();
+						writeln!(file, "    idiv rcx").unwrap();
+						writeln!(file, "    mov rax, rdx").unwrap();
+					}
+					BinOp::LessThan => {
+						writeln!(file, "    cmp rax, rcx").unwrap();
+						writeln!(file, "    setl al").unwrap();
+						writeln!(file, "    movzx rax, al").unwrap();
+					}
+					BinOp::GreaterThan => {
+						writeln!(file, "    cmp rax, rcx").unwrap();
+						writeln!(file, "    setg al").unwrap();
+						writeln!(file, "    movzx rax, al").unwrap();
+					}
+					BinOp::Equal => {
+						writeln!(file, "    cmp rax, rcx").unwrap();
+						writeln!(file, "    sete al").unwrap();
+						writeln!(file, "    movzx rax, al").unwrap();
+					}
+					BinOp::NotEqual => {
+						writeln!(file, "    cmp rax, rcx").unwrap();
+						writeln!(file, "    setne al").unwrap();
+						writeln!(file, "    movzx rax, al").unwrap();
+					}
+					BinOp::LessOrEqualThan => {
+						writeln!(file, "    cmp rax, rcx").unwrap();
+						writeln!(file, "    setle al").unwrap();
+						writeln!(file, "    movzx rax, al").unwrap();
+					}
+					BinOp::GreaterOrEqualThan => {
+						writeln!(file, "    cmp rax, rcx").unwrap();
+						writeln!(file, "    setge al").unwrap();
+						writeln!(file, "    movzx rax, al").unwrap();
+					}
+					BinOp::BitwiseAnd => {
+						writeln!(file, "    and rax, rcx").unwrap();
+					}
+					BinOp::BitwiseXor => {
+						writeln!(file, "    xor rax, rcx").unwrap();
+					}
+					BinOp::BitwiseOr => {
+						writeln!(file, "    or rax, rcx").unwrap();
+					}
+					BinOp::LogicalAnd => {
+						writeln!(file, "    and rax, rcx").unwrap();
+					}
+					BinOp::LogicalOr => {
+						writeln!(file, "    or rax, rcx").unwrap();
+					}
+					BinOp::LogicalXor => {
+						writeln!(file, "    xor rax, rcx").unwrap();
+					}
+					BinOp::LeftShift => {
+						writeln!(file, "    shl rax, cl").unwrap();
+					}
+					BinOp::RightShift => {
+						writeln!(file, "    shr rax, cl").unwrap();
+					}
+					BinOp::MemberAccess => {
+						panic!("Unreachable code, member access is turned into array access much earlier");
+					}
+					BinOp::NotABinaryOp => {
+						panic!("Not a binary op");
+					}
+				}
+			}
         }
-        Expression::Assignment(lvalue, expr, op) => {
+        Typed{expr: Expression::Assignment(lvalue, expr, op), type_} => {
             generate_expression(file, expr, context);
 
             match lvalue {
-                ReassignmentIdentifier::Variable(s) => {
+                Typed{expr: ReassignmentIdentifier::Variable(s), ..} => {
                     let var_address = context.var_map.get(s);
                     if let Some(var_address) = var_address {
-                        generate_assignment(op, file, var_address, false);
+                        generate_assignment(op, file, var_address, false, type_);
                         return;
                     }
 
@@ -379,8 +611,12 @@ fn generate_expression(file: &mut File, expression: &Expression, context: &mut C
                     }
                     panic!("Undeclared variable {:?}", s);
                 }
-                ReassignmentIdentifier::Array(variable, indices) => {
+                Typed{expr: ReassignmentIdentifier::Array(variable, indices), ..} => {
+					if type_ == &Type::Float {
+						writeln!(file, "    movq rax, xmm0").unwrap();
+					}
                     writeln!(file, "    push rax").unwrap();
+
                     generate_expression(file, variable, context);
                     writeln!(file, "    push rax").unwrap();
                     generate_expression(file, &indices[0], context);
@@ -388,35 +624,63 @@ fn generate_expression(file: &mut File, expression: &Expression, context: &mut C
                     writeln!(file, "    imul r8, 8").unwrap();
                     writeln!(file, "    pop rax").unwrap();
                     writeln!(file, "    add r8, rax").unwrap();
+
                     writeln!(file, "    pop rax").unwrap();
-                    generate_assignment(op, file, &0, true);
+					if type_ == &Type::Float {
+						writeln!(file, "    movq xmm0, rax").unwrap();
+					}
+                    generate_assignment(op, file, &0, true, type_);
                 }
-                ReassignmentIdentifier::MemberAccess(_, _) => {
+                Typed{expr: ReassignmentIdentifier::MemberAccess(_, _), ..} => {
                     panic!(
                         "Unreachable code, member access is turned into array access much earlier"
                     );
                 }
-                ReassignmentIdentifier::Dereference(v) => {
-                    writeln!(file, "    push rax").unwrap();
+                Typed{expr: ReassignmentIdentifier::Dereference(v), ..} => {
+					if type_ == &Type::Float {
+						writeln!(file, "    movq rax, xmm0").unwrap();
+					}
+					writeln!(file, "    push rax").unwrap();
+                    
                     generate_expression(file, v, context);
                     writeln!(file, "    mov r8, rax").unwrap();
+
                     writeln!(file, "    pop rax").unwrap();
-                    generate_assignment(op, file, &0, true);
+					if type_ == &Type::Float {
+						writeln!(file, "    movq xmm0, rax").unwrap();
+					}
+
+                    generate_assignment(op, file, &0, true, type_);
                 }
             }
         }
-        Expression::TypeCast(expr, _) => {
-            // Unsure if I should be doing something here or nah
+        Typed{expr: Expression::TypeCast(expr, _), type_: cast_type} => {
+			let expr_type = expr.type_.clone();
             generate_expression(file, expr, context);
+
+			if expr_type == Type::Float && cast_type != &Type::Float {
+				writeln!(file, "    movq rax, xmm0").unwrap();
+			} else if expr_type != Type::Float && cast_type == &Type::Float {
+				writeln!(file, "    movq xmm0, rax").unwrap();
+			}
+
+			// TODO: casting literally interprets the bits of the float as an int.
+			// I should have a different method that actually converts the float to an int
+			// and vice versa. Maybe in std?
         }
-        Expression::ArrayAccess(variable, indices) => {
+        Typed{expr: Expression::ArrayAccess(variable, indices), type_} => {
             generate_expression(file, variable, context);
             let index = indices.get(0).expect("Array access without index");
 
             writeln!(file, "    push rax").unwrap();
             generate_expression(file, index, context);
             writeln!(file, "    pop rcx").unwrap();
-            writeln!(file, "    mov rax, [rcx + rax * 8]").unwrap();
+
+			if type_ == &Type::Float {
+				writeln!(file, "    movq xmm0, [rax + rcx * 8]").unwrap();
+			} else {
+            	writeln!(file, "    mov rax, [rcx + rax * 8]").unwrap();
+			}
         }
     }
 }
@@ -489,16 +753,16 @@ impl Context {
 }
 
 /// Generates the assembly code for a compound statement
-fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_context: &Context) {
+fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>, last_context: &Context) {
     let mut context = Context::from_last_context(last_context);
 
     // Yes I do need to generate compound statements like that otherwise
     // local variables can't be a thing
 
-    if let Statement::Compound(statements) = cmp_statement {
+    if let Typed{expr: Statement::Compound(statements), ..} = cmp_statement {
         for statement in statements.iter() {
             match statement {
-                Statement::Return(expression) => {
+                Typed{expr: Statement::Return(expression), ..} => {
                     generate_expression(file, expression, &mut context);
                     // Pop all the variables from the stack
                     writeln!(
@@ -511,10 +775,10 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     writeln!(file, "    pop rbp		;restore base pointer").unwrap();
                     writeln!(file, "    ret").unwrap();
                 }
-                Statement::Expression(expression) => {
+                Typed{expr: Statement::Expression(expression), ..} => {
                     generate_expression(file, expression, &mut context);
                 }
-                Statement::Let(variable, expr, var_type) => {
+                Typed{expr: Statement::Let(variable, expr, _), type_: var_type} => {
                     if let Some(expr) = expr {
                         generate_expression(file, expr, &mut context);
                     }
@@ -522,12 +786,17 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     // Dereference the variable if it is a pointer
                     let mut number_of_dereferences = 0;
                     let mut variable = variable;
+					let mut type_ = var_type;
                     while let AssignmentIdentifier::Dereference(new_expr) = variable {
-                        variable = new_expr;
+                        variable = &new_expr.expr;
                         number_of_dereferences += 1;
+						type_ = &new_expr.type_;
                     }
 
                     if let Some(_) = expr {
+						if Type::Float == *type_ {
+							writeln!(file, "    movq rax, xmm0").unwrap();
+						}
                         writeln!(file, "    push rax").unwrap();
                     } else {
                         writeln!(file, "    push 0").unwrap(); // Undefined variables default to 0
@@ -566,10 +835,10 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                         panic!("Expected a variable or an array, got {:?}", variable);
                     }
                 }
-                Statement::Compound(_) => {
+                Typed{expr: Statement::Compound(_), ..} => {
                     generate_compound_statement(file, statement, &context);
                 }
-                Statement::If(condition, if_statement, else_statement) => {
+                Typed{expr: Statement::If(condition, if_statement, else_statement), ..} => {
                     let branch_label =
                         BRANCH_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     let else_label = format!("else_{}", branch_label);
@@ -587,7 +856,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     }
                     writeln!(file, "{}:", end_label).unwrap();
                 }
-                Statement::While(condition, statement) => {
+                Typed{expr: Statement::While(condition, statement), ..} => {
                     let loop_label = LOOP_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     let start_label = format!("while_start_{}", loop_label);
                     let end_label = format!("while_end_{}", loop_label);
@@ -604,7 +873,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     writeln!(file, "    jmp {}", start_label).unwrap();
                     writeln!(file, "{}:", end_label).unwrap();
                 }
-                Statement::Loop(statement) => {
+                Typed{expr: Statement::Loop(statement), ..} => {
                     let loop_label = LOOP_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     let start_label = format!("loop_start_{}", loop_label);
                     let end_label = format!("loop_end_{}", loop_label);
@@ -618,7 +887,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     writeln!(file, "    jmp {}", start_label).unwrap();
                     writeln!(file, "{}:", end_label).unwrap();
                 }
-                Statement::Dowhile(condition, statement) => {
+                Typed{expr: Statement::Dowhile(condition, statement), ..} => {
                     let loop_label = LOOP_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     let start_label = format!("dowhile_start_{}", loop_label);
                     let end_label = format!("dowhile_end_{}", loop_label);
@@ -634,7 +903,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     writeln!(file, "    jne {}", start_label).unwrap();
                     writeln!(file, "{}:", end_label).unwrap();
                 }
-                Statement::For(init, condition, update, statement) => {
+                Typed{expr: Statement::For(init, condition, update, statement), ..} => {
                     let loop_label = LOOP_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     let start_label = format!("for_start_{}", loop_label);
                     let end_label = format!("for_end_{}", loop_label);
@@ -653,21 +922,21 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
                     writeln!(file, "    jmp {}", start_label).unwrap();
                     writeln!(file, "{}:", end_label).unwrap();
                 }
-                Statement::Break => {
+                Typed{expr: Statement::Break, ..} => {
                     if let Some(label) = &context.break_label {
                         writeln!(file, "    jmp {}	;break statement", label).unwrap();
                     } else {
                         panic!("Break statement outside of loop");
                     }
                 }
-                Statement::Continue => {
+                Typed{expr: Statement::Continue, ..} => {
                     if let Some(label) = &context.continue_label {
                         writeln!(file, "    jmp {}	;continue statement", label).unwrap();
                     } else {
                         panic!("Continue statement outside of loop");
                     }
                 }
-				Statement::Asm(asm) => {
+				Typed{expr: Statement::Asm(asm, _), ..} => {
 					writeln!(file, "{}", asm).unwrap();
 				}
             }
@@ -686,10 +955,10 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Statement, last_
 }
 
 /// Generates the assembly code for a function
-fn generate_function(file: &mut File, function: &Function, context: &Context) {
+fn generate_function(file: &mut File, function: &Typed<Function>, context: &Context) {
     let mut context = Context::from_last_context(context);
 
-    let Function::Function(name, params, statement, _) = function;
+    let Typed{expr: Function::Function(name, params, statement, _), ..} = function;
 
     context.stack_index = 24; // Skip rbp, rbx and the return address
     for param in params.iter() {
@@ -714,9 +983,18 @@ fn generate_function(file: &mut File, function: &Function, context: &Context) {
     .unwrap();
 }
 
-fn generate_constant(file: &mut File, constant: &Constant) {
-    let Constant::Constant(name, constant, _) = constant;
-    writeln!(file, "    {} equ {}", name, constant).unwrap();
+fn generate_constants(file: &mut File, const_vector: &Vec<Typed<Constant>>) {
+	for constant in const_vector.iter(){
+		let Typed{expr: Constant::Constant(name, constant, _), ..} = constant;
+    	writeln!(file, "    .{}: dq {}", name, constant).unwrap();
+	}
+}
+
+fn generate_float_literals(file: &mut File) {
+	let float_label_map = FLOAT_LABEL_MAP.lock().unwrap();
+	for (label, value) in float_label_map.iter() {
+		writeln!(file, "	{}: dq {}", label, value).unwrap();
+	}
 }
 
 /// Generates the assembly code for the given AST
@@ -726,9 +1004,9 @@ pub fn generate(ast: &Ast, out_path: &str) {
 
     // Post-order traversal of the AST to generate x86_64 (+nasm pseudo-instructions)
 
-    // TODO: structs
     let Program::Program(function_vector, const_vector, structs, _enums) = &ast.program;
-    writeln!(file, "[BITS 64]").unwrap();
+    
+	writeln!(file, "[BITS 64]").unwrap();
     writeln!(file, "section .text").unwrap();
     writeln!(file, "").unwrap();
     writeln!(file, "global _start").unwrap();
@@ -741,8 +1019,7 @@ pub fn generate(ast: &Ast, out_path: &str) {
     let mut context = Context::new();
 
     for constant in const_vector.iter() {
-        generate_constant(&mut file, constant);
-        let Constant::Constant(name, _, _) = constant;
+        let Typed{expr: Constant::Constant(name, _, _), ..} = constant;
         if let Some(_) = context.var_map.get(name) {
             panic!(
                 "Variable {} already declared as a constant. Constants cannot be declared twice",
@@ -768,4 +1045,7 @@ pub fn generate(ast: &Ast, out_path: &str) {
 
     writeln!(file, "").unwrap();
     writeln!(file, "section .data").unwrap();
+
+	generate_constants(&mut file, const_vector);
+	generate_float_literals(&mut file);
 }

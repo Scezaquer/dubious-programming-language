@@ -147,7 +147,7 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
     let identifier_re = Regex::new(r"^[a-zA-Z_][a-zA-Z0-9_]*").unwrap();
 
     // Primitive types are any of the following strings: int float char void array
-    let primitive_type_re = Regex::new(r"^(int|float|bool|char|str|void|array)").unwrap();
+	let primitive_type_re = Regex::new(r"^(int|float|bool|char|str|void|array)$").unwrap();
 
     // Floats are a sequence of digits, followed by a decimal point
     // and more digits
@@ -312,11 +312,12 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
         } else if let Some(caps) = keyword_re.captures(rest) {
             tok = Token::Keyword(caps.get(0).unwrap().as_str().to_string());
             pos += caps.get(0).unwrap().end();
-        } else if let Some(caps) = primitive_type_re.captures(rest) {
-            tok = Token::PrimitiveType(caps.get(0).unwrap().as_str().to_string());
-            pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = identifier_re.captures(rest) {
-            tok = Token::Identifier(caps.get(0).unwrap().as_str().to_string());
+			if primitive_type_re.is_match(caps.get(0).unwrap().as_str()) {
+				tok = Token::PrimitiveType(caps.get(0).unwrap().as_str().to_string());
+			} else {
+				tok = Token::Identifier(caps.get(0).unwrap().as_str().to_string());
+			}
             pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = whitespace_re.captures(rest) {
             pos += caps.get(0).unwrap().end();

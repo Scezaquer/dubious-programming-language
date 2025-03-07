@@ -1,10 +1,16 @@
 use crate::ast_build::{
-	AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Program, ReassignmentIdentifier, Statement, Type, UnOp
+	AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Program, ReassignmentIdentifier, Statement, Type, UnOp, Typed
 };
 
 impl std::fmt::Display for Ast {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{}", self.program)
+	}
+}
+
+impl<T: std::fmt::Display> std::fmt::Display for Typed<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.expr)
 	}
 }
 
@@ -114,11 +120,11 @@ impl std::fmt::Display for Statement {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Statement::Let(var, Some(expr), t) => write!(f, "let {}: {} = {};", var, t, expr),
-			Statement::Let(var, None, t) => write!(f, "let {}: {};", var, t),
+			Statement::Let(var, _, t) => write!(f, "let {}: {};", var, t),
 			Statement::If(cond, then_stmt, Some(else_stmt)) => {
 				write!(f, "if ({}) {{\n{}\n}} else {{\n{}\n}}", cond, then_stmt, else_stmt)
 			}
-			Statement::If(cond, then_stmt, None) => {
+			Statement::If(cond, then_stmt, _) => {
 				write!(f, "if ({}) {{\n{}\n}}", cond, then_stmt)
 			}
 			Statement::While(cond, body) => write!(f, "while ({}) {{\n{}\n}}", cond, body),
@@ -137,7 +143,7 @@ impl std::fmt::Display for Statement {
 			}
 			Statement::Break => write!(f, "break;"),
 			Statement::Continue => write!(f, "continue;"),
-			Statement::Asm(asm) => write!(f, "{}", asm),
+			Statement::Asm(asm, _) => write!(f, "{}", asm),
 		}
 	}
 }

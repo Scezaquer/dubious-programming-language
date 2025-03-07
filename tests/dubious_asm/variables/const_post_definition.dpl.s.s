@@ -7,14 +7,13 @@ _start:
     mov rdi, rax
     mov rax, 60
     syscall
-    a equ 10
 
 global main
 main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
-    mov rax, a
+    mov rax, [.a]
     add rsp, 0		;pop local variables before return
     pop rbx		;restore rbx for caller function
     pop rbp		;restore base pointer
@@ -25,3 +24,4 @@ main:
     ret				;return by default if no return statement was reached
 
 section .data
+    .a: dq 10

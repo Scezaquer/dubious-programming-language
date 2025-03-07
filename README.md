@@ -20,6 +20,7 @@ A simple compiler for the Dubious programming language (DPL).
 - TODO: Generic types
 - TODO: Void pointers?  Im not entirely sure I need it as I can already freely cast anything to anything but that would make for more explicit code. This may be an alternative/complementary to generics, but I feel like it would be worse
 - TODO: let strings be defined over multiple lines like "hello "\n"world" in code would evaluate to the literal "hello world"
+- TODO: if a string literal spans multiple lines it throws off the line displayed by error messages
 
 ### Optional
 
@@ -264,3 +265,25 @@ fn main(): int{
 ## Inline asm
 
 You can inline asm with the `asm [string literal]` statement. It will simply take the string literal and paste it in the asm at the corresponding spot. This is a compile-time operation, so the string literal has to be fully defined at compile time, meaning a variable containing a string doesn't work, and neither do hypothetical string formatting operations.
+
+```
+fn main(): void {
+	asm "
+	mov rdi, 3 ; hello :) this is inline asm
+    mov rax, 60
+    syscall";
+}
+```
+
+Asm statements can be typed. For example
+
+```
+fn ftoint(x : float) : int {
+	x;	// Move x into xmm0
+	asm "	cvtsd2si rax, xmm0  ; Convert double in xmm0 to 64-bit integer" : int; // Cast asm to int
+}
+```
+
+In the example above, the asm is cast to int, which allows us to pass the typechecker by
+promising what the asm does just resolves to int, which in turn means the body of the
+function matches it's definition.

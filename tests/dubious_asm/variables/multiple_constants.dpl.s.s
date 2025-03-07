@@ -7,23 +7,20 @@ _start:
     mov rdi, rax
     mov rax, 60
     syscall
-    a equ 10
-    b equ 15
-    c equ 3
 
 global main
 main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
-    mov rax, a
+    mov rax, [.a]
     push rax
-    mov rax, b
+    mov rax, [.b]
     pop rcx
     xchg rax, rcx
     add rax, rcx
     push rax
-    mov rax, c
+    mov rax, [.c]
     pop rcx
     xchg rax, rcx
     add rax, rcx
@@ -37,3 +34,6 @@ main:
     ret				;return by default if no return statement was reached
 
 section .data
+    .a: dq 10
+    .b: dq 15
+    .c: dq 3

@@ -18,6 +18,7 @@ main:
     mov rax, 60
     syscall
 
+    mov rax, 0
     add rsp, 0		;end of block, pop local variables
     pop rbx			;restore rbx for caller function
     pop rbp			;restore base pointer
