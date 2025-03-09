@@ -15,11 +15,10 @@ main:
     mov rbp, rsp	;set base pointer
     mov rax, 2
     push rax
-    mov rax, [rbp-8]
-    push rax
     mov rax, 1
+    push rax
+    mov rax, [rbp-8]
     pop rcx
-    xchg rax, rcx
     add rax, rcx
     mov [rbp-8], rax
     mov rax, [rbp-8]

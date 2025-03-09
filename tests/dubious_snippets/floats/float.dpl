@@ -5,6 +5,6 @@ fn main() : int {
 	let b : float = 0.5;
 	let c : float = a + b;
 	let i : int = 2;
-	c = inttof(i) + c;
+	c += inttof(i);
 	return ftoint(c);
 }

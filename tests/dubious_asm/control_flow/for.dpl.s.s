@@ -20,21 +20,19 @@ main:
     mov rax, 0
     mov [rbp-8], rax
 for_start_0:
-    mov rax, [rbp-8]
-    push rax
     mov rax, 10
+    push rax
+    mov rax, [rbp-8]
     pop rcx
-    xchg rax, rcx
     cmp rax, rcx
     setl al
     movzx rax, al
     cmp rax, 0
     je for_end_0
-    mov rax, [rbp-16]
-    push rax
     mov rax, 2
+    push rax
+    mov rax, [rbp-16]
     pop rcx
-    xchg rax, rcx
     add rax, rcx
     mov [rbp-16], rax
     add rsp, 0		;end of block, pop local variables
@@ -43,11 +41,10 @@ for_start_0:
     mov [rbp-8], rax
     jmp for_start_0
 for_end_0:
-    mov rax, [rbp-8]
-    push rax
     mov rax, [rbp-16]
+    push rax
+    mov rax, [rbp-8]
     pop rcx
-    xchg rax, rcx
     add rax, rcx
     add rsp, 16		;pop local variables before return
     pop rbx		;restore rbx for caller function

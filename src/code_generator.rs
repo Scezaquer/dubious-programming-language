@@ -32,7 +32,7 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
     match atom {
         Typed{expr: Atom::Literal(constant), ..} => {
 			if let Literal::Float(f) = constant.expr {
-                let label = format!(".float_{}", FLOAT_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst));
+                let label = format!(".float.{}", FLOAT_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst));
 
                 let mut float_label_map = FLOAT_LABEL_MAP.lock().unwrap();
                 float_label_map.insert(label.clone(), f);
@@ -229,7 +229,9 @@ fn generate_assignment(
 				writeln!(file, "    movq {}, xmm0", write_address).unwrap();
 			}
 			AssignmentOp::SubtractAssign => {
-				writeln!(file, "    subsd xmm0, {}", write_address).unwrap();
+				writeln!(file, "    movq xmm1, xmm0").unwrap();
+				writeln!(file, "    movq xmm0, {}", write_address).unwrap();
+				writeln!(file, "    subsd xmm0, xmm1").unwrap();
 				writeln!(file, "    movq {}, xmm0", write_address).unwrap();
 			}
 			AssignmentOp::MultiplyAssign => {
@@ -237,15 +239,13 @@ fn generate_assignment(
 				writeln!(file, "    movq {}, xmm0", write_address).unwrap();
 			}
 			AssignmentOp::DivideAssign => {
-				writeln!(file, "    divsd xmm0, {}", write_address).unwrap();
+				writeln!(file, "    movq xmm1, xmm0").unwrap();
+				writeln!(file, "    movq xmm0, {}", write_address).unwrap();
+				writeln!(file, "    divsd xmm0, xmm1").unwrap();
 				writeln!(file, "    movq {}, xmm0", write_address).unwrap();
 			}
 			AssignmentOp::ModulusAssign => {
-				writeln!(file, "    divsd xmm2, xmm0, {}  ; xmm2 = xmm0 / {}", write_address, write_address).unwrap();
-				writeln!(file, "	roundsd xmm2, xmm2, 0b0011  ; Round towards zero").unwrap();
-				writeln!(file, "	mulsd xmm2, {}         ; xmm2 = truncated(xmm0 / {}) * {}", write_address, write_address, write_address).unwrap();
-				writeln!(file, "	subsd xmm0, xmm2         ; xmm0 = xmm0 - xmm2 (remainder)").unwrap();
-				writeln!(file, "    movq {}, xmm0", write_address).unwrap();
+				panic!("Modulus not implemented for floats");
 			}
 			AssignmentOp::LeftShiftAssign => {
 				panic!("Left shift not implemented for floats");
@@ -402,15 +402,16 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
         }
         Typed{expr: Expression::BinaryOp(left, right, bin_op), type_} => {
 			let left_type = left.type_.clone();
-            generate_expression(file, left, context);
             if bin_op != &BinOp::MemberAccess {
+				generate_expression(file, right, context);
 				if left_type == Type::Float {
 					writeln!(file, "    movq rax, xmm0").unwrap();
 				}
                 writeln!(file, "    push rax").unwrap();
-                generate_expression(file, right, context);
+				generate_expression(file, left, context);
             } else {
                 if let Expression::Atom(Typed{expr: Atom::Literal(Typed{expr: Literal::Int(i), ..}), ..}) = right.expr {
+					generate_expression(file, left, context);
                     writeln!(file, "    mov rcx, {}", i).unwrap();
 					if type_ == &Type::Float {
 						writeln!(file, "    movq xmm0, [rax + rcx * 8]").unwrap();
@@ -426,9 +427,6 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 			if type_ == &Type::Float {
 				writeln!(file, "	pop rcx").unwrap();
 				writeln!(file, "	movq xmm1, rcx").unwrap();
-				writeln!(file, "	movaps xmm2, xmm0").unwrap();
-				writeln!(file, "	movaps xmm0, xmm1").unwrap();
-				writeln!(file, "	movaps xmm1, xmm2").unwrap();
 
 				match bin_op {
 					BinOp::Add => {
@@ -442,12 +440,6 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 					}
 					BinOp::Divide => {
 						writeln!(file, "	divsd xmm0, xmm1").unwrap();
-					}
-					BinOp::Modulus => {
-						writeln!(file, "	divsd xmm2, xmm0, xmm1  ; xmm2 = xmm0 / xmm1").unwrap();
-						writeln!(file, "	roundsd xmm2, xmm2, 0b0011  ; Round towards zero").unwrap();
-						writeln!(file, "	mulsd xmm2, xmm1         ; xmm2 = truncated(xmm0 / xmm1) * xmm1").unwrap();
-						writeln!(file, "	subsd xmm0, xmm2         ; xmm0 = xmm0 - xmm2 (remainder)").unwrap();
 					}
 					BinOp::LessThan => {
 						writeln!(file, "	ucomisd xmm0, xmm1").unwrap();
@@ -488,6 +480,10 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 					BinOp::BitwiseOr => {
 						writeln!(file, "	orpd xmm0, xmm1").unwrap();
 					}
+					
+					BinOp::Modulus => {
+						panic!("Modulus not implemented for floats");
+					}
 					BinOp::LogicalAnd => {
 						panic!("Logical and not implemented for floats");
 					}
@@ -512,7 +508,6 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 				}
 			} else {
 				writeln!(file, "    pop rcx").unwrap();
-				writeln!(file, "    xchg rax, rcx").unwrap();
 				match bin_op {
 					BinOp::Add => {
 						writeln!(file, "    add rax, rcx").unwrap();
@@ -677,7 +672,7 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
             writeln!(file, "    pop rcx").unwrap();
 
 			if type_ == &Type::Float {
-				writeln!(file, "    movq xmm0, [rax + rcx * 8]").unwrap();
+				writeln!(file, "    movq xmm0, [rcx + rax * 8]").unwrap();
 			} else {
             	writeln!(file, "    mov rax, [rcx + rax * 8]").unwrap();
 			}
@@ -993,7 +988,8 @@ fn generate_constants(file: &mut File, const_vector: &Vec<Typed<Constant>>) {
 fn generate_float_literals(file: &mut File) {
 	let float_label_map = FLOAT_LABEL_MAP.lock().unwrap();
 	for (label, value) in float_label_map.iter() {
-		writeln!(file, "	{}: dq {}", label, value).unwrap();
+		// Important to use debug trait, otherwise floats with no decimals will be interpreted as int
+		writeln!(file, "	{}: dq {:?}", label, value).unwrap();
 	}
 }
 

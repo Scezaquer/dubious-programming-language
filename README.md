@@ -244,6 +244,9 @@ let a: S = S{
 Reassignments can only have a variable, a dereferenced address, an array element
 or a struct member as left hand side.
 
+Similarly to functions, structs and enums are both defined everywhere, even before
+they are declared. This allows circular definitions and recursive structures.
+
 ## Enums
 
 Enums are discrete types whose value can be one of in a list of user-defiend values.

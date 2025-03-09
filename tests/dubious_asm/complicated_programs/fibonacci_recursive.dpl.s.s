@@ -14,11 +14,10 @@ fib:
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
     ;if statement
-    mov rax, [rbp+24]
-    push rax
     mov rax, 0
+    push rax
+    mov rax, [rbp+24]
     pop rcx
-    xchg rax, rcx
     cmp rax, rcx
     sete al
     movzx rax, al
@@ -34,11 +33,10 @@ fib:
 else_0:
 end_0:
     ;if statement
-    mov rax, [rbp+24]
-    push rax
     mov rax, 1
+    push rax
+    mov rax, [rbp+24]
     pop rcx
-    xchg rax, rcx
     cmp rax, rcx
     sete al
     movzx rax, al
@@ -54,28 +52,25 @@ end_0:
 else_1:
 end_1:
 	;push function arguments to the stack in reverse order
-    mov rax, [rbp+24]
+    mov rax, 2
     push rax
-    mov rax, 1
+    mov rax, [rbp+24]
     pop rcx
-    xchg rax, rcx
     sub rax, rcx
     push rax
     call fib
     add rsp, 8	;pop arguments
     push rax
 	;push function arguments to the stack in reverse order
-    mov rax, [rbp+24]
+    mov rax, 1
     push rax
-    mov rax, 2
+    mov rax, [rbp+24]
     pop rcx
-    xchg rax, rcx
     sub rax, rcx
     push rax
     call fib
     add rsp, 8	;pop arguments
     pop rcx
-    xchg rax, rcx
     add rax, rcx
     add rsp, 0		;pop local variables before return
     pop rbx		;restore rbx for caller function

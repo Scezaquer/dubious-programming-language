@@ -17,11 +17,10 @@ main:
     push rax
     mov rax, 2
     push rax
-    mov rax, [rbp-8]
-    push rax
     mov rax, [rbp-16]
+    push rax
+    mov rax, [rbp-8]
     pop rcx
-    xchg rax, rcx
     add rax, rcx
     add rsp, 16		;pop local variables before return
     pop rbx		;restore rbx for caller function

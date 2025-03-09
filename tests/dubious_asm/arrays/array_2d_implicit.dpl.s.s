@@ -32,23 +32,19 @@ main:
     mov rax, 0
     push rax
     mov rax, 2
-    pop rcx
-    xchg rax, rcx
-    imul rax, rcx
     push rax
     mov rax, 1
-    pop rcx
-    xchg rax, rcx
-    add rax, rcx
     push rax
     mov rax, 2
-    pop rcx
-    xchg rax, rcx
-    imul rax, rcx
     push rax
     mov rax, 0
     pop rcx
-    xchg rax, rcx
+    imul rax, rcx
+    pop rcx
+    add rax, rcx
+    pop rcx
+    imul rax, rcx
+    pop rcx
     add rax, rcx
     pop rcx
     mov rax, [rcx + rax * 8]

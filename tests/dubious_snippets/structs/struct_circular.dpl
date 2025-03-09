@@ -1,0 +1,16 @@
+struct S1 {
+	some_data: int;
+	parent: S2;
+}
+
+struct S2 {
+	child: S1;
+	some_data: int;
+}
+
+fn main(): int {
+	let a: S1 = S1{ 1, 0 : S2 };	// 0 casted to S2 to escape the circular dependency and effectively set parent as 'None' for now
+	let b: S2 = S2{ a, 2 };
+	a.parent = b;
+	return b.child.parent.child.parent.some_data;
+}

@@ -17,19 +17,17 @@ main:
     push rax
     ;loop statement
 loop_start_0:
-    mov rax, [rbp-8]
-    push rax
     mov rax, 1
+    push rax
+    mov rax, [rbp-8]
     pop rcx
-    xchg rax, rcx
     add rax, rcx
     mov [rbp-8], rax
     ;if statement
-    mov rax, [rbp-8]
-    push rax
     mov rax, 5
+    push rax
+    mov rax, [rbp-8]
     pop rcx
-    xchg rax, rcx
     cmp rax, rcx
     setge al
     movzx rax, al

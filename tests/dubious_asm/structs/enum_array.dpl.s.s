@@ -36,17 +36,16 @@ main:
     mov [r8], rax
     mov rax, [rbp-32]
     push rax
-    mov rax, 1
+    mov rax, 2
     pop rcx
     mov rax, [rcx + rax * 8]
     push rax
     mov rax, [rbp-32]
     push rax
-    mov rax, 2
+    mov rax, 1
     pop rcx
     mov rax, [rcx + rax * 8]
     pop rcx
-    xchg rax, rcx
     add rax, rcx
     add rsp, 40		;pop local variables before return
     pop rbx		;restore rbx for caller function

@@ -6,7 +6,7 @@
 
 use crate::ast_build::{
     AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Expression, Function, Literal, Program,
-    Statement, Type, Typed, UnOp,
+    Statement, Type, Typed, UnOp, Enum, Struct
 };
 use crate::ast_build::{Constant, ReassignmentIdentifier};
 use core::panic;
@@ -285,7 +285,7 @@ fn type_binaryop(
     } = type_expression(rhs, context);
 
     let binop_type = match op {
-        BinOp::Add | BinOp::Subtract | BinOp::Multiply | BinOp::Divide | BinOp::Modulus => {
+        BinOp::Add | BinOp::Subtract | BinOp::Multiply | BinOp::Divide => {
             if lhs_type == Type::Int && rhs_type == Type::Int {
                 Type::Int
             } else if lhs_type == Type::Float && rhs_type == Type::Float {
@@ -317,7 +317,8 @@ fn type_binaryop(
         | BinOp::RightShift
         | BinOp::BitwiseAnd
         | BinOp::BitwiseOr
-        | BinOp::BitwiseXor => {
+        | BinOp::BitwiseXor
+		| BinOp::Modulus => {
             if lhs_type == Type::Int && rhs_type == Type::Int {
                 Type::Int
             } else {
@@ -468,24 +469,57 @@ fn type_assignment(
         }
     }
 
-    if lhs_type == rhs_type {
-        Typed {
-            expr: Expression::Assignment(
-                Typed {
-                    expr: new_lhs,
-                    type_: lhs_type.clone(),
-                },
-                Box::new(Typed {
-                    expr: new_rhs,
-                    type_: rhs_type,
-                }),
-                op.clone(),
-            ),
-            type_: lhs_type,
-        }
-    } else {
-        panic!("Assignment types do not match")
-    }
+	if lhs_type != rhs_type {
+		panic!("Assignment types do not match")
+	}
+
+	match op {
+		AssignmentOp::Assign => {
+			// Do nothing
+		}
+		AssignmentOp::AddAssign
+		| AssignmentOp::SubtractAssign
+		| AssignmentOp::MultiplyAssign
+		| AssignmentOp::DivideAssign => {
+			if lhs_type == Type::Int && rhs_type == Type::Int {
+				// Do nothing
+			} else if lhs_type == Type::Float && rhs_type == Type::Float {
+				// Do nothing
+			} else {
+				panic!("This assignment operation is only supported for integers and floats")
+			}
+		}
+		AssignmentOp::BitwiseAndAssign
+		| AssignmentOp::BitwiseOrAssign
+		| AssignmentOp::BitwiseXorAssign
+		| AssignmentOp::LeftShiftAssign
+		| AssignmentOp::RightShiftAssign
+		| AssignmentOp::ModulusAssign => {
+			if lhs_type == Type::Int && rhs_type == Type::Int {
+				// Do nothing
+			} else {
+				panic!("This assignment operation is only supported for integers")
+			}
+		}
+		AssignmentOp::NotAnAssignmentOp => {
+			panic!("Invalid assignment operation")
+		}
+	}
+
+	Typed {
+		expr: Expression::Assignment(
+			Typed {
+				expr: new_lhs,
+				type_: lhs_type.clone(),
+			},
+			Box::new(Typed {
+				expr: new_rhs,
+				type_: rhs_type,
+			}),
+			op.clone(),
+		),
+		type_: lhs_type,
+	}
 }
 
 fn type_arrayaccess(
@@ -966,12 +1000,47 @@ fn typechecking(ast: &Ast) -> Ast {
         array_dims: HashMap::new(),
     };
 
-    for enum_ in enums {
-        let crate::ast_build::Enum { id, variants } = enum_;
 
-        if context.enums.contains_key(id) {
+	// Functions, structs and enums are defined everywhere, even before declaration
+	// so we need to add them to the context before typechecking them
+
+    for function in functions {
+        // Functions are defined everywhere
+        let Function::Function(name, args, _, return_type) = &function.expr;
+        // Extract only the types from args, discarding the parameter names
+        let arg_types: Vec<Type> = args.iter().map(|(_, t)| t.clone()).collect();
+        context.functions.insert(
+            name.clone(),
+            (check_if_struct_or_enum(&context, &return_type), arg_types),
+        );
+    }
+
+	for enum_ in enums {
+		let Enum {id, variants} = enum_;
+
+		if context.enums.contains_key(id) {
             panic!("Enum '{}' is declared more than once", id);
         }
+	
+		context.enums.insert(id.clone(), variants.clone());
+	}
+
+	for struct_ in structs {
+		let Struct {id, members} = struct_;
+
+		if context.structs.contains_key(id) {
+            panic!("Struct '{}' is declared more than once", id);
+        } else if context.enums.contains_key(id) {
+            panic!("Struct '{}' has the same name as an enum", id);
+        }
+
+		context.structs.insert(id.clone(), (members.clone(), HashMap::new()));
+	}
+
+	// Now we can do proper typechecking
+
+    for enum_ in enums {
+        let Enum { id, variants } = enum_;
 
         let mut variant_set = HashSet::new();
         let mut variant_list = Vec::new();
@@ -1011,13 +1080,7 @@ fn typechecking(ast: &Ast) -> Ast {
     }
 
     for struct_ in structs {
-        let crate::ast_build::Struct { id, members } = struct_;
-
-        if context.structs.contains_key(id) {
-            panic!("Struct '{}' is declared more than once", id);
-        } else if context.enums.contains_key(id) {
-            panic!("Struct '{}' has the same name as an enum", id);
-        }
+        let Struct { id, members } = struct_;
 
         let mut member_names = HashSet::new();
         for (name, _) in members {
@@ -1036,17 +1099,6 @@ fn typechecking(ast: &Ast) -> Ast {
         context
             .structs
             .insert(id.clone(), (ordered_members, unordered_lookup_table));
-    }
-
-    for function in functions {
-        // Functions are defined everywhere
-        let Function::Function(name, args, _, return_type) = &function.expr;
-        // Extract only the types from args, discarding the parameter names
-        let arg_types: Vec<Type> = args.iter().map(|(_, t)| t.clone()).collect();
-        context.functions.insert(
-            name.clone(),
-            (check_if_struct_or_enum(&context, &return_type), arg_types),
-        );
     }
 
     let mut new_functions = Vec::new();

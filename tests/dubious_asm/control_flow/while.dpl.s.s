@@ -17,21 +17,19 @@ main:
     push rax
     ;while statement
 while_start_0:
-    mov rax, [rbp-8]
-    push rax
     mov rax, 10
+    push rax
+    mov rax, [rbp-8]
     pop rcx
-    xchg rax, rcx
     cmp rax, rcx
     setl al
     movzx rax, al
     cmp rax, 0
     je while_end_0
-    mov rax, [rbp-8]
-    push rax
     mov rax, 1
+    push rax
+    mov rax, [rbp-8]
     pop rcx
-    xchg rax, rcx
     add rax, rcx
     mov [rbp-8], rax
     add rsp, 0		;end of block, pop local variables

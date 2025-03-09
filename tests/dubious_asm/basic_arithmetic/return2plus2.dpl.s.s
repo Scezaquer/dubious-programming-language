@@ -17,7 +17,6 @@ main:
     push rax
     mov rax, 2
     pop rcx
-    xchg rax, rcx
     add rax, rcx
     add rsp, 0		;pop local variables before return
     pop rbx		;restore rbx for caller function

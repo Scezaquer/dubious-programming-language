@@ -39,26 +39,22 @@ main:
     push rax	;pushing array dimensions onto stack
     mov rax, [rbp-80]
     push rax
-    mov rax, 0
+    mov rax, 2
     push rax
     mov rax, 3
-    pop rcx
-    xchg rax, rcx
-    imul rax, rcx
     push rax
     mov rax, 1
-    pop rcx
-    xchg rax, rcx
-    add rax, rcx
     push rax
     mov rax, 3
-    pop rcx
-    xchg rax, rcx
-    imul rax, rcx
     push rax
-    mov rax, 2
+    mov rax, 0
     pop rcx
-    xchg rax, rcx
+    imul rax, rcx
+    pop rcx
+    add rax, rcx
+    pop rcx
+    imul rax, rcx
+    pop rcx
     add rax, rcx
     pop rcx
     mov rax, [rcx + rax * 8]

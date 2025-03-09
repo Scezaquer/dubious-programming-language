@@ -13,16 +13,14 @@ main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
-    mov rax, [.a]
+    mov rax, [.c]
     push rax
     mov rax, [.b]
-    pop rcx
-    xchg rax, rcx
-    add rax, rcx
     push rax
-    mov rax, [.c]
+    mov rax, [.a]
     pop rcx
-    xchg rax, rcx
+    add rax, rcx
+    pop rcx
     add rax, rcx
     add rsp, 0		;pop local variables before return
     pop rbx		;restore rbx for caller function

@@ -1,0 +1,18 @@
+#include<cast.dpl>
+
+
+struct S2 {
+	f1: float;
+	f2: float
+}
+
+struct S {
+	f1: float;
+	sub_struct: S2
+}
+
+fn main() : int {
+	let a: S2 = S2{0.8, 1.7};
+	let b: S = S{-0.7, a};
+	return ftoint(b.f1 + b.sub_struct.f2);
+}

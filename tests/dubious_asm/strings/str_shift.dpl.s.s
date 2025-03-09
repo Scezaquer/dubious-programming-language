@@ -17,15 +17,14 @@ main:
     push rax
     mov rax, rsp	; Move the address of the array to rax
     push rax
+    mov rax, 8
+    push rax
     mov rax, [rbp-16]
     push rax
     mov rax, 0
     pop rcx
     mov rax, [rcx + rax * 8]
-    push rax
-    mov rax, 8
     pop rcx
-    xchg rax, rcx
     shr rax, cl
     add rsp, 16		;pop local variables before return
     pop rbx		;restore rbx for caller function

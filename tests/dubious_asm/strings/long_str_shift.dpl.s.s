@@ -25,15 +25,14 @@ main:
     push rax
     mov rax, rsp	; Move the address of the array to rax
     push rax
+    mov rax, 24
+    push rax
     mov rax, [rbp-48]
     push rax
     mov rax, 3
     pop rcx
     mov rax, [rcx + rax * 8]
-    push rax
-    mov rax, 24
     pop rcx
-    xchg rax, rcx
     shr rax, cl
     add rsp, 48		;pop local variables before return
     pop rbx		;restore rbx for caller function

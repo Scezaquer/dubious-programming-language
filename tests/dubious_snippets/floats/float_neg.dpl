@@ -1,0 +1,5 @@
+#include<cast.dpl>
+
+fn main() : int {
+	return ftoint(-1.25 + 3.25);
+}

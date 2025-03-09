@@ -15,11 +15,10 @@ add_3:
     mov rbp, rsp	;set base pointer
     mov rax, 3
     push rax
-    mov rax, [rbp+24]
-    push rax
     mov rax, [rbp-8]
+    push rax
+    mov rax, [rbp+24]
     pop rcx
-    xchg rax, rcx
     add rax, rcx
     add rsp, 8		;pop local variables before return
     pop rbx		;restore rbx for caller function
@@ -35,15 +34,14 @@ main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
-    mov rax, [.a]
-    push rax
 	;push function arguments to the stack in reverse order
     mov rax, 1
     push rax
     call add_3
     add rsp, 8	;pop arguments
+    push rax
+    mov rax, [.a]
     pop rcx
-    xchg rax, rcx
     add rax, rcx
     add rsp, 0		;pop local variables before return
     pop rbx		;restore rbx for caller function

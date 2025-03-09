@@ -19,19 +19,17 @@ main:
     push rax
     mov rax, 3
     push rax
-    mov rax, [rbp-16]
-    push rax
     mov rax, [rbp-24]
+    push rax
+    mov rax, [rbp-16]
     pop rcx
-    xchg rax, rcx
     add rax, rcx
     mov [rbp-16], rax
     add rsp, 8		;end of block, pop local variables
-    mov rax, [rbp-16]
-    push rax
     mov rax, [rbp-8]
+    push rax
+    mov rax, [rbp-16]
     pop rcx
-    xchg rax, rcx
     add rax, rcx
     mov [rbp-16], rax
     mov rax, [rbp-16]

@@ -1,0 +1,7 @@
+#include<cast.dpl>
+
+fn main(): int {
+	let a: float = 7.5;
+	a /= 1.5;
+	return ftoint(a);
+}

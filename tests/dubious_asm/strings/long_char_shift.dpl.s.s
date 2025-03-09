@@ -15,16 +15,14 @@ main:
     mov rbp, rsp	;set base pointer
     mov rax, 'abcdefgh'
     push rax
-    mov rax, [rbp-8]
+    mov rax, 8
     push rax
     mov rax, 5
-    push rax
-    mov rax, 8
     pop rcx
-    xchg rax, rcx
     imul rax, rcx
+    push rax
+    mov rax, [rbp-8]
     pop rcx
-    xchg rax, rcx
     shr rax, cl
     add rsp, 8		;pop local variables before return
     pop rbx		;restore rbx for caller function

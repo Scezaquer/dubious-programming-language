@@ -1269,7 +1269,7 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
 				let mut asm = String::new();
 				let next_tok = tokens.next().unwrap();
 				if let TokenWithDebugInfo { internal_tok: Token::StringLiteral(s), .. } = next_tok {
-					asm.push_str(format!("{}{}", s, "\n").as_str());
+					asm.push_str(s);
 				} else {
 					error_unexpected_token("string literal", &next_tok);
 				}

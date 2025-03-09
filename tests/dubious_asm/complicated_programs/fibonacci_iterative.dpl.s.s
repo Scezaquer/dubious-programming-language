@@ -20,11 +20,10 @@ main:
     mov rax, 1
     push rax
     ;if statement
-    mov rax, [rbp-8]
-    push rax
     mov rax, 0
+    push rax
+    mov rax, [rbp-8]
     pop rcx
-    xchg rax, rcx
     cmp rax, rcx
     sete al
     movzx rax, al
@@ -39,11 +38,10 @@ main:
     jmp end_0
 else_0:
     ;if statement
-    mov rax, [rbp-8]
-    push rax
     mov rax, 1
+    push rax
+    mov rax, [rbp-8]
     pop rcx
-    xchg rax, rcx
     cmp rax, rcx
     sete al
     movzx rax, al
@@ -68,21 +66,19 @@ end_0:
     mov rax, 0
     mov [rbp-40], rax
 for_start_0:
-    mov rax, [rbp-40]
-    push rax
     mov rax, [rbp-8]
+    push rax
+    mov rax, [rbp-40]
     pop rcx
-    xchg rax, rcx
     cmp rax, rcx
     setle al
     movzx rax, al
     cmp rax, 0
     je for_end_0
-    mov rax, [rbp-24]
-    push rax
     mov rax, [rbp-16]
+    push rax
+    mov rax, [rbp-24]
     pop rcx
-    xchg rax, rcx
     add rax, rcx
     mov [rbp-32], rax
     mov rax, [rbp-24]

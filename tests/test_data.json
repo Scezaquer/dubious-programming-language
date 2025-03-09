@@ -140,6 +140,13 @@
 		"output": 2
 	},
 	{
+		"name": "return5mod2",
+		"description": "returns 5%2",
+		"filename": "basic_arithmetic/return5mod2.dpl",
+		"input": [],
+		"output": 1
+	},
+	{
         "name": "assign2",
         "description": "Creates variable a and assigns 2 to it",
         "filename": "variables/assign2.dpl",
@@ -581,6 +588,13 @@
 		"output": 1
 	},
 	{
+		"name": "struct_circular",
+		"description": "Circular references in structs",
+		"filename": "structs/struct_circular.dpl",
+		"input": [],
+		"output": 2
+	},
+	{
 		"name": "struct_array",
 		"description": "Struct with array member",
 		"filename": "structs/struct_array.dpl",
@@ -642,5 +656,82 @@
 		"filename": "inline_asm/inline_asm.dpl",
 		"input": [],
 		"output": 3
+	},
+	{
+		"name": "float",
+		"description": "Floating point operations",
+		"filename": "floats/float.dpl",
+		"input": [],
+		"output": 4
+	},
+	{
+		"name": "float_sub",
+		"description": "Floating point subtraction",
+		"filename": "floats/float_sub.dpl",
+		"input": [],
+		"output": 2
+	},
+	{
+		"name": "float_struct",
+		"description": "Floating point in struct",
+		"filename": "floats/float_struct.dpl",
+		"input": [],
+		"output": 1
+	},
+	{
+		"name": "float_nested",
+		"description": "Nested floating point operations",
+		"filename": "floats/float_nested.dpl",
+		"input": [],
+		"output": 4
+	},
+	{
+		"name": "float_neg",
+		"description": "Floating point negation",
+		"filename": "floats/float_neg.dpl",
+		"input": [],
+		"output": 2
+	},
+	{
+		"name": "float_mult",
+		"description": "Floating point multiplication",
+		"filename": "floats/float_mult.dpl",
+		"input": [],
+		"output": 2
+	},
+	{
+		"name": "float_div",
+		"description": "Floating point division",
+		"filename": "floats/float_div.dpl",
+		"input": [],
+		"output": 3
+	},
+	{
+		"name": "float_array",
+		"description": "Floating point array",
+		"filename": "floats/float_array.dpl",
+		"input": [],
+		"output": 5
+	},
+	{
+		"name": "float_add",
+		"description": "Floating point addition",
+		"filename": "floats/float_add.dpl",
+		"input": [],
+		"output": 1
+	},
+	{
+		"name": "div_assign",
+		"description": "Division assignment operator on floating point variable",
+		"filename": "floats/div_assign.dpl",
+		"input": [],
+		"output": 5
+	},
+	{
+		"name": "minus_assign",
+		"description": "Subtraction assignment operator on floating point variable",
+		"filename": "floats/minus_assign.dpl",
+		"input": [],
+		"output": 1
 	}
 ]
