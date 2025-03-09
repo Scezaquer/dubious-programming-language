@@ -7,12 +7,10 @@ A simple compiler for the Dubious programming language (DPL).
 ### Priority features
 
 - TODO: Helpful compiler error messages at the code generation stage (make &lt;T>TokenWithDebugInfo generic?)
-- TODO: Structs, enums, unions
 - TODO: better checker error messages
 - TODO: heap memory stuff
 - TODO: std library
 - TODO: vscode syntax highlighting
-- TODO: floating point arithmetic
 - TODO: Wiki
 - TODO: support escape characters
 - TODO: namespaces for functions, constants, structs, enums, unions
@@ -295,3 +293,52 @@ compiler works before using that feature, but in short: If the value your asm re
 is a float, then the compiler will assume it is located in xmm0. If it is anything
 else; it will assume it is in rax. So write your asm such that the right stuff ends
 up in the right place.
+
+## Floating point arithmetic
+
+Floating point arithmetic is performed as follows
+
+```
+#include<cast.dpl>
+
+fn main() : int {
+	let a : float = 1.5;
+	let b : float = 0.5;
+	let c : float = a + b;
+	let i : int = 2;
+	c += inttof(i);
+	return ftoint(c);
+}
+```
+
+We note that in order to perform operations involving both ints and floats,
+we first need some type conversion, as mixed type operations with implicit type
+conversion such as `1.5 + 2` are not supported.
+
+IMPORTANT: Casting a float to an int (or conversely) will NOT give the result
+you might expect. The typecasting operator interprets the bits contained in the
+memory location of the variable as being bits that represent the type you cast
+the variable to. What this means is that if you cast `1.0` to int, you will NOT get `1`.
+Instead, we have 1.0 being represented in binary according to IEEE 754 as
+`0x3FF0000000000000`, which will simply be read as if it was an int, which means
+you'll get `4607182418800017408` in decimal. Similarly, casting the integer `1`
+to float will read `0x1` as if it was the IEEE 754 representation of a float,
+which is about `5e-324`.
+
+In order to convert from int to float, or float to int, you should use the
+`inttof(x: float)` and `ftoint(x: float)` functions in cast.dpl. These will actually
+give the correct number, unlike type casting. Note that ftoint rounds to the
+closest integer. If the decimal is .5, see x86-64 `cvtsd2si` doc to know if
+it will round up or down. TODO: implement in stdlib, make .5 behavior reliable.
+
+## Type casting
+
+Type casting is an extremely powerful tool, but with great power comes great
+responsibility. Basically, you're allowed to cast anything to anything else,
+and the compiler won't complain about it. This lets you essentially entirely
+bypass the type system, if you want to. However, this does mean that you have
+the ability to feed nonsensical data anywhere you want, which may result in
+less than ideal scenarios, and if you're lucky, a crash.
+
+TODO: explan how type casting works, what you could theoretically do with it,
+and how you can typecast asm statements.
