@@ -23,6 +23,13 @@ struct Context {
 
 fn type_atom(expr: &Expression, atom: &Atom, context: &Context) -> Typed<Expression> {
     match atom {
+		Atom::Literal(Typed {
+			expr: Literal::Bool(_),
+			..
+		}) => Typed {
+			expr: expr.clone(),
+			type_: Type::Bool,
+		},
         Atom::Literal(Typed {
             expr: Literal::Int(_),
             ..
@@ -295,20 +302,26 @@ fn type_binaryop(
             }
         }
         BinOp::Equal
-        | BinOp::NotEqual
-        | BinOp::LessThan
+        | BinOp::NotEqual => {
+            if lhs_type == rhs_type {
+                Type::Bool
+            } else {
+                panic!("Invalid types for comparison operation")
+            }
+        }
+        BinOp::LessThan
         | BinOp::LessOrEqualThan
         | BinOp::GreaterThan
         | BinOp::GreaterOrEqualThan => {
-            if lhs_type == rhs_type {
-                Type::Int
+            if lhs_type == rhs_type && (lhs_type == Type::Int || lhs_type == Type::Float) {
+                Type::Bool
             } else {
                 panic!("Invalid types for comparison operation")
             }
         }
         BinOp::LogicalAnd | BinOp::LogicalOr | BinOp::LogicalXor => {
-            if lhs_type == Type::Int && rhs_type == Type::Int {
-                Type::Int
+            if lhs_type == Type::Bool && rhs_type == Type::Bool {
+                Type::Bool
             } else {
                 panic!("Invalid types for logical operation")
             }
@@ -370,8 +383,8 @@ fn type_unaryop(expr: &Expression, op: &UnOp, context: &Context) -> Typed<Expres
             }
         }
         UnOp::LogicalNot => {
-            if expr_type == Type::Int {
-                Type::Int
+            if expr_type == Type::Bool {
+                Type::Bool
             } else {
                 panic!("Invalid type for not operation")
             }
@@ -647,7 +660,7 @@ fn check_if_struct_or_enum(context: &Context, t: &Type) -> Type {
                 .collect();
             Type::Function(Box::new(check_if_struct_or_enum(context, ret)), new_args)
         }
-        Type::Int | Type::Float | Type::Char | Type::Void => t.clone(),
+        Type::Bool | Type::Int | Type::Float | Type::Char | Type::Void => t.clone(),
     }
 }
 
@@ -703,7 +716,7 @@ fn type_statement(statement: &Statement, context: &Context) -> Typed<Statement> 
                 expr: new_condition,
                 type_: condition_type,
             } = type_expression(&condition.expr, context);
-            if condition_type != Type::Int {
+            if condition_type != Type::Bool {
                 panic!("Condition in if statement is not a boolean");
             }
             let Typed {
@@ -756,7 +769,7 @@ fn type_statement(statement: &Statement, context: &Context) -> Typed<Statement> 
                 expr: new_condition,
                 type_: condition_type,
             } = type_expression(&condition.expr, context);
-            if condition_type != Type::Int {
+            if condition_type != Type::Bool {
                 panic!("Condition in while statement is not a boolean");
             }
             let Typed {
@@ -787,7 +800,7 @@ fn type_statement(statement: &Statement, context: &Context) -> Typed<Statement> 
                 expr: new_condition,
                 type_: condition_type,
             } = type_expression(&condition.expr, context);
-            if condition_type != Type::Int {
+            if condition_type != Type::Bool {
                 panic!("Condition in for statement is not a boolean");
             }
             let Typed {
@@ -955,12 +968,12 @@ fn type_statement(statement: &Statement, context: &Context) -> Typed<Statement> 
                 type_: body_type,
             };
         }
-        Statement::Dowhile(expr, body) => {
+        Statement::Dowhile(condition, body) => {
             let Typed {
                 expr: new_expr,
                 type_: expr_type,
-            } = type_expression(&expr.expr, context);
-            if expr_type != Type::Int {
+            } = type_expression(&condition.expr, context);
+            if expr_type != Type::Bool {
                 panic!("Condition in do while statement is not a boolean");
             }
             let Typed {

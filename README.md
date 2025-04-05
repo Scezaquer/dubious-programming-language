@@ -16,7 +16,6 @@ A simple compiler for the Dubious programming language (DPL).
 - TODO: namespaces for functions, constants, structs, enums, unions
 - TODO: Reassignment for struct members, array elements and pointer dereference
 - TODO: Generic types
-- TODO: re-separate bool from int
 - TODO: Void pointers?  Im not entirely sure I need it as I can already freely cast anything to anything but that would make for more explicit code. This may be an alternative/complementary to generics, but I feel like it would be worse
 - TODO: let strings be defined over multiple lines like "hello "\n"world" in code would evaluate to the literal "hello world"
 - TODO: if a string literal spans multiple lines it throws off the line displayed by error messages
@@ -122,7 +121,7 @@ they are declared. They are essentially just aliases for literals, so expression
 only literals. If I implement expression pre-processing then maybe it'll become possible to have
 combinations of literals instead. Right now #define is more versatile.
 
-true/false booleans evaluate to 1 and 0 respectively.
+true/false booleans evaluate to 0xFFFFFFFFFFFFFFFF and 0 respectively.
 
 The compiler is pretty wasteful in terms of space, making everything 64 bits alined even when that's excessive,
 but on modern hardware that should not matter at all, and it makes my life easier.
@@ -195,7 +194,7 @@ TODO: Can't change elements in arrays yet
 
 ## Strings
 
-Type `str` is an alias of type `array[char]`. Type `bool` is an alias of type `int`
+Type `str` is an alias of type `array[char]`.
 
 The `char` type is different from usual. Since all data types are 64 bits, it
 would be very wasteful to have individual characters take 64 bits, especially

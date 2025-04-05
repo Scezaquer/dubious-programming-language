@@ -1,6 +1,6 @@
 fn main(): int {
-    if 0 {return 3;}
-	else if 1 {
+    if false {return 3;}
+	else if true {
 		return 4;
 	}
 	else return 5;

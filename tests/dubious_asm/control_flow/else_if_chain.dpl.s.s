@@ -50,7 +50,7 @@ else_1:
     jmp end_2
 else_2:
     ;if statement
-    mov rax, 1
+    mov rax, 0xFFFFFFFFFFFFFFFF
     cmp rax, 0
     je else_3
     mov rax, 3

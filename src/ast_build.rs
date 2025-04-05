@@ -57,6 +57,7 @@ impl<T> Typed<T> {
 /// Represents a literal value in the AST.
 #[derive(Debug, Clone)]
 pub enum Literal {
+	Bool(bool),
     Int(i64),
     Float(f64),
     Hex(i64),
@@ -102,6 +103,7 @@ pub enum Type {
     Float,
     Void,
     Char,
+	Bool,
     Pointer(Box<Type>),
     Array(Box<Type>), // array[type]. Strings are array[char]
     Function(Box<Type>, Vec<Type>),
@@ -309,6 +311,7 @@ pub enum Statement {
 /// Represents a function in the AST.
 #[derive(Debug, Clone)]
 pub enum Function {
+	//TODO: should be struct instead of enum
     Function(String, Vec<(String, Type)>, Typed<Statement>, Type),
 }
 
@@ -337,6 +340,7 @@ pub struct Ast {
 impl std::fmt::Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+			Literal::Bool(b) => write!(f, "{}", if *b {"0xFFFFFFFFFFFFFFFF"} else {"0"}),
             Literal::Int(i) => write!(f, "{}", i),
             Literal::Float(fl) => write!(f, "{}", fl),
             Literal::Hex(h) => write!(f, "0x{:x}", h),
@@ -379,13 +383,7 @@ fn parse_literal(token: &TokenWithDebugInfo) -> Typed<Literal> {
         TokenWithDebugInfo {
             internal_tok: Token::BoolLiteral(b),
             ..
-        } => {
-            if *b {
-                Typed::new_with_type(Literal::Int(1), Type::Int)
-            } else {
-                Typed::new_with_type(Literal::Int(0), Type::Int)
-            }
-        }
+        } => Typed::new_with_type(Literal::Bool(*b), Type::Bool),
         TokenWithDebugInfo {
             internal_tok: Token::CharLiteral(c),
             ..

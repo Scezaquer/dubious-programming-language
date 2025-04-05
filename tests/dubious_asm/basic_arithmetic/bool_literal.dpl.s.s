@@ -26,7 +26,7 @@ main:
     jmp end_0
 else_0:
     ;if statement
-    mov rax, 1
+    mov rax, 0xFFFFFFFFFFFFFFFF
     cmp rax, 0
     je else_1
     mov rax, 1

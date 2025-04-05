@@ -14,7 +14,7 @@ main:
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
     ;if statement
-    mov rax, 1
+    mov rax, 0xFFFFFFFFFFFFFFFF
     cmp rax, 0
     je else_0
     mov rax, 3

@@ -1,4 +1,4 @@
 fn main(): int {
-    if 0 {return 3;}
+    if false {return 3;}
 	else {return 4;}
 }
