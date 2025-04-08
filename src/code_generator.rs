@@ -38,7 +38,36 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
                 float_label_map.insert(label.clone(), f);
 
 				writeln!(file, "    movsd xmm0, [{}]	; Load float into xmm0", label).unwrap();
-			} else {
+			} else if let Literal::Char(c) = &constant.expr {
+				// Turn the character into the corresponding ASCII
+				// We need this encoding otherwise weird characters may cause
+				// malformed asm to be generated
+
+				let mut display_chars = String::new();
+				let mut encoding: i64 = 0;
+				for character in c.chars() {
+					if !character.is_ascii() { // Continue checking each character
+						panic!("Non ASCII character");
+					}
+					
+					// Build the display string for comments
+					match character {
+						'\n' => display_chars.push_str("\\n"),
+						'\r' => display_chars.push_str("\\r"),
+						'\t' => display_chars.push_str("\\t"),
+						'\0' => display_chars.push_str("\\0"),
+						c if c.is_ascii() && c.is_ascii_graphic() => display_chars.push(c),
+						_ => display_chars.push('?'),
+					};
+					
+					// Stack each byte into the encoding
+					encoding = (encoding << 8) | (character as i64);
+				}
+				
+				writeln!(file, "    mov rax, 0x{:x}	;{}", encoding, display_chars).unwrap();
+			}
+			
+			else {
 				// NOTE: change the std::fmt::Display trait for Constant in build_ast.rs in case it doesn't print the asm correctly
 				writeln!(file, "    mov rax, {}", constant).unwrap();
 			}

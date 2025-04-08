@@ -13,7 +13,7 @@ main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
-    mov rax, 'abcdefgh'
+    mov rax, 0x6162636465666768	;abcdefgh
     push rax
     mov rax, [rbp-8]
     add rsp, 8		;pop local variables before return

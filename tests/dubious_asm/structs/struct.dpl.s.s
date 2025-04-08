@@ -13,7 +13,7 @@ main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
-    mov rax, 'a'
+    mov rax, 0x61	;a
     push rax
     mov rax, 1
     push rax

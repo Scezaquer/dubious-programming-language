@@ -41,7 +41,7 @@ main:
     mov rax, rcx
     mov rax, rsp	; Move the address of the array to rax
     push rax
-    mov rax, 'b'
+    mov rax, 0x62	;b
     push rax
     mov rax, [rbp-104]
     push rax

@@ -13,19 +13,23 @@ main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
-    mov rax, '7890'
+    mov rax, 0x37383930	;7890
     push rax
-    mov rax, 'yz123456'
+    mov rax, 0x797a313233343536	;yz123456
     push rax
-    mov rax, 'qrstuvwx'
+    mov rax, 0x7172737475767778	;qrstuvwx
     push rax
-    mov rax, 'ijklmnop'
+    mov rax, 0x696a6b6c6d6e6f70	;ijklmnop
     push rax
-    mov rax, 'abcdefgh'
+    mov rax, 0x6162636465666768	;abcdefgh
     push rax
     mov rax, rsp	; Move the address of the array to rax
     push rax
-    mov rax, 24
+    mov rax, 8
+    push rax
+    mov rax, 4
+    pop rcx
+    imul rax, rcx
     push rax
     mov rax, [rbp-48]
     push rax

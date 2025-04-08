@@ -13,7 +13,7 @@ main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
-    mov rax, 'abc'
+    mov rax, 0x616263	;abc
     push rax
     mov rax, rsp	; Move the address of the array to rax
     push rax

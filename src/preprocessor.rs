@@ -82,7 +82,7 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 					// Get the directory of the current file
 					let current_dir = std::path::Path::new(filename).parent()
 						.unwrap_or(std::path::Path::new("."));
-					
+
 					// Construct the full path by joining the current directory and included file
 					let full_path = current_dir.join(file);
 					
@@ -103,7 +103,7 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 					// Add a comment to indicate the start of the included file to track the source of errors
 					processed_file.push_str(format!("// <{}>\n", full_path.display()).as_str());
 					processed_file.push_str(&included_file);
-					processed_file.push_str(format!("// </{}>\n", filename).as_str());
+					processed_file.push_str(format!("// <{}>\n", filename).as_str());
 				},
 				"define" => {
 					// #define [IDENTIFIER] [REPLACEMENT]

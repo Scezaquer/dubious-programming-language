@@ -543,14 +543,14 @@
 		"description" : "char with 8 characters, and shift it's bits to access one of the middle values",
 		"filename": "strings/long_char_shift.dpl",
 		"input": [],
-		"output": 102
+		"output": 99
 	},
 	{
 		"name": "long_char",
 		"description" : "char with 8 characters, return first one",
 		"filename": "strings/long_char.dpl",
 		"input": [],
-		"output": 97
+		"output": 104
 	},
 	{
 		"name": "long_str_shift",
@@ -571,7 +571,35 @@
 		"description" : "declare a short string, return it's first character",
 		"filename": "strings/str.dpl",
 		"input": [],
-		"output": 97
+		"output": 99
+	},
+	{
+		"name": "multiline_char",
+		"description" : "multiline char literal",
+		"filename": "strings/multiline_char.dpl",
+		"input": [],
+		"output": 111
+	},
+	{
+		"name": "multiline_str",
+		"description" : "multiline string literal",
+		"filename": "strings/multiline_str.dpl",
+		"input": [],
+		"output": 100
+	},
+	{
+		"name": "char_escape_characters",
+		"description" : "char literal with escape characters",
+		"filename": "strings/char_escape_characters.dpl",
+		"input": [],
+		"output": 39
+	},
+	{
+		"name": "str_escape_characters",
+		"description" : "string literal with escape characters",
+		"filename": "strings/str_escape_characters.dpl",
+		"input": [],
+		"output": 34
 	},
 	{
 		"name": "struct",

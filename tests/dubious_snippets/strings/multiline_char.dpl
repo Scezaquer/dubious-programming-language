@@ -1,0 +1,6 @@
+fn main(): int {
+	let a: char = 'He
+l
+lo';
+	return a : int; //o = 111
+}

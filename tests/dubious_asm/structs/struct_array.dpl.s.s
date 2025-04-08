@@ -23,14 +23,14 @@ main:
     mov rax, rsp
     add rax, 24
     push rax
-    mov rax, 'b'
+    mov rax, 0x62	;b
     pop rcx
     sub rsp, 8
     push rax
     mov rax, rcx
     sub rax, 24
     push rax
-    mov rax, 'a'
+    mov rax, 0x61	;a
     pop rcx
     sub rsp, 8
     push rax

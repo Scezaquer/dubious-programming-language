@@ -12,13 +12,10 @@ A simple compiler for the Dubious programming language (DPL).
 - TODO: std library
 - TODO: vscode syntax highlighting
 - TODO: Wiki
-- TODO: support escape characters
 - TODO: namespaces for functions, constants, structs, enums, unions
-- TODO: Reassignment for struct members, array elements and pointer dereference
 - TODO: Generic types
 - TODO: Void pointers?  Im not entirely sure I need it as I can already freely cast anything to anything but that would make for more explicit code. This may be an alternative/complementary to generics, but I feel like it would be worse
 - TODO: let strings be defined over multiple lines like "hello "\n"world" in code would evaluate to the literal "hello world"
-- TODO: if a string literal spans multiple lines it throws off the line displayed by error messages
 
 ### Optional
 
@@ -202,15 +199,15 @@ when manipulating long strings or text files. So `char` can actually contain
 up to 8 characters. This means that `'a'` is a char, but `'abcdefgh'` is also a char.
 However, `'abcdefghi'` is not.
 
-In memory, characters in the char are stored backwards, such that `'abcd'`
-corresponds to hex `0x64636261`, which naïvely translates to `dcba`. This is so
-that chars with less than 8 letters behave as expected (meaning, `'a'` corresponds
-to hex `0x61` instead of `0x6100000000000000`)
+In memory, characters in the char are in order, padded to the left, such that
+`'abcd'` corresponds to hex `0x61626364`. Char `'a'` corresponds to hex `0x61`
+(instead of `0x6100000000000000`).
 
 This also means that `str` are actually chunked into groups of 8 characters,
 which is important to keep in mind when indexing them. I.e., `let a: str = "abcdefghij"`
 will give you `a[0] == 'abcdefgh'` and `a[1] == 'ij'`. Finer access is obtained through
-casting to int and bitwise manipulation.
+casting to int and bitwise manipulation. The standard library should eventually
+implement nicer ways to manipulate strings.
 
 ## Structs
 

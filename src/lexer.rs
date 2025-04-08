@@ -107,6 +107,29 @@ impl PartialEq<TokenWithDebugInfo> for Token {
 	}
 }
 
+fn process_escape_sequence(s: &str) -> String {
+	// Process escape sequences in the string literal
+	let mut processed = String::new();
+	let mut chars = s.chars().peekable();
+	while let Some(c) = chars.next() {
+		if c == '\\' && chars.peek().is_some() {
+			match chars.next().unwrap() {
+				'n' => processed.push('\n'),
+				'r' => processed.push('\r'),
+				't' => processed.push('\t'),
+				'\\' => processed.push('\\'),
+				'\'' => processed.push('\''),
+				'"' => processed.push('"'),
+				'0' => processed.push('\0'),
+				c => processed.push(c), // Unknown escape, keep as is
+			}
+		} else {
+			processed.push(c);
+		}
+	}
+	return processed;
+}
+
 /// Lexes the input file and returns a list of tokens.
 /// 
 /// The lex function takes a string representing the contents of a file
@@ -177,10 +200,9 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
 
 	let preprocessor_re = Regex::new(r"^\#(include|define|undef|ifdef|ifndef|if|elif|else|endif|error|print).*?(\n|$)").unwrap();
 	
-	let char_re = Regex::new(r"^'[^']{0,8}?'").unwrap();
-	//let char_re = Regex::new(r"^'(?:\\'|[^']){0,8}'").unwrap(); // This one supports escaping quotes (\'), but the rest of the code doesn't so its commented out for now
+	let char_re = Regex::new(r"^'(?:\\.|[^\\']){0,8}'").unwrap();
 
-	let string_re = Regex::new(r#"^"(?:[^"\\]|\\.)*""#).unwrap();
+	let string_re = Regex::new(r#"^"(?:\\.|[^\\"])*""#).unwrap();
 
 	// Since the preprocessor will have removed actual comments, it's safe to assume that
 	// any line starting with // was something the preprocesser added
@@ -188,6 +210,8 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
 	let mut current_file = String::new();
 
     let mut pos: usize = 0; // Current position in the file
+
+	// The current line number in the file
 	let mut line_hashmap: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
 
     while pos < file.len() {
@@ -253,11 +277,17 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
             tok = Token::IntLiteral(caps.get(0).unwrap().as_str().parse().unwrap());
             pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = char_re.captures(rest) {
-			tok = Token::CharLiteral(caps.get(0).unwrap().as_str().strip_prefix("'").unwrap().strip_suffix("'").unwrap().to_string());
 			pos += caps.get(0).unwrap().end();
+			if let Some(file) = line_hashmap.get_mut(&current_file){
+				*file += caps.get(0).unwrap().as_str().matches('\n').count();
+			}
+			tok = Token::CharLiteral(process_escape_sequence(caps.get(0).unwrap().as_str().strip_prefix("'").unwrap().strip_suffix("'").unwrap()));
 		} else if let Some(caps) = string_re.captures(rest) {
-			tok = Token::StringLiteral(caps.get(0).unwrap().as_str().strip_prefix("\"").unwrap().strip_suffix("\"").unwrap().to_string());
 			pos += caps.get(0).unwrap().end();
+			if let Some(file) = line_hashmap.get_mut(&current_file){
+				*file += caps.get(0).unwrap().as_str().matches('\n').count();
+			}
+			tok = Token::StringLiteral(process_escape_sequence(caps.get(0).unwrap().as_str().strip_prefix("\"").unwrap().strip_suffix("\"").unwrap()));
 		} else if let Some(caps) = large_operator_re.captures(rest) {
             let op = match caps.get(0).unwrap().as_str() {
                 "==" => Operator::Equal,
