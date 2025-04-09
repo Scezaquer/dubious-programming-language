@@ -483,6 +483,13 @@
 		"output": 15
 	},
 	{
+		"name": "empty_define",
+		"description": "Define a macro with no value",
+		"filename": "preprocessor/empty_define.dpl",
+		"input": [],
+		"output": 0
+	},
+	{
 		"name": "pointer",
 		"description": "Pointer",
 		"filename": "pointers/pointer.dpl",

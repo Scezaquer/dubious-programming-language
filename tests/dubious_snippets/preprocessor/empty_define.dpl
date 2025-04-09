@@ -1,0 +1,6 @@
+#define test
+#ifdef test
+fn main(): int {
+	return 0;
+}
+#endif

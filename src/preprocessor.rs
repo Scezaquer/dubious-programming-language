@@ -45,7 +45,7 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 	let preprocessor_re = Regex::new(r"^\#(include|define|undef|ifdef|ifndef|else|endif|error|print)").unwrap();
 
 	let identifier_re = Regex::new(r"^(?:\s*)[a-zA-Z_][a-zA-Z0-9_]*").unwrap();
-	let replacement_re = Regex::new(r"^\s*(.*)\s*?(?:\n|$)").unwrap();
+	let replacement_re = Regex::new(r"^[\t ]*(.*)\s*?(?:\n|$)").unwrap();
 	let file_re = Regex::new(r"^(?:\s*)<(.*)>").unwrap();
 
     let comments_re = Regex::new(r"^\/\/.*(?:\n|$)").unwrap();

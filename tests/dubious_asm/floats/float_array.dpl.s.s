@@ -190,12 +190,12 @@ main:
     ret				;return by default if no return statement was reached
 
 section .data
-	.float.4: dq 6.71
 	.float.1: dq 7.0
+	.float.4: dq 6.71
 	.float.6: dq 0.7
-	.float.3: dq 3.14159
-	.float.0: dq 3.99
-	.float.2: dq 2.0
-	.float.5: dq 1.3
 	.float.7: dq 0.3
 	.float.8: dq 0.2
+	.float.2: dq 2.0
+	.float.5: dq 1.3
+	.float.0: dq 3.99
+	.float.3: dq 3.14159

@@ -70,7 +70,7 @@ an x86_64 assembly file or an elf64 binary.
 8. **Bitwise AND**: `a & b`
 9. **Bitwise XOR**: `a ^ b`
 10. **Bitwise OR**: `a | b`
-11. **Logical AND**: `a && b`V
+11. **Logical AND**: `a && b`
 12. **Logical XOR**: `a ^^ b`
 13. **Logical OR**: `a || b`
 14. **Type cast**: `a : b`
@@ -208,6 +208,8 @@ which is important to keep in mind when indexing them. I.e., `let a: str = "abcd
 will give you `a[0] == 'abcdefgh'` and `a[1] == 'ij'`. Finer access is obtained through
 casting to int and bitwise manipulation. The standard library should eventually
 implement nicer ways to manipulate strings.
+
+The following escape characters are supported: `\n \r \t \\ \' \" \0`
 
 ## Structs
 
