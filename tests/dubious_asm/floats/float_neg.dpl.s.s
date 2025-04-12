@@ -3,13 +3,12 @@ section .text
 
 global _start
 _start:
-    call main
+    call .toplevel.main
     mov rdi, rax
     mov rax, 60
     syscall
 
-global ftoint
-ftoint:
+.toplevel.ftoint:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
@@ -20,8 +19,7 @@ ftoint:
     pop rbp			;restore base pointer
     ret				;return by default if no return statement was reached
 
-global inttof
-inttof:
+.toplevel.inttof:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
@@ -32,8 +30,7 @@ inttof:
     pop rbp			;restore base pointer
     ret				;return by default if no return statement was reached
 
-global main
-main:
+.toplevel.main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
@@ -50,7 +47,7 @@ main:
 	addsd xmm0, xmm1
     movq rax, xmm0
     push rax
-    call ftoint
+    call .toplevel.ftoint
     add rsp, 8	;pop arguments
     add rsp, 0		;pop local variables before return
     pop rbx		;restore rbx for caller function
@@ -62,5 +59,5 @@ main:
     ret				;return by default if no return statement was reached
 
 section .data
-	.float.0: dq 3.25
 	.float.1: dq 1.25
+	.float.0: dq 3.25

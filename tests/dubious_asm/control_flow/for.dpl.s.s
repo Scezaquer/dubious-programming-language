@@ -3,13 +3,12 @@ section .text
 
 global _start
 _start:
-    call main
+    call .toplevel.main
     mov rdi, rax
     mov rax, 60
     syscall
 
-global main
-main:
+.toplevel.main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
@@ -19,7 +18,7 @@ main:
     ;for statement
     mov rax, 0
     mov [rbp-8], rax
-for_start_0:
+.for_start_0:
     mov rax, 10
     push rax
     mov rax, [rbp-8]
@@ -28,7 +27,7 @@ for_start_0:
     setl al
     movzx rax, al
     cmp rax, 0
-    je for_end_0
+    je .for_end_0
     mov rax, 2
     push rax
     mov rax, [rbp-16]
@@ -39,8 +38,8 @@ for_start_0:
     mov rax, [rbp-8]
     inc rax
     mov [rbp-8], rax
-    jmp for_start_0
-for_end_0:
+    jmp .for_start_0
+.for_end_0:
     mov rax, [rbp-16]
     push rax
     mov rax, [rbp-8]

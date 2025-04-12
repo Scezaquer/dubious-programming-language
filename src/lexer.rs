@@ -47,6 +47,7 @@ pub enum Operator {
     BitwiseOrAssign,    // |=
 	Comma,              // ,
 	MemberAccess,       // .
+	DoubleColon,		// ::
 }
 
 /// All the tokens that the lexer can recognize.
@@ -191,10 +192,10 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
     let operator_re = Regex::new(r"^[\+\-\*/%\^&~\|<>=!\.,]").unwrap();
 
     // Large operators are any of the following strings: == != <= >= && || ++ -- << >> += -= *= /= %= <<= >>= &= ^= |= ^^
-    let large_operator_re = Regex::new(r"^(==|!=|<=|>=|&&|\|\||\+\+|--|<<=|>>=|<<|>>|\+=|-=|\*=|\/=|%=|&=|\^=|\|=|\^\^)").unwrap();
+    let large_operator_re = Regex::new(r"^(==|!=|<=|>=|&&|\|\||\+\+|--|<<=|>>=|<<|>>|\+=|-=|\*=|\/=|%=|&=|\^=|\|=|\^\^|::)").unwrap();
 
     // Keywords are any of the following strings: if else while for return
-    let keyword_re = Regex::new(r"^(if|else|do|while|for|loop|return|fn|let|break|continue|const|struct|union|enum|asm)$").unwrap();
+    let keyword_re = Regex::new(r"^(if|else|do|while|for|loop|return|fn|let|break|continue|const|struct|union|enum|asm|namespace|spacename)$").unwrap();
 
 	let whitespace_re = Regex::new(r"^[^\S\n]+").unwrap();
 
@@ -248,9 +249,6 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
             pos += 1;
         } else if rest.starts_with(";") {
             tok = Token::Semicolon;
-            pos += 1;
-        } else if rest.starts_with(":") {
-            tok = Token::Colon;
             pos += 1;
         } else if rest.starts_with("{") {
             tok = Token::LBrace;
@@ -311,6 +309,7 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
                 "^=" => Operator::BitwiseXorAssign,
                 "|=" => Operator::BitwiseOrAssign,
                 "^^" => Operator::LogicalXor,
+				"::" => Operator::DoubleColon,
                 _ => unreachable!(),
             };
             tok = Token::Operator(op);
@@ -336,6 +335,9 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
             };
             tok = Token::Operator(op);
             pos += caps.get(0).unwrap().end();
+        } else if rest.starts_with(":") {
+            tok = Token::Colon;
+            pos += 1;
         } else if let Some(caps) = identifier_re.captures(rest) {
 			if primitive_type_re.is_match(caps.get(0).unwrap().as_str()) {
 				tok = Token::PrimitiveType(caps.get(0).unwrap().as_str().to_string());

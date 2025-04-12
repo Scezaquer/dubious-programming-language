@@ -47,10 +47,6 @@ impl<T> Typed<T> {
 	pub fn get_type(&self) -> &Type {
 		&self.type_
 	}
-
-	pub fn set_type(&mut self, type_: Type) {
-		self.type_ = type_;
-	}
 }
 
 
@@ -106,9 +102,9 @@ pub enum Type {
 	Bool,
     Pointer(Box<Type>),
     Array(Box<Type>), // array[type]. Strings are array[char]
-    Function(Box<Type>, Vec<Type>),
     Struct(String),
 	Enum(String),
+	Namespace(String, Box<Type>)
 }
 
 /// Represents a unary operator in the AST.
@@ -149,6 +145,7 @@ pub enum BinOp {
     LogicalAnd,
     LogicalXor,
     LogicalOr,
+	NamespaceAccess,
     NotABinaryOp, // Not pretty but it makes the code nicer
 }
 
@@ -237,6 +234,7 @@ fn get_bin_operator_from_token(token: &TokenWithDebugInfo) -> BinOp {
             Operator::LogicalXor => BinOp::LogicalXor,
             Operator::LogicalOr => BinOp::LogicalOr,
             Operator::MemberAccess => BinOp::MemberAccess,
+			Operator::DoubleColon => BinOp::NamespaceAccess,
             _ => BinOp::NotABinaryOp,
         },
         _ => BinOp::NotABinaryOp,
@@ -324,17 +322,20 @@ pub enum Constant {
     Constant(String, Typed<Literal>, Type),
 }
 
-/// Represents a program in the AST.
 #[derive(Debug, Clone)]
-pub enum Program {
-    //TODO: should be a struct instead of enum
-    Program(Vec<Typed<Function>>, Vec<Typed<Constant>>, Vec<Struct>, Vec<Enum>),
+pub struct Namespace{
+	pub id: String,
+	pub functions: Vec<Typed<Function>>,
+	pub constants: Vec<Typed<Constant>>,
+	pub structs: Vec<Struct>,
+	pub enums: Vec<Enum>,
+	pub sub_namespaces: Vec<Namespace>,
 }
 
 /// Represents the abstract syntax tree (AST) of a program.
 #[derive(Debug, Clone)]
 pub struct Ast {
-    pub program: Program,
+    pub program: Namespace,
 }
 
 impl std::fmt::Display for Literal {
@@ -500,35 +501,6 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Typed<Atom> {
                 }
                 return Typed::new(Atom::FunctionCall(s.to_string(), args));
             }
-            /*else if let TokenWithDebugInfo {
-                internal_tok: Token::LBracket,
-                ..
-            } = next_tok
-            {
-                // Array access
-                tokens.next();
-                let mut args = Vec::new();
-                loop {
-                    let next_tok = tokens.clone().next().unwrap();
-                    if let TokenWithDebugInfo {
-                        internal_tok: Token::RBracket,
-                        ..
-                    } = next_tok
-                    {
-                        tokens.next();
-                        break;
-                    } else if let TokenWithDebugInfo {
-                        internal_tok: Token::Comma,
-                        ..
-                    } = next_tok
-                    {
-                        tokens.next();
-                    } else {
-                        args.push(parse_expression(&mut tokens));
-                    }
-                }
-                return Atom::ArrayAccess(s.to_string(), args);
-            }*/
             else if let TokenWithDebugInfo {
                 internal_tok: Token::LBrace,
                 ..
@@ -859,7 +831,7 @@ fn parse_expression_with_precedence(
 /// The levels are ordered from highest to lowest precedence.
 ///
 /// # Precedence levels
-/// 1. Member access (.)
+/// 1. Member access (.) Namespace access (::)
 /// 2. Pre increment (++a) Pre decrement (--a) Unary plus (+a) Unary minus (-a) Logical not (!a) Bitwise not (~a) Dereference (*a) Address of (&a)
 /// 3. Exponentiation (a ** b)
 /// 4. Multiplication (a * b) Division (a / b) Modulus (a % b)
@@ -882,7 +854,7 @@ fn build_precedence_table() -> Vec<PrecedenceLevel> {
             assignment_ops: vec![],
         },
         PrecedenceLevel {
-            binary_ops: vec![BinOp::MemberAccess],
+            binary_ops: vec![BinOp::MemberAccess, BinOp::NamespaceAccess],
             unary_ops: vec![],
             assignment_ops: vec![],
         },
@@ -1037,37 +1009,23 @@ fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Type {
             return Type::Pointer(Box::new(inner_type));
         }
         TokenWithDebugInfo {
-            internal_tok: Token::LParen,
-            ..
-        } => {
-            let return_type = parse_type(&mut tokens);
-            let mut params = Vec::new();
-            loop {
-                let next_tok = tokens.clone().next().unwrap();
-                if let TokenWithDebugInfo {
-                    internal_tok: Token::RParen,
-                    ..
-                } = next_tok
-                {
-                    tokens.next();
-                    break;
-                } else if let TokenWithDebugInfo {
-                    internal_tok: Token::Comma,
-                    ..
-                } = next_tok
-                {
-                    tokens.next();
-                } else {
-                    params.push(parse_type(&mut tokens));
-                }
-            }
-            return Type::Function(Box::new(return_type), params);
-        }
-        TokenWithDebugInfo {
             internal_tok: Token::Identifier(id),
             ..
-        } => Type::Struct(id.to_string()), 	// Here we assume that the identifier is a struct name, but it could also be an enum, or just not exist
-										   	// in case there is no such struct/enum. We check for this in logic_checker.rs (check_if_struct_or_enum)
+        } => {
+			// Here we assume that the identifier is a struct name, but it could also be an enum, or just not exist
+			// in case there is no such struct/enum. We check for this in logic_checker.rs (check_if_struct_or_enum)
+			let next_tok = tokens.clone().next().unwrap();
+			if let TokenWithDebugInfo {
+				internal_tok: Token::Operator(Operator::DoubleColon),
+				..
+			} = next_tok
+			{
+				tokens.next();
+				Type::Namespace(id.to_string(), Box::new(parse_type(tokens)))
+			} else {
+				Type::Struct(id.to_string())
+			}
+		}
         _ => error_unexpected_token("valid type token", &tok),
     }
 }
@@ -1113,7 +1071,7 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
                     error_unexpected_token("colon", next_tok);
                 };
 
-                let var_type = parse_type(tokens); // TODO: Do something with this
+                let var_type = parse_type(tokens);
 
                 let next_tok = tokens.clone().next().unwrap();
                 if let TokenWithDebugInfo {
@@ -1334,6 +1292,7 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
     }
 
     let tok = tokens.next().unwrap();
+
     if !matches!(
         tok,
         TokenWithDebugInfo {
@@ -1370,7 +1329,7 @@ fn parse_const(tokens: &mut Iter<TokenWithDebugInfo>) -> Constant {
         error_unexpected_token("colon", next_tok);
     };
 
-    let var_type = parse_type(tokens); // TODO: Do something with this
+    let var_type = parse_type(tokens);
 
     let lit;
     let next_tok = tokens.clone().next().unwrap();
@@ -1654,12 +1613,48 @@ fn parse_enum(tokens: &mut Iter<TokenWithDebugInfo>) -> Enum {
 
 
 /// Parses an abstract syntax tree (AST) from a list of tokens.
-pub fn parse(tokens: &Vec<TokenWithDebugInfo>) -> Ast {
-    let mut tokens = tokens.iter();
+pub fn parse_namespace(tokens: &mut Iter<TokenWithDebugInfo>, is_toplevel: bool) -> Namespace {
+
+	let id;
+	if !is_toplevel {
+		let tok = tokens.next().unwrap();
+		if let TokenWithDebugInfo {
+			internal_tok: Token::Keyword(ref k),
+			..
+		} = tok {
+			if k != "namespace" {
+				error_unexpected_token("namespace keyword", &tok)
+			}
+		} else {
+			error_unexpected_token("namespace keyword", &tok)
+		}
+		let tok = tokens.next().unwrap();
+		id = match tok {
+			TokenWithDebugInfo {
+				internal_tok: Token::Identifier(id),
+				..
+			} => id.clone(),
+			TokenWithDebugInfo { .. } => error_unexpected_token("identifier", &tok),
+		};
+		let tok = tokens.next().unwrap();
+		if !matches!(
+			tok,
+			TokenWithDebugInfo {
+				internal_tok: Token::Semicolon,
+				..
+			}
+		) {
+			error_unexpected_token("semicolon", tok);
+		}
+	} else {
+		id = "toplevel".to_string();
+	}
+
     let mut functions = Vec::new();
     let mut constants = Vec::new();
     let mut structs = Vec::new();
 	let mut enums = Vec::new();
+	let mut sub_namespaces = Vec::new();
 
     // Parse functions until there are no more tokens
     loop {
@@ -1673,19 +1668,42 @@ pub fn parse(tokens: &Vec<TokenWithDebugInfo>) -> Ast {
                 internal_tok: Token::Keyword(ref k),
                 ..
             } => {
-				if k == "fn" {functions.push(Typed::new(parse_function(&mut tokens)))}
-				else if k == "const" {constants.push(Typed::new(parse_const(&mut tokens)))}
-				else if k == "struct" {structs.push(parse_struct(&mut tokens))}
-				else if k == "enum" {enums.push(parse_enum(&mut tokens))}
+				if k == "fn" {functions.push(Typed::new(parse_function(tokens)))}
+				else if k == "const" {constants.push(Typed::new(parse_const(tokens)))}
+				else if k == "struct" {structs.push(parse_struct(tokens))}
+				else if k == "enum" {enums.push(parse_enum(tokens))}
 				else if k == "union" {todo!("union")}
+				else if k == "namespace" {sub_namespaces.push(parse_namespace(tokens, false));}
+				else if k == "spacename" {
+					if is_toplevel {
+						error("cannot use 'spacename' outside of a namespace", &next_tok);
+					} else {
+						tokens.next();
+						let tok = tokens.next().unwrap();
+						if !matches!(
+							tok,
+							TokenWithDebugInfo {
+								internal_tok: Token::Semicolon,
+								..
+							}
+						) {
+							error_unexpected_token("semicolon", &tok);
+						}
+						break
+					}
+				}
 				else {error_unexpected_token("function, constant, struct, enum or union declaration", &next_tok)}
 			}
 			_ => error_unexpected_token("function, constant, struct, enum or union declaration", &next_tok),
         }
     }
 
-    let ast = Ast {
-        program: Program::Program(functions, constants, structs, enums),
-    };
-    return ast;
+	Namespace { id, functions, constants, structs, enums, sub_namespaces }
+}
+
+pub fn parse(tokens: &Vec<TokenWithDebugInfo>) -> Ast {
+	let mut tokens = tokens.iter();
+	let program = parse_namespace(&mut tokens, true);
+
+	Ast { program }
 }

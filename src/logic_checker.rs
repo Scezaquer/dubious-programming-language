@@ -1,11 +1,10 @@
-// TODO: Typechecking
 // TODO: Check uninitialized variables aren't called
 // TODO: Complain if a variable is declared but never used
 // TODO: Check that the return type of a function matches the type of the return statement in every branch
 // TODO: is there ambiguity between function and variable names?
 
 use crate::ast_build::{
-    AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Expression, Function, Literal, Program,
+    AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Expression, Function, Literal, Namespace,
     Statement, Type, Typed, UnOp, Enum, Struct
 };
 use crate::ast_build::{Constant, ReassignmentIdentifier};
@@ -14,6 +13,7 @@ use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
 struct Context {
+	namespace: String,
     variables: HashMap<String, Type>,
     functions: HashMap<String, (Type, Vec<Type>)>,
     structs: HashMap<String, (Vec<(String, Type)>, HashMap<String, Type>)>,
@@ -72,10 +72,15 @@ fn type_atom(expr: &Expression, atom: &Atom, context: &Context) -> Typed<Express
                     expr: Expression::Atom(Typed::new_with_type(Atom::Variable(v.clone()), var_type.clone())),
                     type_: var_type.clone(),
                 }
-            } else if let Some(_) = context.enums.get(v) {
+            } else if let Some(var_type) = context.variables.get(&format!("{}{}", context.namespace, v)) {
                 Typed {
-                    expr: Expression::Atom(Typed::new_with_type(Atom::Variable(v.clone()), Type::Enum(v.clone()))),
-                    type_: Type::Enum(v.clone()),
+                    expr: Expression::Atom(Typed::new_with_type(Atom::Variable(format!("{}{}", context.namespace, v)), var_type.clone())),
+                    type_: var_type.clone(),
+                }
+            } else if let Some(_) = context.enums.get(&format!("{}{}", context.namespace, v)) {
+                Typed {
+                    expr: Expression::Atom(Typed::new_with_type(Atom::Variable(format!("{}{}", context.namespace, v)), Type::Enum(format!("{}{}", context.namespace, v)))),
+                    type_: Type::Enum(format!("{}{}", context.namespace, v)),
                 }
             } else {
                 panic!("Variable '{}' not in scope", v)
@@ -111,6 +116,7 @@ fn type_atom(expr: &Expression, atom: &Atom, context: &Context) -> Typed<Express
             }
         }
         Atom::FunctionCall(name, args) => {
+			let name = if name.contains("::") { name } else { &format!("{}{}", context.namespace, name) };
             if let Some((function_type, args_types)) = context.functions.get(name) {
                 let mut new_args = Vec::new();
                 
@@ -136,7 +142,7 @@ fn type_atom(expr: &Expression, atom: &Atom, context: &Context) -> Typed<Express
                 
                 Typed {
                     expr: Expression::Atom(Typed {
-                        expr: Atom::FunctionCall(name.clone(), new_args),
+                        expr: Atom::FunctionCall(name.to_string(), new_args),
                         type_: function_type.clone(),
                     }),
                     type_: function_type.clone(),
@@ -147,6 +153,7 @@ fn type_atom(expr: &Expression, atom: &Atom, context: &Context) -> Typed<Express
         }
         Atom::Expression(expr) => type_expression(&expr.expr, context),
         Atom::StructInstance(id, exprs) => {
+			let id = if id.contains("::") { id } else { &format!("{}{}", context.namespace, id) };
             if let Some((ordered_list, _)) = context.structs.get(id) {
                 if exprs.len() != ordered_list.len() {
                     panic!(
@@ -176,7 +183,7 @@ fn type_atom(expr: &Expression, atom: &Atom, context: &Context) -> Typed<Express
                 }
                 Typed {
                     expr: Expression::Atom(Typed {
-                        expr: Atom::StructInstance(id.to_string(), new_exprs),
+                        expr: Atom::StructInstance(id.clone(), new_exprs),
                         type_: Type::Struct(id.clone()),
                     }),
                     type_: Type::Struct(id.clone()),
@@ -188,103 +195,150 @@ fn type_atom(expr: &Expression, atom: &Atom, context: &Context) -> Typed<Express
     }
 }
 
+
+fn type_member_access(
+	lhs: &Expression,
+    rhs: &Expression,
+    op: &BinOp,
+    context: &Context,
+	lhs_expr: Expression,
+	lhs_type: Type
+) -> Typed<Expression> {
+	
+	// Treat member access separately from the other operators, otherwise
+    // we try to typecheck both sides, but the rhs isn't defined as a
+    // separate variable so it crashes
+	if let Type::Struct(s) = lhs_type.clone() {
+		if let Expression::Atom(Typed {
+			expr: Atom::Variable(attribute),
+			..
+		}) = rhs
+		{
+			let s = if s.contains("::") { s } else { format!("{}{}", context.namespace, s) };
+			let (ordered_list, unordered_list) = context
+				.structs
+				.get(&s)
+				.expect(format!("Undefined struct {}", lhs_type).as_str());
+
+			if let Some(t) = unordered_list.get(attribute) {
+				// Slow but whatever. Don't make structs with a bajillion members,
+				// or if you do change this to a hashmap
+				let index = ordered_list
+					.iter()
+					.position(|(attr, _)| attr == attribute)
+					.expect("Attribute not found in ordered list")
+					as i64;
+				return Typed {
+					expr: Expression::BinaryOp(
+						Box::new(Typed {
+							expr: lhs_expr,
+							type_: lhs_type,
+						}),
+						Box::new(Typed {
+							expr: Expression::Atom(Typed {
+								expr: Atom::Literal(Typed {
+									expr: Literal::Int(index),
+									type_: Type::Int,
+								}),
+								type_: Type::Int,
+							}),
+							type_: Type::Int,
+						}),
+						op.clone(),
+					),
+					type_: t.clone(),
+				};
+			} else {
+				dbg!(context.structs.clone(), s);
+				panic!("Struct '{}' does not have member '{}'", lhs, rhs);
+			}
+		} else {
+			panic!("Member access must be on a variable");
+		}
+	} else if let Type::Enum(e) = lhs_type.clone() {
+		if let Expression::Atom(Typed {
+			expr: Atom::Variable(attribute),
+			..
+		}) = rhs
+		{
+			if let Some(variants) = context.enums.get(&e) {
+				if variants.contains(attribute) {
+					return Typed {
+						expr: Expression::Atom(Typed {
+							expr: Atom::Literal(Typed {
+								expr: Literal::Int(
+									variants.iter().position(|v| v == attribute).unwrap()
+										as i64,
+								),
+								type_: Type::Int,
+							}),
+							type_: Type::Int,
+						}),
+						type_: Type::Enum(e),
+					};
+				} else {
+					dbg!(context.enums.clone());
+					panic!("Enum '{}' does not have variant '{}'", e, attribute);
+				}
+			} else {
+				panic!("Enum '{}' not in scope", e);
+			}
+		} else {
+			panic!("Member access must be on a variable");
+		}
+	} else {
+		panic!(
+			"Type {} is not a struct or an enum, members access is undefined",
+			lhs_type
+		)
+	}
+}
+
+
+fn type_namespace_access(
+	lhs: &Expression,
+	rhs: &Expression,
+	context: &Context,
+) -> Typed<Expression> {
+	if let Expression::Atom(Typed {
+		expr: Atom::Variable(namespace),
+		..
+	}) = lhs
+	{
+		let namespace_path = format!("{}{}::", context.namespace, namespace);
+		type_expression(rhs, &Context {
+			namespace: namespace_path,
+			variables: context.variables.clone(),
+			functions: context.functions.clone(),
+			structs: context.structs.clone(),
+			enums: context.enums.clone(),
+			array_dims: context.array_dims.clone(),
+		})
+	} else {
+		panic!("Namespace access must be on a variable");
+	}
+}
+
+
 fn type_binaryop(
     lhs: &Expression,
     rhs: &Expression,
     op: &BinOp,
     context: &Context,
 ) -> Typed<Expression> {
+
+	if let BinOp::NamespaceAccess = op {
+		return type_namespace_access(lhs, rhs, context);
+	}
+
     let Typed {
         expr: lhs_expr,
         type_: lhs_type,
     } = type_expression(lhs, context);
 
-    // Treat member access separately from the other operators, otherwise
-    // we try to typecheck both sides, but the rhs isn't defined as a
-    // separate variable so it crashes
     if let BinOp::MemberAccess = op {
-        if let Type::Struct(s) = lhs_type.clone() {
-            if let Expression::Atom(Typed {
-                expr: Atom::Variable(attribute),
-                ..
-            }) = rhs
-            {
-                let (ordered_list, unordered_list) = context
-                    .structs
-                    .get(&s)
-                    .expect(format!("Undefined struct {}", lhs_type).as_str());
-
-                if let Some(t) = unordered_list.get(attribute) {
-                    // Slow but whatever. Don't make structs with a bajillion members,
-                    // or if you do change this to a hashmap
-                    let index = ordered_list
-                        .iter()
-                        .position(|(attr, _)| attr == attribute)
-                        .expect("Attribute not found in ordered list")
-                        as i64;
-                    return Typed {
-                        expr: Expression::BinaryOp(
-                            Box::new(Typed {
-                                expr: lhs_expr,
-                                type_: lhs_type,
-                            }),
-                            Box::new(Typed {
-                                expr: Expression::Atom(Typed {
-                                    expr: Atom::Literal(Typed {
-                                        expr: Literal::Int(index),
-                                        type_: Type::Int,
-                                    }),
-                                    type_: Type::Int,
-                                }),
-                                type_: Type::Int,
-                            }),
-                            op.clone(),
-                        ),
-                        type_: t.clone(),
-                    };
-                } else {
-                    panic!("Struct '{}' does not have member '{}'", lhs, rhs);
-                }
-            } else {
-                panic!("Member access must be on a variable");
-            }
-        } else if let Type::Enum(e) = lhs_type.clone() {
-            if let Expression::Atom(Typed {
-                expr: Atom::Variable(attribute),
-                ..
-            }) = rhs
-            {
-                if let Some(variants) = context.enums.get(&e) {
-                    if variants.contains(attribute) {
-                        return Typed {
-                            expr: Expression::Atom(Typed {
-                                expr: Atom::Literal(Typed {
-                                    expr: Literal::Int(
-                                        variants.iter().position(|v| v == attribute).unwrap()
-                                            as i64,
-                                    ),
-                                    type_: Type::Int,
-                                }),
-                                type_: Type::Int,
-                            }),
-                            type_: Type::Enum(e),
-                        };
-                    } else {
-                        panic!("Enum '{}' does not have variant '{}'", e, attribute);
-                    }
-                } else {
-                    panic!("Enum '{}' not in scope", e);
-                }
-            } else {
-                panic!("Member access must be on a variable");
-            }
-        } else {
-            panic!(
-                "Type {} is not a struct or an enum, members access is undefined",
-                lhs_type
-            )
-        }
-    }
+		return type_member_access(lhs, rhs, op, context, lhs_expr, lhs_type);
+	}
 
     let Typed {
         expr: rhs_expr,
@@ -339,8 +393,11 @@ fn type_binaryop(
             }
         }
         BinOp::MemberAccess => {
-            panic!("Unreachable code, member access is turned into array-like access earlier")
+            unreachable!()
         }
+		BinOp::NamespaceAccess => {
+			unreachable!()
+		}
         BinOp::NotABinaryOp => {
             panic!("Invalid binary operation")
         }
@@ -634,8 +691,9 @@ fn type_arrayaccess(
 fn check_if_struct_or_enum(context: &Context, t: &Type) -> Type {
     match t {
         Type::Struct(id) => {
+			let id = if id.contains("::") { id } else { &format!("{}{}", context.namespace, id) };
             if let Some(_) = context.structs.get(id) {
-                t.clone()
+                Type::Struct(id.clone())
             } else if let Some(_) = context.enums.get(id) {
                 Type::Enum(id.clone())
             } else {
@@ -643,24 +701,38 @@ fn check_if_struct_or_enum(context: &Context, t: &Type) -> Type {
             }
         }
         Type::Enum(id) => {
+			let id = if id.contains("::") { id } else { &format!("{}{}", context.namespace, id) };
             if let Some(_) = context.structs.get(id) {
                 Type::Struct(id.clone())
             } else if let Some(_) = context.enums.get(id) {
-                t.clone()
+                Type::Enum(id.clone())
             } else {
                 panic!("Type '{}' not in scope", id);
             }
         }
         Type::Array(t) => Type::Array(Box::new(check_if_struct_or_enum(context, t))),
         Type::Pointer(t) => Type::Pointer(Box::new(check_if_struct_or_enum(context, t))),
-        Type::Function(ret, args) => {
-            let new_args = args
-                .iter()
-                .map(|t| check_if_struct_or_enum(context, t))
-                .collect();
-            Type::Function(Box::new(check_if_struct_or_enum(context, ret)), new_args)
-        }
         Type::Bool | Type::Int | Type::Float | Type::Char | Type::Void => t.clone(),
+		Type::Namespace(id, t) => {
+			match &**t {
+				Type::Struct(sub_id) => {
+					check_if_struct_or_enum(context, &Type::Struct(format!("{}{}::{}", context.namespace, id, sub_id)))
+				}
+				Type::Enum(sub_id) => {
+					check_if_struct_or_enum(context, &Type::Enum(format!("{}{}::{}", context.namespace, id, sub_id)))
+				}
+				Type::Namespace(sub_id, sub_t) => {
+					if id == "toplevel" {
+						let mut context = context.clone();
+						context.namespace = "".to_string();
+						check_if_struct_or_enum(&context, &Type::Namespace(sub_id.clone(), sub_t.clone()))
+					} else {
+						check_if_struct_or_enum(context, &Type::Namespace(format!("{}{}::{}", context.namespace, id, sub_id), sub_t.clone()))
+					}
+				}
+				_ => panic!("Type '{}' cannot be namespaced (only struct or enums may be)", id),
+			}
+		}
     }
 }
 
@@ -834,6 +906,8 @@ fn type_statement(statement: &Statement, context: &Context) -> Typed<Statement> 
             };
         }
         Statement::Compound(statements) => {
+			// TODO: Check all return statements in a compound statement have the same type
+			// The return statements in inner-blocks should be checked recursively too
             let mut new_context = context.clone();
             let mut last_type = Type::Void;
             let mut new_statements = Vec::new();
@@ -1003,57 +1077,121 @@ fn type_statement(statement: &Statement, context: &Context) -> Typed<Statement> 
     }
 }
 
-fn typechecking(ast: &Ast) -> Ast {
-    let Program::Program(functions, constants, structs, enums) = &ast.program;
-    let mut context = Context {
-        variables: HashMap::new(),
-        functions: HashMap::new(),
-        structs: HashMap::new(),
-        enums: HashMap::new(),
-        array_dims: HashMap::new(),
-    };
-
+fn get_all_functions_structs_enums_consts(
+	namespace: &Namespace, namespace_path: &str
+) -> (HashMap<String, (Type, Vec<Type>)>, HashMap<String, (Vec<(String, Type)>, HashMap<String, Type>)>, HashMap<String, Vec<String>>, HashMap<String, Type>) {
 
 	// Functions, structs and enums are defined everywhere, even before declaration
-	// so we need to add them to the context before typechecking them
+	// so we need to add them to the context before typechecking them. This
+	// allows recursion
 
-    for function in functions {
-        // Functions are defined everywhere
-        let Function::Function(name, args, _, return_type) = &function.expr;
-        // Extract only the types from args, discarding the parameter names
-        let arg_types: Vec<Type> = args.iter().map(|(_, t)| t.clone()).collect();
-        context.functions.insert(
+	let namespace_path = format!("{}{}::", namespace_path, namespace.id);
+
+	let mut functions = HashMap::new();
+	let mut structs = HashMap::new();
+	let mut enums = HashMap::new();
+	let mut constants = HashMap::new();
+
+	for function in &namespace.functions {
+		let Function::Function(name, args, _, return_type) = &function.expr;
+		let name = format!("{}{}", namespace_path, name);
+
+		if functions.contains_key(&name) {
+			panic!("Function '{}' is declared more than once", name);
+		}
+
+		let arg_types: Vec<Type> = args.iter().map(|(_, t)| t.clone()).collect();
+        functions.insert(
             name.clone(),
-            (check_if_struct_or_enum(&context, &return_type), arg_types),
+            (return_type.clone(), arg_types),
         );
-    }
-
-	for enum_ in enums {
-		let Enum {id, variants} = enum_;
-
-		if context.enums.contains_key(id) {
-            panic!("Enum '{}' is declared more than once", id);
-        }
-	
-		context.enums.insert(id.clone(), variants.clone());
 	}
 
-	for struct_ in structs {
-		let Struct {id, members} = struct_;
-
-		if context.structs.contains_key(id) {
-            panic!("Struct '{}' is declared more than once", id);
-        } else if context.enums.contains_key(id) {
-            panic!("Struct '{}' has the same name as an enum", id);
-        }
-
-		context.structs.insert(id.clone(), (members.clone(), HashMap::new()));
+	for struct_ in &namespace.structs {
+		let Struct { id, members } = struct_;
+		let id = format!("{}{}", namespace_path, id);
+		if structs.contains_key(&id) {
+			panic!("Struct '{}' is declared more than once", id);
+		} else if enums.contains_key(&id) {
+			panic!("Struct '{}' has the same name as an enum", id);
+		}
+		let unordered_list = members
+			.iter()
+			.map(|(name, t)| (name.clone(), t.clone()))
+			.collect::<HashMap<_, _>>();
+		structs.insert(id.clone(), (members.clone(), unordered_list));
 	}
+
+	for enum_ in &namespace.enums {
+		let Enum { id, .. } = enum_;
+		let id = format!("{}{}", namespace_path, id);
+		if enums.contains_key(&id) {
+			panic!("Enum '{}' is declared more than once", id);
+		} else if structs.contains_key(&id) {
+			panic!("Enum '{}' has the same name as a struct", id);
+		}
+		let variants = enum_
+			.variants
+			.iter()
+			.map(|variant| variant.clone())
+			.collect::<Vec<_>>();
+		enums.insert(id.clone(), variants);
+	}
+
+	for constant in &namespace.constants {
+		let Constant::Constant(name, _, var_type) = &constant.expr;
+		let name = format!("{}{}", namespace_path, name);
+
+		if constants.contains_key(&name) {
+			panic!("Constant '{}' is declared more than once", name);
+		}
+
+		constants.insert(name.clone(), var_type.clone());
+	}
+
+	for sub_namespace in &namespace.sub_namespaces {
+		let (sub_functions, sub_structs, sub_enums, sub_constants) =
+			get_all_functions_structs_enums_consts(&sub_namespace, &namespace_path);
+		functions.extend(sub_functions);
+		structs.extend(sub_structs);
+		enums.extend(sub_enums);
+		constants.extend(sub_constants);
+	}
+
+	(functions, structs, enums, constants)
+}
+
+fn typechecking(
+	namespace: &Namespace,
+	is_toplevel: bool,
+	namespace_path: &str,
+	all_functions: HashMap<String, (Type, Vec<Type>)>,
+	all_structs: HashMap<String, (Vec<(String, Type)>, HashMap<String, Type>)>,
+	all_enums: HashMap<String, Vec<String>>,
+	all_constants: HashMap<String, Type>
+) -> Namespace {
+    let Namespace{ id, functions, constants, structs, enums, sub_namespaces } = namespace;
+
+	if id == "toplevel" && !is_toplevel {
+		panic!("toplevel namespace is reserved, use a different name");
+	}
+
+	let namespace_path = format!("{}{}::", namespace_path, id);
+
+    let mut context = Context {
+		namespace: namespace_path.clone(),
+        variables: all_constants.clone(),
+        functions: all_functions.clone(),
+        structs: all_structs.clone(),
+        enums: all_enums.clone(),
+        array_dims: HashMap::new(),
+    };
 
 	// Now we can do proper typechecking
 
     for enum_ in enums {
         let Enum { id, variants } = enum_;
+		let id = format!("{}{}", namespace_path, id);
 
         let mut variant_set = HashSet::new();
         let mut variant_list = Vec::new();
@@ -1069,10 +1207,7 @@ fn typechecking(ast: &Ast) -> Ast {
     let mut typed_constants = Vec::new();
     for constant in constants {
         let Constant::Constant(name, lit, var_type) = &constant.expr;
-
-        if context.variables.contains_key(name) {
-            panic!("Constant '{}' is declared more than once", name);
-        }
+		let name = format!("{}{}", namespace_path, name);
 
         let Typed {
             type_: expr_type, ..
@@ -1094,6 +1229,7 @@ fn typechecking(ast: &Ast) -> Ast {
 
     for struct_ in structs {
         let Struct { id, members } = struct_;
+		let id = format!("{}{}", namespace_path, id);
 
         let mut member_names = HashSet::new();
         for (name, _) in members {
@@ -1118,6 +1254,8 @@ fn typechecking(ast: &Ast) -> Ast {
 
     for function in functions {
         let Function::Function(name, params, body, return_type) = &function.expr;
+		let name = format!("{}{}", namespace_path, name);
+	
         let mut local_context = context.clone();
         // Function parameters are only in scope in the function
         for (param_name, param_type) in params.clone() {
@@ -1149,15 +1287,39 @@ fn typechecking(ast: &Ast) -> Ast {
         });
     }
 
-    let new_ast = Ast {
-        program: Program::Program(
-            new_functions,
-            typed_constants,
-            structs.clone(),
-            enums.clone(),
-        ),
-    };
-    return new_ast;
+	let mut new_enums = enums.clone();
+	let mut new_structs = structs.clone();
+
+	for sub_namespace in sub_namespaces.iter(){
+		let Namespace { 
+			functions: sub_functions,
+			constants: sub_constants,
+			structs: sub_structs,
+			enums: sub_enums,
+			.. } = typechecking(
+				sub_namespace,
+				false,
+				namespace_path.as_str(),
+				all_functions.clone(),
+				all_structs.clone(),
+				all_enums.clone(),
+				all_constants.clone()
+			);
+		
+		new_functions.extend(sub_functions);
+		typed_constants.extend(sub_constants);
+		new_structs.extend(sub_structs);
+		new_enums.extend(sub_enums);
+	}
+
+    Namespace {
+		id: id.to_string(),
+		functions: new_functions,
+		constants: typed_constants,
+		structs: new_structs,
+		enums: new_enums,
+		sub_namespaces: vec![],
+    }
 }
 
 pub fn check_program(ast: &Ast) -> Ast {
@@ -1166,7 +1328,7 @@ pub fn check_program(ast: &Ast) -> Ast {
     let mut main_found = false;
     let mut function_names = HashSet::new();
 
-    let Program::Program(functions, _, _, _) = &ast.program;
+    let Namespace{ functions, ..} = &ast.program;
     for function in functions {
         let Function::Function(name, _, _, ret_type) = &function.expr;
         if name == "main" {
@@ -1185,5 +1347,11 @@ pub fn check_program(ast: &Ast) -> Ast {
         panic!("No main function found");
     }
 
-    return typechecking(ast);
+	// We do a pre-parsing pass to get all functions, structs, enums and constants
+	// This lets us use functions, structs and enums before they are declared
+	// and allows recursivity
+	let (functions,structs,enums, constants) = 
+		get_all_functions_structs_enums_consts(&ast.program, "");
+	
+    Ast{ program: typechecking(&ast.program, true, "", functions, structs, enums, constants) }
 }

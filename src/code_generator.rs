@@ -1,6 +1,6 @@
 use crate::ast_build::{
     AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Literal,
-    Program, ReassignmentIdentifier, Statement, Struct, UnOp, Typed, Type
+    Namespace, ReassignmentIdentifier, Statement, Struct, UnOp, Typed, Type
 };
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -25,8 +25,6 @@ lazy_static! {
     };
 }
 
-// TODO: test all of these one by one (pain)
-
 /// Generates the assembly code for an atom
 fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
     match atom {
@@ -37,7 +35,7 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
                 let mut float_label_map = FLOAT_LABEL_MAP.lock().unwrap();
                 float_label_map.insert(label.clone(), f);
 
-				writeln!(file, "    movsd xmm0, [{}]	; Load float into xmm0", label).unwrap();
+				writeln!(file, "    movsd xmm0, [{}]	; Load float into xmm0", label.replace("::", "..")).unwrap();
 			} else if let Literal::Char(c) = &constant.expr {
 				// Turn the character into the corresponding ASCII
 				// We need this encoding otherwise weird characters may cause
@@ -97,7 +95,7 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
                 	.constants
                 	.get(variable)
                 	.expect(format!("Undeclared variable {}", variable).as_str());
-            	writeln!(file, "    {} {}, [.{}]", instruction, register, constant).unwrap();
+            	writeln!(file, "    {} {}, [.constant.{}]", instruction, register, constant.replace("::", ".")).unwrap();
 			}
         }
         Typed{expr: Atom::Expression(expression), ..} => {
@@ -119,7 +117,7 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 
                 writeln!(file, "    push rax").unwrap();
             }
-            writeln!(file, "    call {}", name).unwrap();
+            writeln!(file, "    call .{}", name.replace("::", ".")).unwrap();
             writeln!(file, "    add rsp, {}	;pop arguments", args.len() * 8).unwrap();
             // Pop arguments from stack
         }
@@ -531,6 +529,9 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 					BinOp::MemberAccess => {
 						panic!("Member access not implemented for floats");
 					}
+					BinOp::NamespaceAccess => {
+						panic!("Namespace access not implemented for floats");
+					}
 					BinOp::NotABinaryOp => {
 						panic!("Not a binary op");
 					}
@@ -613,6 +614,9 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 					BinOp::MemberAccess => {
 						panic!("Unreachable code, member access is turned into array access much earlier");
 					}
+					BinOp::NamespaceAccess => {
+						panic!("Namespace access not implemented");
+					}
 					BinOp::NotABinaryOp => {
 						panic!("Not a binary op");
 					}
@@ -687,10 +691,6 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 			} else if expr_type != Type::Float && cast_type == &Type::Float {
 				writeln!(file, "    movq xmm0, rax").unwrap();
 			}
-
-			// TODO: casting literally interprets the bits of the float as an int.
-			// I should have a different method that actually converts the float to an int
-			// and vice versa. Maybe in std?
         }
         Typed{expr: Expression::ArrayAccess(variable, indices), type_} => {
             generate_expression(file, variable, context);
@@ -865,8 +865,8 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>
                 Typed{expr: Statement::If(condition, if_statement, else_statement), ..} => {
                     let branch_label =
                         BRANCH_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    let else_label = format!("else_{}", branch_label);
-                    let end_label = format!("end_{}", branch_label);
+                    let else_label = format!(".else_{}", branch_label);
+                    let end_label = format!(".end_{}", branch_label);
 
                     writeln!(file, "    ;if statement").unwrap();
                     generate_expression(file, condition, &mut context);
@@ -882,8 +882,8 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>
                 }
                 Typed{expr: Statement::While(condition, statement), ..} => {
                     let loop_label = LOOP_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    let start_label = format!("while_start_{}", loop_label);
-                    let end_label = format!("while_end_{}", loop_label);
+                    let start_label = format!(".while_start_{}", loop_label);
+                    let end_label = format!(".while_end_{}", loop_label);
 
                     context.continue_label = Some(start_label.clone());
                     context.break_label = Some(end_label.clone());
@@ -899,8 +899,8 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>
                 }
                 Typed{expr: Statement::Loop(statement), ..} => {
                     let loop_label = LOOP_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    let start_label = format!("loop_start_{}", loop_label);
-                    let end_label = format!("loop_end_{}", loop_label);
+                    let start_label = format!(".loop_start_{}", loop_label);
+                    let end_label = format!(".loop_end_{}", loop_label);
 
                     context.continue_label = Some(start_label.clone());
                     context.break_label = Some(end_label.clone());
@@ -913,8 +913,8 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>
                 }
                 Typed{expr: Statement::Dowhile(condition, statement), ..} => {
                     let loop_label = LOOP_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    let start_label = format!("dowhile_start_{}", loop_label);
-                    let end_label = format!("dowhile_end_{}", loop_label);
+                    let start_label = format!(".dowhile_start_{}", loop_label);
+                    let end_label = format!(".dowhile_end_{}", loop_label);
 
                     context.continue_label = Some(start_label.clone());
                     context.break_label = Some(end_label.clone());
@@ -929,8 +929,8 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>
                 }
                 Typed{expr: Statement::For(init, condition, update, statement), ..} => {
                     let loop_label = LOOP_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    let start_label = format!("for_start_{}", loop_label);
-                    let end_label = format!("for_end_{}", loop_label);
+                    let start_label = format!(".for_start_{}", loop_label);
+                    let end_label = format!(".for_end_{}", loop_label);
 
                     context.continue_label = Some(start_label.clone());
                     context.break_label = Some(end_label.clone());
@@ -992,8 +992,7 @@ fn generate_function(file: &mut File, function: &Typed<Function>, context: &Cont
     context.stack_index = 0;
 
     writeln!(file, "").unwrap();
-    writeln!(file, "global {}", name).unwrap();
-    writeln!(file, "{}:", name).unwrap();
+    writeln!(file, ".{}:", name.replace("::", ".")).unwrap();
     writeln!(file, "    push rbp		;save previous base pointer").unwrap();
     writeln!(file, "    push rbx		;functions should preserve rbx").unwrap();
     writeln!(file, "    mov rbp, rsp	;set base pointer").unwrap();
@@ -1010,7 +1009,7 @@ fn generate_function(file: &mut File, function: &Typed<Function>, context: &Cont
 fn generate_constants(file: &mut File, const_vector: &Vec<Typed<Constant>>) {
 	for constant in const_vector.iter(){
 		let Typed{expr: Constant::Constant(name, constant, _), ..} = constant;
-    	writeln!(file, "    .{}: dq {}", name, constant).unwrap();
+    	writeln!(file, "    .constant.{}: dq {}", name.replace("::", "."), constant).unwrap();
 	}
 }
 
@@ -1018,7 +1017,7 @@ fn generate_float_literals(file: &mut File) {
 	let float_label_map = FLOAT_LABEL_MAP.lock().unwrap();
 	for (label, value) in float_label_map.iter() {
 		// Important to use debug trait, otherwise floats with no decimals will be interpreted as int
-		writeln!(file, "	{}: dq {:?}", label, value).unwrap();
+		writeln!(file, "	{}: dq {:?}", label.replace("::", "."), value).unwrap();
 	}
 }
 
@@ -1029,14 +1028,19 @@ pub fn generate(ast: &Ast, out_path: &str) {
 
     // Post-order traversal of the AST to generate x86_64 (+nasm pseudo-instructions)
 
-    let Program::Program(function_vector, const_vector, structs, _enums) = &ast.program;
+    let Namespace{
+		functions: function_vector,
+		constants: const_vector,
+		structs, enums: _enums,
+		..
+	} = &ast.program;
     
 	writeln!(file, "[BITS 64]").unwrap();
     writeln!(file, "section .text").unwrap();
     writeln!(file, "").unwrap();
     writeln!(file, "global _start").unwrap();
     writeln!(file, "_start:").unwrap(); // Entry point
-    writeln!(file, "    call main").unwrap(); // Call main
+    writeln!(file, "    call .toplevel.main").unwrap(); // Call main
     writeln!(file, "    mov rdi, rax").unwrap(); // Return value of main
     writeln!(file, "    mov rax, 60").unwrap(); // Exit syscall
     writeln!(file, "    syscall").unwrap();

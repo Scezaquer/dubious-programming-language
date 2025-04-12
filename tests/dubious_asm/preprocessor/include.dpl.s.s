@@ -3,13 +3,12 @@ section .text
 
 global _start
 _start:
-    call main
+    call .toplevel.main
     mov rdi, rax
     mov rax, 60
     syscall
 
-global sub
-sub:
+.toplevel.sub:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
@@ -27,8 +26,7 @@ sub:
     pop rbp			;restore base pointer
     ret				;return by default if no return statement was reached
 
-global add
-add:
+.toplevel.add:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
@@ -46,8 +44,7 @@ add:
     pop rbp			;restore base pointer
     ret				;return by default if no return statement was reached
 
-global main
-main:
+.toplevel.main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
@@ -59,10 +56,10 @@ main:
     push rax
     mov rax, 1
     push rax
-    call add
+    call .toplevel.add
     add rsp, 16	;pop arguments
     push rax
-    call sub
+    call .toplevel.sub
     add rsp, 16	;pop arguments
     add rsp, 0		;pop local variables before return
     pop rbx		;restore rbx for caller function

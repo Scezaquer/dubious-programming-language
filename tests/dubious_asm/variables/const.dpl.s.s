@@ -3,17 +3,16 @@ section .text
 
 global _start
 _start:
-    call main
+    call .toplevel.main
     mov rdi, rax
     mov rax, 60
     syscall
 
-global main
-main:
+.toplevel.main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
-    mov rax, [.a]
+    mov rax, [.constant.toplevel.a]
     add rsp, 0		;pop local variables before return
     pop rbx		;restore rbx for caller function
     pop rbp		;restore base pointer
@@ -24,4 +23,4 @@ main:
     ret				;return by default if no return statement was reached
 
 section .data
-    .a: dq 10
+    .constant.toplevel.a: dq 10

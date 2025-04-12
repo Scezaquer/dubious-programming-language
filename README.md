@@ -12,7 +12,7 @@ A simple compiler for the Dubious programming language (DPL).
 - TODO: std library
 - TODO: vscode syntax highlighting
 - TODO: Wiki
-- TODO: namespaces for functions, constants, structs, enums, unions
+- TODO: namespaces (in the ast, indermediate structure between program and functions. Omitted "spacename" should be implicit. Write extensive tests)
 - TODO: Generic types
 - TODO: Void pointers?  Im not entirely sure I need it as I can already freely cast anything to anything but that would make for more explicit code. This may be an alternative/complementary to generics, but I feel like it would be worse
 - TODO: let strings be defined over multiple lines like "hello "\n"world" in code would evaluate to the literal "hello world"
@@ -60,7 +60,7 @@ an x86_64 assembly file or an elf64 binary.
 
 ## Operator Precedence Table
 
-1. **Member access**: `.`
+1. **Member access**: `.`, `::`
 2. **Unary operators**: `++a`, `--a`, `+a`, `-a`, `!a`, `~a`, `*a`, `&a`
 3. **Multiplicative operators**: `a * b`, `a / b`, `a % b`
 4. **Additive operators**: `a + b`, `a - b`

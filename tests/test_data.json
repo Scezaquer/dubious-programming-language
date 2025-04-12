@@ -490,6 +490,13 @@
 		"output": 0
 	},
 	{
+		"name": "if_without_endif",
+		"description": "If without endif",
+		"filename": "preprocessor/if_without_endif.dpl",
+		"input": [],
+		"output": 0
+	},
+	{
 		"name": "pointer",
 		"description": "Pointer",
 		"filename": "pointers/pointer.dpl",
@@ -658,8 +665,8 @@
 		"output": 98
 	},
 	{
-		"name": "enums",
-		"description": "Enums",
+		"name": "enum",
+		"description": "Enum",
 		"filename": "structs/enum.dpl",
 		"input": [],
 		"output": 2

@@ -3,13 +3,12 @@ section .text
 
 global _start
 _start:
-    call main
+    call .toplevel.main
     mov rdi, rax
     mov rax, 60
     syscall
 
-global add_3
-add_3:
+.toplevel.add_3:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
@@ -29,18 +28,17 @@ add_3:
     pop rbp			;restore base pointer
     ret				;return by default if no return statement was reached
 
-global main
-main:
+.toplevel.main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
 	;push function arguments to the stack in reverse order
     mov rax, 1
     push rax
-    call add_3
+    call .toplevel.add_3
     add rsp, 8	;pop arguments
     push rax
-    mov rax, [.a]
+    mov rax, [.constant.toplevel.a]
     pop rcx
     add rax, rcx
     add rsp, 0		;pop local variables before return
@@ -53,4 +51,4 @@ main:
     ret				;return by default if no return statement was reached
 
 section .data
-    .a: dq 10
+    .constant.toplevel.a: dq 10

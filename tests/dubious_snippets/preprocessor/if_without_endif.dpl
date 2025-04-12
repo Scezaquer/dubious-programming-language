@@ -1,0 +1,8 @@
+#include <if_without_endif_imported.dpl>
+
+// The included file contains an unsatisfied #ifdef that isn't closed by an #endif
+// It should not "spill" here, meaning what's in this file should be unaffected.
+
+fn main(): int {
+	return 0;
+}

@@ -1,5 +1,5 @@
 use crate::ast_build::{
-	AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Program, ReassignmentIdentifier, Statement, Type, UnOp, Typed
+	AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Namespace, ReassignmentIdentifier, Statement, Type, UnOp, Typed
 };
 
 impl std::fmt::Display for Ast {
@@ -14,23 +14,27 @@ impl<T: std::fmt::Display> std::fmt::Display for Typed<T> {
 	}
 }
 
-impl std::fmt::Display for Program {
+impl std::fmt::Display for Namespace {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			Program::Program(functions, constants, structs, enums) => {
-				for constant in constants {
-					writeln!(f, "{}", constant)?;
-				}
+		match &self {
+			&Namespace{ id, functions, structs, enums, constants, sub_namespaces } => {
+				write!(f, "namespace {} {{\n", id)?;
 				for function in functions {
-					writeln!(f, "{}", function)?;
+					write!(f, "{}\n", function)?;
 				}
 				for struct_ in structs {
-					writeln!(f, "{}", struct_)?;
+					write!(f, "{}\n", struct_)?;
 				}
 				for enum_ in enums {
-					writeln!(f, "{}", enum_)?;
+					write!(f, "{}\n", enum_)?;
 				}
-				Ok(())
+				for constant in constants {
+					write!(f, "{}\n", constant)?;
+				}
+				for sub_namespace in sub_namespaces {
+					write!(f, "{}\n", sub_namespace)?;
+				}
+				write!(f, "}}")
 			}
 		}
 	}
@@ -101,18 +105,9 @@ impl std::fmt::Display for Type {
 			Type::Void => write!(f, "void"),
 			Type::Pointer(t) => write!(f, "*{}", t),
 			Type::Array(t) => write!(f, "[{}]", t),
-			Type::Function(ret, params) => {
-				write!(f, "fn(")?;
-				for (i, param) in params.iter().enumerate() {
-					write!(f, "{}", param)?;
-					if i < params.len() - 1 {
-						write!(f, ", ")?;
-					}
-				}
-				write!(f, ") -> {}", ret)
-			}
 			Type::Struct(id) => write!(f, "{}", id),
 			Type::Enum(id) => write!(f, "{}", id),
+			Type::Namespace(id, t) => write!(f, "{}::{}", id, t),
 		}
 	}
 }
@@ -273,6 +268,7 @@ impl std::fmt::Display for BinOp {
 			BinOp::LogicalXor => "^^",
 			BinOp::LogicalOr => "||",
 			BinOp::NotABinaryOp => "",
+			BinOp::NamespaceAccess => "::",
 		};
 		write!(f, "{}", op_str)
 	}

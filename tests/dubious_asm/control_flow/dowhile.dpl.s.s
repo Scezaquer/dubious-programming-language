@@ -3,20 +3,19 @@ section .text
 
 global _start
 _start:
-    call main
+    call .toplevel.main
     mov rdi, rax
     mov rax, 60
     syscall
 
-global main
-main:
+.toplevel.main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
     mov rax, 0
     push rax
     ;do while statement
-dowhile_start_0:
+.dowhile_start_0:
     mov rax, 1
     push rax
     mov rax, [rbp-8]
@@ -32,8 +31,8 @@ dowhile_start_0:
     setl al
     movzx rax, al
     cmp rax, 0
-    jne dowhile_start_0
-dowhile_end_0:
+    jne .dowhile_start_0
+.dowhile_end_0:
     mov rax, [rbp-8]
     add rsp, 8		;pop local variables before return
     pop rbx		;restore rbx for caller function

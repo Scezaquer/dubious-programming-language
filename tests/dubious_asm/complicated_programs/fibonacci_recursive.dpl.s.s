@@ -3,13 +3,12 @@ section .text
 
 global _start
 _start:
-    call main
+    call .toplevel.main
     mov rdi, rax
     mov rax, 60
     syscall
 
-global fib
-fib:
+.toplevel.fib:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
@@ -22,16 +21,16 @@ fib:
     sete al
     movzx rax, al
     cmp rax, 0
-    je else_0
+    je .else_0
     mov rax, 0
     add rsp, 0		;pop local variables before return
     pop rbx		;restore rbx for caller function
     pop rbp		;restore base pointer
     ret
     add rsp, 0		;end of block, pop local variables
-    jmp end_0
-else_0:
-end_0:
+    jmp .end_0
+.else_0:
+.end_0:
     ;if statement
     mov rax, 1
     push rax
@@ -41,16 +40,16 @@ end_0:
     sete al
     movzx rax, al
     cmp rax, 0
-    je else_1
+    je .else_1
     mov rax, 1
     add rsp, 0		;pop local variables before return
     pop rbx		;restore rbx for caller function
     pop rbp		;restore base pointer
     ret
     add rsp, 0		;end of block, pop local variables
-    jmp end_1
-else_1:
-end_1:
+    jmp .end_1
+.else_1:
+.end_1:
 	;push function arguments to the stack in reverse order
     mov rax, 2
     push rax
@@ -58,7 +57,7 @@ end_1:
     pop rcx
     sub rax, rcx
     push rax
-    call fib
+    call .toplevel.fib
     add rsp, 8	;pop arguments
     push rax
 	;push function arguments to the stack in reverse order
@@ -68,7 +67,7 @@ end_1:
     pop rcx
     sub rax, rcx
     push rax
-    call fib
+    call .toplevel.fib
     add rsp, 8	;pop arguments
     pop rcx
     add rax, rcx
@@ -81,15 +80,14 @@ end_1:
     pop rbp			;restore base pointer
     ret				;return by default if no return statement was reached
 
-global main
-main:
+.toplevel.main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
 	;push function arguments to the stack in reverse order
     mov rax, 10
     push rax
-    call fib
+    call .toplevel.fib
     add rsp, 8	;pop arguments
     add rsp, 0		;pop local variables before return
     pop rbx		;restore rbx for caller function
