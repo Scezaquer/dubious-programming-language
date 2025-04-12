@@ -12,19 +12,9 @@ A simple compiler for the Dubious programming language (DPL).
 - TODO: std library
 - TODO: vscode syntax highlighting
 - TODO: Wiki
-- TODO: namespaces (in the ast, indermediate structure between program and functions. Omitted "spacename" should be implicit. Write extensive tests)
 - TODO: Generic types
 - TODO: Void pointers?  Im not entirely sure I need it as I can already freely cast anything to anything but that would make for more explicit code. This may be an alternative/complementary to generics, but I feel like it would be worse
 - TODO: let strings be defined over multiple lines like "hello "\n"world" in code would evaluate to the literal "hello world"
-- TODO: Make #include panic on circular includes. Let #define define things across files to allow surrounding lib definitions in 
-```
-#ifndef V 
-#define V 
-...
-#endif
-```
-blocks. This would also allow including the same file multiple times in different namespaces by just doing #undef V
-
 ### Optional
 
 - TODO: register allocation ?
