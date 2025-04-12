@@ -1663,7 +1663,12 @@ pub fn parse_namespace(tokens: &mut Iter<TokenWithDebugInfo>, is_toplevel: bool)
             TokenWithDebugInfo {
                 internal_tok: Token::EOF,
                 ..
-            } => break,
+            } => {
+				if !is_toplevel {
+					error("unexpected EOF: Missing 'spacename' keyword", &next_tok);
+				}
+				break
+			},
             TokenWithDebugInfo {
                 internal_tok: Token::Keyword(ref k),
                 ..

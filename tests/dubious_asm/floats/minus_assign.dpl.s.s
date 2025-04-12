@@ -58,5 +58,5 @@ _start:
     ret				;return by default if no return statement was reached
 
 section .data
-	.float.1: dq 1.5
 	.float.0: dq 2.5
+	.float.1: dq 1.5

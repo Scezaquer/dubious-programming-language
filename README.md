@@ -15,6 +15,7 @@ A simple compiler for the Dubious programming language (DPL).
 - TODO: Generic types
 - TODO: Void pointers?  Im not entirely sure I need it as I can already freely cast anything to anything but that would make for more explicit code. This may be an alternative/complementary to generics, but I feel like it would be worse
 - TODO: let strings be defined over multiple lines like "hello "\n"world" in code would evaluate to the literal "hello world"
+
 ### Optional
 
 - TODO: register allocation ?
@@ -338,3 +339,74 @@ less than ideal scenarios, and if you're lucky, a crash.
 
 TODO: explan how type casting works, what you could theoretically do with it,
 and how you can typecast asm statements.
+
+## Namespaces
+
+Namespaces lets you avoid conflicts when compartemetalizing code. This should be
+clearer with an example. Assume you have two libraries, each of which implements
+it's own `add` method. Without namespaces, including both will lead to a conflict
+since `add` is defined twice, which is not allowed and will cause a compilation
+error.
+
+The solution: namespaces! Now, instead of having two `add` functions, you will
+get `lib_a::add` and `lib_b::add`. Both are clearly distinct from eachother,
+any ambiguity is removed and your code compiles!
+
+Here is how to use namespaces in practice
+
+lib_a.dpl
+```
+#namespace LIB_A
+
+fn add(a: int, b: int): int {
+	return a + b;
+}
+```
+
+main.dpl
+```
+#include <lib_a.dpl>
+
+fn main(): int {
+	return LIB_A::add(1, 5);
+}
+```
+
+A namespace can contain functions, constants, structs, enums, and nested namespaces.
+All are accessed using the same `::` syntax. NOTE: In case the access path gets
+too long, you can always use a #define macro to get a shorthand.
+
+It is possible to close a namespace using the #spacename macro. The following
+code is strictly equivalent to the one in multiple files above
+
+```
+#namespace LIB_A
+
+fn add(a: int, b: int): int {
+	return a + b;
+}
+
+#spacename
+
+fn main(): int {
+	return LIB_A::add(1, 5);
+}
+```
+
+In fact, what the preprocessor does is precisely turn the code in multiple files
+into the code in one single file.
+
+NOTE: It is also possible to define namespaces with the `namespace [name];` and
+`spacename;`keywords rather than the `#namespace` and `#spacename` macros.
+However, this is not recommanded unless you're sure that you know what you're
+doing. The entire point of the `#namespace` macro is that the preprocessor
+will automatically add `#spacename` at the end of your file if you forget to
+do it. If you instead use the `namespace` keyword, you could forget to add
+`spacename` at the end, which could have very unpleasant to debug unintended
+consequences. If your file with a missing `spacename` is included somewhere
+else, the namespace will "spill over", and everything after that include will
+also end up in the namespace. In principle, this should cause a compilation
+error because a namespace won't have been properly closed by the time EOF is
+reached, but a stray `spacename` keyword lost somewhere could remove this
+safeguard. Spare yourself the pain and just use the macros, the preprocessor
+translates them into the correct keywords for you.
