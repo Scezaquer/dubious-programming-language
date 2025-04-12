@@ -1,0 +1,27 @@
+#namespace test
+
+const c: int = 5;
+
+fn return_2(): int {
+	return 2;
+}
+
+struct S {
+	first_attribute: int;
+	second_attribute: char;
+}
+
+enum E {
+	LOW,
+	MEDIUM,
+	HIGH
+}
+
+#spacename
+
+
+fn main(): int {
+	let a: test::S = test::S{ 1, 'a' };
+	a.first_attribute = 2;
+	return a.first_attribute + test::return_2() + (test::E.MEDIUM : int) + test::c;
+}

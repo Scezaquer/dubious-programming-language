@@ -476,6 +476,13 @@
 		"output": 4
 	},
 	{
+		"name": "repetitive_include",
+		"description": "Include a file",
+		"filename": "preprocessor/repetitive_include.dpl",
+		"input": [],
+		"output": 4
+	},
+	{
 		"name": "undef",
 		"description": "Undefine a macro",
 		"filename": "preprocessor/undef.dpl",
@@ -775,5 +782,75 @@
 		"filename": "floats/minus_assign.dpl",
 		"input": [],
 		"output": 1
+	},
+	{
+		"name": "namespace",
+		"description": "Testing namespaces with multiple elements",
+		"filename": "namespaces/namespace.dpl",
+		"input": [],
+		"output": 10
+	},
+	{
+		"name": "namespace_function", 
+		"description": "Function in a namespace",
+		"filename": "namespaces/namespace_function.dpl",
+		"input": [],
+		"output": 2
+	},
+	{
+		"name": "namespace_constant",
+		"description": "Constant in a namespace",
+		"filename": "namespaces/namespace_constant.dpl",
+		"input": [],
+		"output": 5
+	},
+	{
+		"name": "namespace_struct",
+		"description": "Struct in a namespace",
+		"filename": "namespaces/namespace_struct.dpl",
+		"input": [],
+		"output": 2
+	},
+	{
+		"name": "namespace_enum",
+		"description": "Enum in a namespace",
+		"filename": "namespaces/namespace_enum.dpl",
+		"input": [],
+		"output": 1
+	},
+	{
+		"name": "namespace_nested",
+		"description": "Nested namespaces",
+		"filename": "namespaces/namespace_nested.dpl",
+		"input": [],
+		"output": 62
+	},
+	{
+		"name": "namespace_preprocessor_simple",
+		"description": "Namespace using preprocessor directives",
+		"filename": "namespaces/namespace_preprocessor_simple.dpl",
+		"input": [],
+		"output": 10
+	},
+	{
+		"name": "namespace_preprocessor_nested",
+		"description": "Nested namespaces using preprocessor directives",
+		"filename": "namespaces/namespace_preprocessor_nested.dpl",
+		"input": [],
+		"output": 62
+	},
+	{
+		"name": "namespace_preprocessor_include",
+		"description": "Including a file with a namespace defined using preprocessor directives",
+		"filename": "namespaces/namespace_preprocessor_include.dpl",
+		"input": [],
+		"output": 10
+	},
+	{
+		"name": "namespace_preprocessor_include_implicit_spacename",
+		"description": "Including a file with a namespace using implicit spacename",
+		"filename": "namespaces/namespace_preprocessor_include_implicit_spacename.dpl",
+		"input": [],
+		"output": 10
 	}
 ]

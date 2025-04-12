@@ -1,0 +1,14 @@
+namespace test;
+
+enum E {
+	LOW,
+	MEDIUM,
+	HIGH
+}
+
+spacename;
+
+
+fn main(): int {
+	return test::E.MEDIUM : int;
+}

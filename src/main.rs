@@ -15,6 +15,7 @@ use preprocessor::preprocessor;
 use ast_build::parse;
 use code_generator::generate;
 use lexer::lex;
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -84,7 +85,7 @@ fn main() {
     let file = fs::read_to_string(&args.input_file).expect("Failed to read file");
     //let file = fs::read_to_string("return_2.dpl").expect("Failed to read file");
 
-	let preprocessed_file = preprocessor(&file, &args.input_file);
+	let preprocessed_file = preprocessor(&file, &args.input_file, HashSet::new());
 
     let tokens = lex(preprocessed_file.as_str());
 

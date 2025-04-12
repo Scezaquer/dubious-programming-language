@@ -1,0 +1,10 @@
+namespace test;
+
+const c: int = 5;
+
+spacename;
+
+
+fn main(): int {
+	return test::c;
+}

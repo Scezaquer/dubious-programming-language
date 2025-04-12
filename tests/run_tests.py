@@ -39,6 +39,14 @@ if __name__ == '__main__':
 
     for test in tests:
         print(f'Compiling {test["name"]}')
+        # Ensure directories exist
+        asm_dir = os.path.dirname(f"tests/dubious_asm/{test['filename']}.s")
+        exec_dir = os.path.dirname(
+            f"tests/dubious_executables/{test['filename']}.out")
+        os.makedirs(asm_dir, exist_ok=True)
+        os.makedirs(exec_dir, exist_ok=True)
+
+        # Remove existing files if they exist
         try:
             os.remove(f"tests/dubious_asm/{test['filename']}.s")
         except FileNotFoundError:

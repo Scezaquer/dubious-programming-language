@@ -1,3 +1,6 @@
+#ifndef LIB_ADD
+#define LIB_ADD
+
 #include <lib_sub.dpl>
 
 fn add(a: int, b: int): int {

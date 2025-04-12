@@ -1,0 +1,18 @@
+#namespace test
+
+const c: int = 5;
+
+fn return_2(): int {
+	return 2;
+}
+
+struct S {
+	first_attribute: int;
+	second_attribute: char;
+}
+
+enum E {
+	LOW,
+	MEDIUM,
+	HIGH
+}

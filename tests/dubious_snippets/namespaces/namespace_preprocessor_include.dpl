@@ -1,0 +1,7 @@
+#include <lib_namespace_preprocessor_include.dpl>
+
+fn main(): int {
+	let a: test::S = test::S{ 1, 'a' };
+	a.first_attribute = 2;
+	return a.first_attribute + test::return_2() + (test::E.MEDIUM : int) + test::c;
+}

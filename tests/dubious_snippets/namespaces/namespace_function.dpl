@@ -1,0 +1,12 @@
+namespace test;
+
+fn return_2(): int {
+	return 2;
+}
+
+spacename;
+
+
+fn main(): int {
+	return test::return_2();
+}

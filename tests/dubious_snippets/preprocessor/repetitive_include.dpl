@@ -1,0 +1,9 @@
+#include <lib_add.dpl>
+#include <lib_add.dpl>
+
+// This should raise a warning, but the #ifndef block in lib_add
+// should ensure this doesn't crash
+
+fn main(): int {
+	return sub(add(1, 5), 2);
+}

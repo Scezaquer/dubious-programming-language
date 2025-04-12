@@ -295,28 +295,61 @@ fn type_member_access(
 }
 
 
+fn unroll_namespace_access(
+	lhs: &Expression,
+	context: &Context,
+) -> String {
+
+	// The namespace operator is left-associative, so we need a bit of machinery
+	// to unroll it. This turns
+	// (((a b ::) c ::) d ::)
+	// into
+	// "a::b::c::d"
+
+	match lhs {
+		Expression::Atom(Typed {
+			expr: Atom::Variable(namespace),
+			..
+		}) => {
+			let namespace_path = 
+				if namespace.contains("::") {namespace.to_string()}
+				else {format!("{}{}::", context.namespace, namespace)};
+			namespace_path
+		}
+		Expression::BinaryOp(
+			l,
+			r, 
+			BinOp::NamespaceAccess
+		) => {
+			if let Typed{expr: Expression::Atom(Typed {expr: Atom::Variable(id), ..}), ..} = &**r {
+				let namespace_path = unroll_namespace_access(&l.expr, context);
+				format!("{}{}::", namespace_path, id)
+			} else {
+				panic!("Namespace access must be on a variable");
+			}
+		}
+		_ => {
+			panic!("Namespace access must be on a variable");
+		}
+	}
+}
+
+
 fn type_namespace_access(
 	lhs: &Expression,
 	rhs: &Expression,
 	context: &Context,
 ) -> Typed<Expression> {
-	if let Expression::Atom(Typed {
-		expr: Atom::Variable(namespace),
-		..
-	}) = lhs
-	{
-		let namespace_path = format!("{}{}::", context.namespace, namespace);
-		type_expression(rhs, &Context {
-			namespace: namespace_path,
-			variables: context.variables.clone(),
-			functions: context.functions.clone(),
-			structs: context.structs.clone(),
-			enums: context.enums.clone(),
-			array_dims: context.array_dims.clone(),
-		})
-	} else {
-		panic!("Namespace access must be on a variable");
-	}
+	let namespace_path = unroll_namespace_access(lhs, context);
+	
+	type_expression(rhs, &Context {
+		namespace: namespace_path,
+		variables: context.variables.clone(),
+		functions: context.functions.clone(),
+		structs: context.structs.clone(),
+		enums: context.enums.clone(),
+		array_dims: context.array_dims.clone(),
+	})
 }
 
 
@@ -697,6 +730,7 @@ fn check_if_struct_or_enum(context: &Context, t: &Type) -> Type {
             } else if let Some(_) = context.enums.get(id) {
                 Type::Enum(id.clone())
             } else {
+				dbg!(context.structs.clone(), context.enums.clone());
                 panic!("Type '{}' not in scope", id);
             }
         }
@@ -716,19 +750,28 @@ fn check_if_struct_or_enum(context: &Context, t: &Type) -> Type {
 		Type::Namespace(id, t) => {
 			match &**t {
 				Type::Struct(sub_id) => {
-					check_if_struct_or_enum(context, &Type::Struct(format!("{}{}::{}", context.namespace, id, sub_id)))
+					let id = if id.starts_with("toplevel") { 
+						format!("{}::{}", id, sub_id)
+					} else { 
+						format!("{}{}::{}", context.namespace, id, sub_id)
+					};
+					check_if_struct_or_enum(context, &Type::Struct(id))
 				}
 				Type::Enum(sub_id) => {
-					check_if_struct_or_enum(context, &Type::Enum(format!("{}{}::{}", context.namespace, id, sub_id)))
+					let id = if id.starts_with("toplevel") { 
+						format!("{}::{}", id, sub_id)
+					} else { 
+						format!("{}{}::{}", context.namespace, id, sub_id)
+					};
+					check_if_struct_or_enum(context, &Type::Enum(id))
 				}
 				Type::Namespace(sub_id, sub_t) => {
-					if id == "toplevel" {
-						let mut context = context.clone();
-						context.namespace = "".to_string();
-						check_if_struct_or_enum(&context, &Type::Namespace(sub_id.clone(), sub_t.clone()))
-					} else {
-						check_if_struct_or_enum(context, &Type::Namespace(format!("{}{}::{}", context.namespace, id, sub_id), sub_t.clone()))
-					}
+					let id = if id.starts_with("toplevel") { 
+						format!("{}::{}", id, sub_id)
+					} else { 
+						format!("{}{}::{}", context.namespace, id, sub_id)
+					};
+					check_if_struct_or_enum(context, &Type::Namespace(id, sub_t.clone()))
 				}
 				_ => panic!("Type '{}' cannot be namespaced (only struct or enums may be)", id),
 			}

@@ -1,5 +1,18 @@
 use std::collections::{HashMap, HashSet};
 use regex::Regex;
+use lazy_static::lazy_static;
+use std::sync::Mutex;
+
+lazy_static! {
+    static ref INCLUDED_FILES: Mutex<HashSet<String>> = {
+        let m = HashSet::new();
+        Mutex::new(m)
+    };
+	static ref DEFINED_EXPRESSIONS: Mutex<HashMap<String, String>> = {
+		let m = HashMap::new();
+		Mutex::new(m)
+	};
+}
 
 /// This module is responsible for preprocessing the input file.
 /// 
@@ -36,13 +49,18 @@ use regex::Regex;
 /// 
 /// ## `#print [MESSAGE]`
 /// Displays a message during compilation.
-pub fn preprocessor(file: &str, filename: &str) -> String {
-	let mut defined_expressions:HashMap<String, String> = HashMap::new();
-	let mut included_files:HashSet<String> = HashSet::new();
+pub fn preprocessor(file: &str, filename: &str, include_path: HashSet<String>) -> String {
+	{
+		// Lock the mutex to access the included files
+		// This is in a separate block to ensure the lock is released
+		let mut included_files = INCLUDED_FILES.lock().unwrap();
+		included_files.insert(filename.to_string());
+	}
 
-	included_files.insert(filename.to_string());
+	let mut include_path = include_path;
+	include_path.insert(filename.to_string());
 
-	let preprocessor_re = Regex::new(r"^\#(include|define|undef|ifdef|ifndef|else|endif|error|print)").unwrap();
+	let preprocessor_re = Regex::new(r"^\#(include|define|undef|ifdef|ifndef|else|endif|error|print|namespace|spacename)").unwrap();
 
 	let identifier_re = Regex::new(r"^(?:\s*)[a-zA-Z_][a-zA-Z0-9_]*").unwrap();
 	let replacement_re = Regex::new(r"^[\t ]*(.*)\s*?(?:\n|$)").unwrap();
@@ -55,6 +73,7 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 
 	let mut pos = 0;
 	let mut line = 1;
+	let mut namespace_counter = 0;
 
 	processed_file.push_str(format!("// <{}>\n", filename).as_str());
 	while pos < file.len(){
@@ -85,10 +104,24 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 
 					// Construct the full path by joining the current directory and included file
 					let full_path = current_dir.join(file);
-					
-					if included_files.contains(full_path.to_str().unwrap()){
-						println!("{} Line {} Warning: File '{}' is already included", filename, line, full_path.display());
-						continue;
+
+					// Check if we are in a circular include situation
+					if include_path.contains(full_path.to_str().unwrap()) {
+						panic!("{} Line {}: Circular include detected: {}", filename, line, full_path.display());
+					}
+
+					{
+						// Lock the mutex to access the included files
+						// This is in a separate block to ensure the lock is released
+						let included_files = INCLUDED_FILES.lock().unwrap();
+						if included_files.contains(full_path.to_str().unwrap()){
+							// We don't panic here in case it's deliberate (like
+							// if different namespaces import the same lib). Note that
+							// if this causes functions/structs/etc to be defined
+							// multiple times in the same namespace, it will
+							// cause a compilation error later down the line.
+							println!("{} Line {} Warning: File '{}' is already included somewhere else", filename, line, full_path.display());
+						}
 					}
 
 					// Read the file
@@ -98,7 +131,7 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 					};
 
 					// Preprocess the included file
-					let included_file = preprocessor(&included_file, full_path.to_str().unwrap());
+					let included_file = preprocessor(&included_file, full_path.to_str().unwrap(), include_path.clone());
 
 					// Add a comment to indicate the start of the included file to track the source of errors
 					processed_file.push_str(format!("// <{}>\n", full_path.display()).as_str());
@@ -119,9 +152,12 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 						identifier = caps.get(0).unwrap().as_str();
 						pos += caps.get(0).unwrap().end();
 
-						// Warning if the identifier is already defined
-						if defined_expressions.contains_key(identifier){
-							println!("{} Line {} Warning: #define identifier '{}' is already defined", filename, line, identifier);
+						{
+							let defined_expressions = DEFINED_EXPRESSIONS.lock().unwrap();
+							// Warning if the identifier is already defined
+							if defined_expressions.contains_key(identifier){
+								println!("{} Line {} Warning: #define identifier '{}' is already defined", filename, line, identifier);
+							}
 						}
 					}
 					else{
@@ -139,7 +175,10 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 					}
 
 					// Add the macro to the defined expressions
-					defined_expressions.insert(identifier.to_string(), replacement.to_string());
+					{
+						let mut defined_expressions = DEFINED_EXPRESSIONS.lock().unwrap();
+						defined_expressions.insert(identifier.to_string(), replacement.to_string());
+					}
 					processed_file.push('\n');	// Keep the line count the same
 					line += 1;
 				},
@@ -160,13 +199,16 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 						panic!("{} Line {}: Invalid #undef identifier", filename, line);
 					}
 
-					// Warning if the identifier is not defined
-					if !defined_expressions.contains_key(identifier){
-						println!("{} Line {} Warning: #undef identifier '{}' is not defined", filename, line, identifier);
-					}
+					{
+						let mut defined_expressions = DEFINED_EXPRESSIONS.lock().unwrap();
+						// Warning if the identifier is not defined
+						if !defined_expressions.contains_key(identifier){
+							println!("{} Line {} Warning: #undef identifier '{}' is not defined", filename, line, identifier);
+						}
 
-					// Remove the macro from the defined expressions
-					defined_expressions.remove(identifier);
+						// Remove the macro from the defined expressions
+						defined_expressions.remove(identifier);
+					}
 					processed_file.push('\n');	// Keep the line count the same
 					line += 1;
 				},
@@ -188,19 +230,22 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 						panic!("{} Line {}: Invalid #ifdef identifier", filename, line);
 					}
 
-					// Check if the identifier is not defined, and skip the code until #endif or #else
-					if !defined_expressions.contains_key(identifier){
-						let mut rest = &file[pos..];
-						while !rest.starts_with("#endif") && !rest.starts_with("#else") && !rest.is_empty(){
-							pos += 1;
-							if rest.starts_with("\n"){
-								line += 1;
+					{
+						let defined_expressions = DEFINED_EXPRESSIONS.lock().unwrap();
+						// Check if the identifier is not defined, and skip the code until #endif or #else
+						if !defined_expressions.contains_key(identifier){
+							let mut rest = &file[pos..];
+							while !rest.starts_with("#endif") && !rest.starts_with("#else") && !rest.is_empty(){
+								pos += 1;
+								if rest.starts_with("\n"){
+									line += 1;
+								}
+								rest = &file[pos..];
 							}
-							rest = &file[pos..];
-						}
-						if rest.starts_with("#else"){
-							// ignore #else directive and keep the code it contains
-							pos += 5;
+							if rest.starts_with("#else"){
+								// ignore #else directive and keep the code it contains
+								pos += 5;
+							}
 						}
 					}
 				},
@@ -221,19 +266,22 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 						panic!("{} Line {}: Invalid #ifndef identifier", filename, line);
 					}
 
-					// Check if the identifier is defined, and skip the code until #endif or #else
-					if defined_expressions.contains_key(identifier){
-						let mut rest = &file[pos..];
-						while !rest.starts_with("#endif") && !rest.starts_with("#else") && !rest.is_empty(){
-							pos += 1;
-							if rest.starts_with("\n"){
-								line += 1;
+					{
+						// Check if the identifier is defined, and skip the code until #endif or #else
+						let defined_expressions = DEFINED_EXPRESSIONS.lock().unwrap();
+						if defined_expressions.contains_key(identifier){
+							let mut rest = &file[pos..];
+							while !rest.starts_with("#endif") && !rest.starts_with("#else") && !rest.is_empty(){
+								pos += 1;
+								if rest.starts_with("\n"){
+									line += 1;
+								}
+								rest = &file[pos..];
 							}
-							rest = &file[pos..];
-						}
-						if rest.starts_with("#else"){
-							// ignore #else directive and keep the code it contains
-							pos += 5;
+							if rest.starts_with("#else"){
+								// ignore #else directive and keep the code it contains
+								pos += 5;
+							}
 						}
 					}
 				},
@@ -293,7 +341,47 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 					println!("{} Line {}: {}", filename, line, message.trim_end());
 					line += message.matches('\n').count();
 				},
-				_ => {}
+				"namespace" => {
+					// #namespace [NAMESPACE]
+					// Define a namespace
+
+					// Get the namespace
+					pos += caps.get(0).unwrap().end();
+					let rest = &file[pos..];
+					let namespace;
+					if let Some(caps) = identifier_re.captures(rest){
+						namespace = caps.get(0).unwrap().as_str();
+						pos += caps.get(0).unwrap().end();
+					}
+					else{
+						panic!("{} Line {}: Invalid #namespace identifier", filename, line);
+					}
+
+					{
+						// Warning if the namespace is already defined
+						let defined_expressions = DEFINED_EXPRESSIONS.lock().unwrap();
+						if defined_expressions.contains_key(namespace){
+							println!("{} Line {} Warning: #namespace identifier '{}' is already defined", filename, line, namespace);
+						}
+					}
+
+					namespace_counter += 1;
+					processed_file.push_str(format!("namespace {};\n", namespace).as_str());
+				}
+				"spacename" => {
+					// #spacename
+					// Undefine a namespace
+					
+					pos += caps.get(0).unwrap().end();
+					namespace_counter -= 1;
+					if namespace_counter < 0 {
+						panic!("{} Line {}: #spacename directive without matching #namespace", filename, line);
+					}
+					processed_file.push_str("spacename;\n");
+				}
+				_ => {
+					panic!("{} Line {}: Invalid preprocessor directive", filename, line);
+				}
 			}
 		} else if rest.starts_with("\n") {
 			processed_file.push('\n');
@@ -311,16 +399,23 @@ pub fn preprocessor(file: &str, filename: &str) -> String {
 
 		} else if let Some(caps) = identifier_re.captures(rest) {
 			let identifier = caps.get(0).unwrap().as_str();
-			if defined_expressions.contains_key(identifier){
-				processed_file.push_str(defined_expressions.get(identifier).unwrap());
-			} else {
-				processed_file.push_str(identifier);
+
+			{
+				let defined_expressions = DEFINED_EXPRESSIONS.lock().unwrap();
+				if defined_expressions.contains_key(identifier){
+					processed_file.push_str(defined_expressions.get(identifier).unwrap());
+				} else {
+					processed_file.push_str(identifier);
+				}
 			}
 			pos += caps.get(0).unwrap().end();
 		} else {
 			processed_file.push(file.chars().nth(pos).unwrap());
 			pos += 1;
 		}
+	}
+	for _ in 0..namespace_counter{
+		processed_file.push_str("spacename;\n");
 	}
 	return processed_file;
 }
