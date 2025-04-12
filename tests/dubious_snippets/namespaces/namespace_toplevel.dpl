@@ -1,0 +1,55 @@
+namespace test;
+
+const c: int = 5;
+
+fn return_2(): int {
+	return 2;
+}
+
+struct S {
+	first_attribute: int;
+	second_attribute: char;
+}
+
+enum E {
+	LOW,
+	MEDIUM,
+	HIGH
+}
+
+spacename;
+
+namespace second_test;
+
+const c: int = 36;
+
+fn return_2(): int {
+	return -1 * toplevel::test::return_2() + toplevel::test::c - 5 ;
+}
+
+struct S {
+	first_element: int;
+	second_attribute: char;
+}
+
+
+enum E {
+	HIGH,
+	LOW,
+	MEDIUM
+}
+
+spacename;
+
+fn main(): int {
+	let a: toplevel::test::S = toplevel::test::S{ 1, 'a' };
+	let b: toplevel::second_test::S = toplevel::second_test::S{ 3, 'c' };
+
+	a.first_attribute += b.first_element;	// 4
+	b.second_attribute = ((a.second_attribute : int) + a.first_attribute) : char; // e
+
+	let tmp: int = toplevel::test::c + second_test::c;	// 41
+	tmp += (toplevel::second_test::E.MEDIUM : int) - (toplevel::test::E.LOW : int); // 43
+
+	return a.first_attribute + (b.second_attribute : int) - tmp; // 62
+}

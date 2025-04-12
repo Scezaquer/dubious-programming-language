@@ -116,7 +116,7 @@ fn type_atom(expr: &Expression, atom: &Atom, context: &Context) -> Typed<Express
             }
         }
         Atom::FunctionCall(name, args) => {
-			let name = if name.contains("::") { name } else { &format!("{}{}", context.namespace, name) };
+			let name = if name.contains("::") | name.eq("toplevel") { name } else { &format!("{}{}", context.namespace, name) };
             if let Some((function_type, args_types)) = context.functions.get(name) {
                 let mut new_args = Vec::new();
                 
@@ -153,7 +153,7 @@ fn type_atom(expr: &Expression, atom: &Atom, context: &Context) -> Typed<Express
         }
         Atom::Expression(expr) => type_expression(&expr.expr, context),
         Atom::StructInstance(id, exprs) => {
-			let id = if id.contains("::") { id } else { &format!("{}{}", context.namespace, id) };
+			let id = if id.contains("::") | id.eq("toplevel") { id } else { &format!("{}{}", context.namespace, id) };
             if let Some((ordered_list, _)) = context.structs.get(id) {
                 if exprs.len() != ordered_list.len() {
                     panic!(
@@ -214,7 +214,7 @@ fn type_member_access(
 			..
 		}) = rhs
 		{
-			let s = if s.contains("::") { s } else { format!("{}{}", context.namespace, s) };
+			let s = if s.contains("::") | s.eq("toplevel") { s } else { format!("{}{}", context.namespace, s) };
 			let (ordered_list, unordered_list) = context
 				.structs
 				.get(&s)
@@ -313,6 +313,7 @@ fn unroll_namespace_access(
 		}) => {
 			let namespace_path = 
 				if namespace.contains("::") {namespace.to_string()}
+				else if namespace.eq("toplevel") {format!("{}::", namespace.to_string())}
 				else {format!("{}{}::", context.namespace, namespace)};
 			namespace_path
 		}
@@ -724,7 +725,7 @@ fn type_arrayaccess(
 fn check_if_struct_or_enum(context: &Context, t: &Type) -> Type {
     match t {
         Type::Struct(id) => {
-			let id = if id.contains("::") { id } else { &format!("{}{}", context.namespace, id) };
+			let id = if id.contains("::") | id.eq("toplevel") { id } else { &format!("{}{}", context.namespace, id) };
             if let Some(_) = context.structs.get(id) {
                 Type::Struct(id.clone())
             } else if let Some(_) = context.enums.get(id) {
@@ -735,7 +736,7 @@ fn check_if_struct_or_enum(context: &Context, t: &Type) -> Type {
             }
         }
         Type::Enum(id) => {
-			let id = if id.contains("::") { id } else { &format!("{}{}", context.namespace, id) };
+			let id = if id.contains("::") | id.eq("toplevel") { id } else { &format!("{}{}", context.namespace, id) };
             if let Some(_) = context.structs.get(id) {
                 Type::Struct(id.clone())
             } else if let Some(_) = context.enums.get(id) {

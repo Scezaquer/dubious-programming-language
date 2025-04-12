@@ -342,8 +342,8 @@ and how you can typecast asm statements.
 
 ## Namespaces
 
-Namespaces lets you avoid conflicts when compartemetalizing code. This should be
-clearer with an example. Assume you have two libraries, each of which implements
+Namespaces lets you avoid conflicts when compartemetalizing code. The point should be
+clear with an example: Assume you have two libraries, each of which implements
 it's own `add` method. Without namespaces, including both will lead to a conflict
 since `add` is defined twice, which is not allowed and will cause a compilation
 error.
@@ -377,7 +377,7 @@ All are accessed using the same `::` syntax. NOTE: In case the access path gets
 too long, you can always use a #define macro to get a shorthand.
 
 It is possible to close a namespace using the #spacename macro. The following
-code is strictly equivalent to the one in multiple files above
+code is strictly equivalent to the one in the two files above
 
 ```
 #namespace LIB_A
@@ -393,11 +393,11 @@ fn main(): int {
 }
 ```
 
-In fact, what the preprocessor does is precisely turn the code in multiple files
+In fact, what the preprocessor does is turn the code in multiple files
 into the code in one single file.
 
 NOTE: It is also possible to define namespaces with the `namespace [name];` and
-`spacename;`keywords rather than the `#namespace` and `#spacename` macros.
+`spacename;` keywords rather than the `#namespace` and `#spacename` macros.
 However, this is not recommanded unless you're sure that you know what you're
 doing. The entire point of the `#namespace` macro is that the preprocessor
 will automatically add `#spacename` at the end of your file if you forget to
@@ -410,3 +410,8 @@ error because a namespace won't have been properly closed by the time EOF is
 reached, but a stray `spacename` keyword lost somewhere could remove this
 safeguard. Spare yourself the pain and just use the macros, the preprocessor
 translates them into the correct keywords for you.
+
+All elements in code are considered as part of the `toplevel` namespace. This
+means that you can use an "absolute" path to access anything by doing
+`toplevel::some_namespace::some_function`. This also implies that `toplevel` is
+a reserved namespace that can't be used elsewhere, to avoid ambiguities.

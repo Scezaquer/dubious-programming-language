@@ -852,5 +852,12 @@
 		"filename": "namespaces/namespace_preprocessor_include_implicit_spacename.dpl",
 		"input": [],
 		"output": 10
+	},
+	{
+		"name": "namespace_toplevel",
+		"description": "Using absolute paths in namespaces",
+		"filename": "namespaces/namespace_toplevel.dpl",
+		"input": [],
+		"output": 62
 	}
 ]

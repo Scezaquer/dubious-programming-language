@@ -1633,7 +1633,12 @@ pub fn parse_namespace(tokens: &mut Iter<TokenWithDebugInfo>, is_toplevel: bool)
 			TokenWithDebugInfo {
 				internal_tok: Token::Identifier(id),
 				..
-			} => id.clone(),
+			} => {
+				if id.eq("toplevel") {
+					error("cannot use 'toplevel' as a namespace name", &tok);
+				}
+				id.clone()
+			},
 			TokenWithDebugInfo { .. } => error_unexpected_token("identifier", &tok),
 		};
 		let tok = tokens.next().unwrap();

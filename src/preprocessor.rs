@@ -62,6 +62,8 @@ pub fn preprocessor(file: &str, filename: &str, include_path: HashSet<String>) -
 
 	let preprocessor_re = Regex::new(r"^\#(include|define|undef|ifdef|ifndef|else|endif|error|print|namespace|spacename)").unwrap();
 
+	//TODO: Things in strings should not be interpreted as procesor directives
+
 	let identifier_re = Regex::new(r"^(?:\s*)[a-zA-Z_][a-zA-Z0-9_]*").unwrap();
 	let replacement_re = Regex::new(r"^[\t ]*(.*)\s*?(?:\n|$)").unwrap();
 	let file_re = Regex::new(r"^(?:\s*)<(.*)>").unwrap();
