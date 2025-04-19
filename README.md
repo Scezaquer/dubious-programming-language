@@ -10,9 +10,9 @@ A simple compiler for the Dubious programming language (DPL).
 - TODO: better checker error messages
 - TODO: heap memory stuff
 - TODO: std library
-- TODO: vscode syntax highlighting
+- TODO: Upload vscode syntax highlighting to marketplace
 - TODO: Wiki
-- TODO: Generic types
+- TODO: Generic types tests + operator conflicts >> >>= >=
 - TODO: Void pointers?  Im not entirely sure I need it as I can already freely cast anything to anything but that would make for more explicit code. This may be an alternative/complementary to generics, but I feel like it would be worse
 - TODO: let strings be defined over multiple lines like "hello "\n"world" in code would evaluate to the literal "hello world"
 
@@ -82,7 +82,7 @@ statement executes. Otherwise else (if present).
 
 Uninitialized variables default to 0.
 
-++ and -- are NOT assignment operators (i.e. ++a will evaluate to a+1 but the value of a will be unchanged).
+++ and -- are NOT assignment operators (i.e. `++a` will evaluate to `a+1` but the value of `a` will be unchanged).
 
 For loop iterator variables can't be declared inside the loop itself they have to be declared before. i.e.
 ```
@@ -244,7 +244,7 @@ they are declared. This allows circular definitions and recursive structures.
 
 ## Enums
 
-Enums are discrete types whose value can be one of in a list of user-defiend values.
+Enums are discrete types whose value can be one in a list of user-defiend values.
 
 ```
 enum E { // Define the enum and give it 3 possible values

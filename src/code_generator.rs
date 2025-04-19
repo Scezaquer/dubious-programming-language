@@ -101,7 +101,7 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
         Typed{expr: Atom::Expression(expression), ..} => {
             generate_expression(file, expression, context);
         }
-        Typed{expr: Atom::FunctionCall(name, args), ..} => {
+        Typed{expr: Atom::FunctionCall(name, args, _), ..} => {
             writeln!(
                 file,
                 "	;push function arguments to the stack in reverse order"
@@ -121,7 +121,7 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
             writeln!(file, "    add rsp, {}	;pop arguments", args.len() * 8).unwrap();
             // Pop arguments from stack
         }
-        Typed{expr: Atom::Array(expressions, _), ..} | Typed{expr: Atom::StructInstance(_, expressions), ..} => {
+        Typed{expr: Atom::Array(expressions, _), ..} | Typed{expr: Atom::StructInstance(_, expressions, _), ..} => {
 			// Careful, this section of the code is technical because we want
 			// to be able to define arrays of structs such that
 			//  [
@@ -169,7 +169,7 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 			for expr in expressions.iter().rev() {
 				// If the expression is a struct or an array, we need to push the
 				// values on the stack first
-				if matches!(expr, Typed{expr: Expression::Atom(Typed{expr: Atom::StructInstance(_, _) | Atom::Array(_, _), ..}), ..}) {
+				if matches!(expr, Typed{expr: Expression::Atom(Typed{expr: Atom::StructInstance(..) | Atom::Array(..), ..}), ..}) {
 					generate_expression(file, expr, context);
 					stack_indices.push(stack_index - context.stack_index);
 					stack_index = context.stack_index;
@@ -182,7 +182,7 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 				writeln!(file, "    mov rax, rsp").unwrap();
 				writeln!(file, "    add rax, {}", sum).unwrap();
 
-				if !matches!(expressions[0], Typed{expr: Expression::Atom(Typed{expr: Atom::StructInstance(_, _) | Atom::Array(_, _), ..}), ..}){
+				if !matches!(expressions[0], Typed{expr: Expression::Atom(Typed{expr: Atom::StructInstance(..) | Atom::Array(..), ..}), ..}){
 					writeln!(file, "    push rax").unwrap();
 					context.stack_index -= 8;
 					context.len += 1;
@@ -191,7 +191,7 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 
 			let mut iterator = stack_indices.iter();
 			for expr in expressions.iter().rev() {
-				if matches!(expr, Typed{expr: Expression::Atom(Typed{expr: Atom::StructInstance(_, _) | Atom::Array(_, _), ..}), ..}) {
+				if matches!(expr, Typed{expr: Expression::Atom(Typed{expr: Atom::StructInstance(..) | Atom::Array(..), ..}), ..}) {
 					let i = iterator.next().unwrap();
 					writeln!(file, "    sub rax, {}", i).unwrap();
 					writeln!(file, "    push rax").unwrap(); // If generate_expression pushes stuff, this is broken. Same for StructInstance
@@ -982,7 +982,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>
 fn generate_function(file: &mut File, function: &Typed<Function>, context: &Context) {
     let mut context = Context::from_last_context(context);
 
-    let Typed{expr: Function::Function(name, params, statement, _), ..} = function;
+    let Typed{expr: Function{id: name, args: params, body: statement, ..}, ..} = function;
 
     context.stack_index = 24; // Skip rbp, rbx and the return address
     for param in params.iter() {
@@ -1059,7 +1059,7 @@ pub fn generate(ast: &Ast, out_path: &str) {
     }
 
     for struct_ in structs.iter() {
-        let Struct { id, members } = struct_;
+        let Struct { id, members, .. } = struct_;
         let mut member_names = HashMap::new();
         for (i, member) in members.iter().enumerate() {
             let (name, _) = member;

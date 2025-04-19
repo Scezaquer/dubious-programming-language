@@ -1,0 +1,10 @@
+fn return2<T>(i: T, j: T, k: T): T {
+	let tmp: T = i;
+	let tmp2: T = tmp + j;
+	let tmp3: T = tmp2 + k;
+	return tmp3;
+}
+
+fn main(): int {
+	return return2:<int>(2, 3, 4);
+}

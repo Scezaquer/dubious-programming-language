@@ -1,0 +1,8 @@
+fn return2<T>(i: T): T {
+	let tmp: T;
+	return i;
+}
+
+fn main(): int {
+	return return2:<int>(2);
+}

@@ -24,36 +24,32 @@ use std::vec;
 /// Monad to attach types to elements of the AST
 #[derive(Debug, Clone)]
 pub struct Typed<T> {
-	pub expr: T,
-	pub type_: Type,
+    pub expr: T,
+    pub type_: Type,
 }
 
 impl<T> Typed<T> {
-	/// Creates a new Typed instance with a void type.
-	pub fn new(expr: T) -> Self {
-		Typed {
-			expr,
-			type_: Type::Void,
-		}
-	}
+    /// Creates a new Typed instance with a void type.
+    pub fn new(expr: T) -> Self {
+        Typed {
+            expr,
+            type_: Type::Void,
+        }
+    }
 
-	pub fn new_with_type(expr: T, type_: Type) -> Self {
-		Typed {
-			expr,
-			type_,
-		}
-	}
+    pub fn new_with_type(expr: T, type_: Type) -> Self {
+        Typed { expr, type_ }
+    }
 
-	pub fn get_type(&self) -> &Type {
-		&self.type_
-	}
+    pub fn get_type(&self) -> &Type {
+        &self.type_
+    }
 }
-
 
 /// Represents a literal value in the AST.
 #[derive(Debug, Clone)]
 pub enum Literal {
-	Bool(bool),
+    Bool(bool),
     Int(i64),
     Float(f64),
     Hex(i64),
@@ -69,9 +65,9 @@ pub enum Atom {
     Literal(Typed<Literal>),
     Expression(Box<Typed<Expression>>),
     Variable(String),
-    FunctionCall(String, Vec<Typed<Expression>>),
+    FunctionCall(String, Vec<Typed<Expression>>, Vec<Type>), // id<T1, T2, ...>(args)
     Array(Vec<Typed<Expression>>, i64), // Array literal with a given number of dimensions
-    StructInstance(String, Vec<Typed<Expression>>), // Struct instance with a given number of fields
+    StructInstance(String, Vec<Typed<Expression>>, Vec<Type>), // Struct instance with a given number of fields
 }
 
 // In let bindings, the left hand side of the assignment
@@ -99,12 +95,13 @@ pub enum Type {
     Float,
     Void,
     Char,
-	Bool,
+    Bool,
     Pointer(Box<Type>),
     Array(Box<Type>), // array[type]. Strings are array[char]
     Struct(String),
-	Enum(String),
-	Namespace(String, Box<Type>)
+    Enum(String),
+    Namespace(String, Box<Type>),
+	GenericBinding(String, Vec<Type>),
 }
 
 /// Represents a unary operator in the AST.
@@ -145,7 +142,7 @@ pub enum BinOp {
     LogicalAnd,
     LogicalXor,
     LogicalOr,
-	NamespaceAccess,
+    NamespaceAccess,
     NotABinaryOp, // Not pretty but it makes the code nicer
 }
 
@@ -202,7 +199,11 @@ pub enum Expression {
     Atom(Typed<Atom>),
     UnaryOp(Box<Typed<Expression>>, UnOp),
     BinaryOp(Box<Typed<Expression>>, Box<Typed<Expression>>, BinOp),
-    Assignment(Typed<ReassignmentIdentifier>, Box<Typed<Expression>>, AssignmentOp),
+    Assignment(
+        Typed<ReassignmentIdentifier>,
+        Box<Typed<Expression>>,
+        AssignmentOp,
+    ),
     TypeCast(Box<Typed<Expression>>, Type),
     ArrayAccess(Box<Typed<Expression>>, Vec<Typed<Expression>>),
 }
@@ -234,7 +235,7 @@ fn get_bin_operator_from_token(token: &TokenWithDebugInfo) -> BinOp {
             Operator::LogicalXor => BinOp::LogicalXor,
             Operator::LogicalOr => BinOp::LogicalOr,
             Operator::MemberAccess => BinOp::MemberAccess,
-			Operator::DoubleColon => BinOp::NamespaceAccess,
+            Operator::DoubleColon => BinOp::NamespaceAccess,
             _ => BinOp::NotABinaryOp,
         },
         _ => BinOp::NotABinaryOp,
@@ -293,24 +294,36 @@ fn get_un_operator_from_token(token: &TokenWithDebugInfo) -> UnOp {
 #[derive(Debug, Clone)]
 pub enum Statement {
     Let(AssignmentIdentifier, Option<Typed<Expression>>, Type),
-    If(Typed<Expression>, Box<Typed<Statement>>, Option<Box<Typed<Statement>>>),
+    If(
+        Typed<Expression>,
+        Box<Typed<Statement>>,
+        Option<Box<Typed<Statement>>>,
+    ),
     While(Typed<Expression>, Box<Typed<Statement>>),
     Loop(Box<Typed<Statement>>),
     Dowhile(Typed<Expression>, Box<Typed<Statement>>),
-    For(Typed<Expression>, Typed<Expression>, Typed<Expression>, Box<Typed<Statement>>),
+    For(
+        Typed<Expression>,
+        Typed<Expression>,
+        Typed<Expression>,
+        Box<Typed<Statement>>,
+    ),
     Return(Typed<Expression>),
     Expression(Typed<Expression>),
     Compound(Vec<Typed<Statement>>),
     Break,
     Continue,
-	Asm(String, Type),
+    Asm(String, Type),
 }
 
 /// Represents a function in the AST.
 #[derive(Debug, Clone)]
-pub enum Function {
-	//TODO: should be struct instead of enum
-    Function(String, Vec<(String, Type)>, Typed<Statement>, Type),
+pub struct Function {
+    pub id: String,
+    pub args: Vec<(String, Type)>,
+    pub body: Typed<Statement>,
+    pub return_type: Type,
+    pub generics: Vec<String>,
 }
 
 /// Represents a constant in the AST.
@@ -323,13 +336,13 @@ pub enum Constant {
 }
 
 #[derive(Debug, Clone)]
-pub struct Namespace{
-	pub id: String,
-	pub functions: Vec<Typed<Function>>,
-	pub constants: Vec<Typed<Constant>>,
-	pub structs: Vec<Struct>,
-	pub enums: Vec<Enum>,
-	pub sub_namespaces: Vec<Namespace>,
+pub struct Namespace {
+    pub id: String,
+    pub functions: Vec<Typed<Function>>,
+    pub constants: Vec<Typed<Constant>>,
+    pub structs: Vec<Struct>,
+    pub enums: Vec<Enum>,
+    pub sub_namespaces: Vec<Namespace>,
 }
 
 /// Represents the abstract syntax tree (AST) of a program.
@@ -341,7 +354,7 @@ pub struct Ast {
 impl std::fmt::Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-			Literal::Bool(b) => write!(f, "{}", if *b {"0xFFFFFFFFFFFFFFFF"} else {"0"}),
+            Literal::Bool(b) => write!(f, "{}", if *b { "0xFFFFFFFFFFFFFFFF" } else { "0" }),
             Literal::Int(i) => write!(f, "{}", i),
             Literal::Float(fl) => write!(f, "{}", fl),
             Literal::Hex(h) => write!(f, "0x{:x}", h),
@@ -447,8 +460,8 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Typed<Atom> {
             internal_tok: Token::CharLiteral(_),
             ..
         } => {
-			let lit = parse_literal(&tok);
-			let t = lit.get_type().clone();
+            let lit = parse_literal(&tok);
+            let t = lit.get_type().clone();
             return Typed::new_with_type(Atom::Literal(lit), t);
         }
         TokenWithDebugInfo {
@@ -460,7 +473,9 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Typed<Atom> {
                     .collect::<Vec<_>>()
                     .chunks(8)
                     .map(|chunk| {
-                        Typed::new(Expression::Atom(Typed::new(Atom::Literal(Typed::new(Literal::Char(chunk.iter().collect()))))))
+                        Typed::new(Expression::Atom(Typed::new(Atom::Literal(Typed::new(
+                            Literal::Char(chunk.iter().collect()),
+                        )))))
                     })
                     .collect(),
                 (s.len() as i64 + 3) / 8,
@@ -470,8 +485,56 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Typed<Atom> {
             internal_tok: Token::Identifier(s),
             ..
         } => {
-            let next_tok = tokens.clone().next().unwrap();
-            // TODO: Make this if-else chain into match statement
+			let mut lookahead_tokens = tokens.clone();
+            let mut next_tok = lookahead_tokens.next().unwrap();
+
+			// Function call / struct instance with generic binding
+			// id:<T1, T2, ...>(args)
+			// The colon is necessary or else there is ambiguity with the
+			// "less than" and "greater than" operators. We do need to make
+			// sure it's not the colon of a typecast though.
+
+			let mut generics = Vec::new();
+
+			if let TokenWithDebugInfo {
+				internal_tok: Token::Colon,
+				..
+			} = next_tok 
+			{
+				let generics_tok = lookahead_tokens.next().unwrap();
+
+				if matches!(generics_tok.internal_tok, Token::Operator(Operator::LessThan)) {
+					tokens.next();
+					tokens.next();
+					loop {
+						generics.push(parse_type(&mut tokens));
+						let next_tok = tokens.next().unwrap();
+						if let TokenWithDebugInfo {
+							internal_tok: Token::Operator(Operator::GreaterThan),
+							..
+						} = next_tok
+						{
+							break;
+						} else if let TokenWithDebugInfo {
+							internal_tok: Token::Comma,
+							..
+						} = next_tok
+						{
+							continue;
+						} else {
+							error_unexpected_token("comma or '>'", &next_tok);
+						}
+					}
+	
+					next_tok = tokens.clone().next().unwrap();
+	
+					if !matches!(next_tok.internal_tok, Token::LParen) & 
+					   !matches!(next_tok.internal_tok, Token::LBrace) {
+						error_unexpected_token("function call '(' ( fn_id:<T1, T2, ..>(args) )", &next_tok);
+					}
+				}
+			}
+
             if let TokenWithDebugInfo {
                 internal_tok: Token::LParen,
                 ..
@@ -499,9 +562,8 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Typed<Atom> {
                         args.push(Typed::new(parse_expression(&mut tokens)));
                     }
                 }
-                return Typed::new(Atom::FunctionCall(s.to_string(), args));
-            }
-            else if let TokenWithDebugInfo {
+                return Typed::new(Atom::FunctionCall(s.to_string(), args, generics));
+            } else if let TokenWithDebugInfo {
                 internal_tok: Token::LBrace,
                 ..
             } = next_tok
@@ -528,7 +590,7 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Typed<Atom> {
                         fields.push(Typed::new(parse_expression(&mut tokens)));
                     }
                 }
-                return Typed::new(Atom::StructInstance(s.to_string(), fields));
+                return Typed::new(Atom::StructInstance(s.to_string(), fields, generics));
             }
 
             // Variable
@@ -546,9 +608,9 @@ fn parse_assignment_identifier(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Ass
             internal_tok: Token::Operator(Operator::Multiply),
             ..
         } => {
-            return AssignmentIdentifier::Dereference(Box::new(Typed::new(parse_assignment_identifier(
-                &mut tokens,
-            ))));
+            return AssignmentIdentifier::Dereference(Box::new(Typed::new(
+                parse_assignment_identifier(&mut tokens),
+            )));
         }
         TokenWithDebugInfo {
             internal_tok: Token::Identifier(s),
@@ -599,7 +661,10 @@ fn parse_reassignment_identifier(expr: Expression) -> ReassignmentIdentifier {
     // }
 
     match expr {
-        Expression::Atom(Typed { expr: Atom::Variable(s), .. }) => ReassignmentIdentifier::Variable(s),
+        Expression::Atom(Typed {
+            expr: Atom::Variable(s),
+            ..
+        }) => ReassignmentIdentifier::Variable(s),
         Expression::UnaryOp(expr, UnOp::Dereference) => ReassignmentIdentifier::Dereference(expr),
         Expression::ArrayAccess(expr, args) => ReassignmentIdentifier::Array(expr, args),
         Expression::BinaryOp(expr1, expr2, BinOp::MemberAccess) => {
@@ -614,8 +679,8 @@ fn find_arr_dims(array: &Atom) -> Option<Vec<i64>> {
         Atom::Array(sub_elements, dim) => {
             let mut dims: Vec<i64> = Vec::new();
 
-            for Typed{expr, ..} in sub_elements {
-                let Typed{expr: elem, ..} = match expr {
+            for Typed { expr, .. } in sub_elements {
+                let Typed { expr: elem, .. } = match expr {
                     Expression::Atom(atom) => atom,
                     _ => continue,
                 };
@@ -643,20 +708,29 @@ fn find_arr_dims(array: &Atom) -> Option<Vec<i64>> {
 fn rectangularize_array(array: &mut Vec<Typed<Expression>>, depth: usize, max_dims: &Vec<i64>) {
     let max_size = max_dims[depth] as usize;
     if depth + 1 < max_dims.len() {
-        for Typed{expr: elem , ..} in array.iter_mut() {
-            if let Expression::Atom(Typed{expr: Atom::Array(ref mut sub_array, _), ..}) = elem {
+        for Typed { expr: elem, .. } in array.iter_mut() {
+            if let Expression::Atom(Typed {
+                expr: Atom::Array(ref mut sub_array, _),
+                ..
+            }) = elem
+            {
                 rectangularize_array(sub_array, depth + 1, max_dims);
             } else {
                 let mut new_elem = vec![Typed::new(elem.clone())];
                 rectangularize_array(&mut new_elem, depth + 1, max_dims);
-                *elem = Expression::Atom(Typed::new(Atom::Array(new_elem.clone(), new_elem.len() as i64)));
+                *elem = Expression::Atom(Typed::new(Atom::Array(
+                    new_elem.clone(),
+                    new_elem.len() as i64,
+                )));
             }
         }
     }
 
     while array.len() < max_size {
         if depth == max_dims.len() - 1 {
-            array.push(Typed::new(Expression::Atom(Typed::new(Atom::Literal(Typed::new(Literal::Int(0)))))));
+            array.push(Typed::new(Expression::Atom(Typed::new(Atom::Literal(
+                Typed::new(Literal::Int(0)),
+            )))));
         } else {
             let mut new_elem = vec![];
             rectangularize_array(&mut new_elem, depth + 1, max_dims);
@@ -670,8 +744,12 @@ fn rectangularize_array(array: &mut Vec<Typed<Expression>>, depth: usize, max_di
 
 fn flatten(array: &Vec<Typed<Expression>>) -> Vec<Typed<Expression>> {
     let mut flat_arr = Vec::new();
-    for Typed{expr: elem, ..} in array.iter() {
-        if let Expression::Atom(Typed{expr: Atom::Array(ref sub_array, _), ..}) = elem {
+    for Typed { expr: elem, .. } in array.iter() {
+        if let Expression::Atom(Typed {
+            expr: Atom::Array(ref sub_array, _),
+            ..
+        }) = elem
+        {
             flatten(sub_array);
             for sub_elem in sub_array.iter() {
                 flat_arr.push(sub_elem.clone());
@@ -798,14 +876,22 @@ fn parse_expression_with_precedence(
 
             // Re-parse the left hand side of the assignment expression
             let assignment_identifier = parse_reassignment_identifier(expr);
-            expr = Expression::Assignment(Typed::new(assignment_identifier), Box::new(Typed::new(next_term)), op);
+            expr = Expression::Assignment(
+                Typed::new(assignment_identifier),
+                Box::new(Typed::new(next_term)),
+                op,
+            );
         } else {
             let next_term = parse_expression_with_precedence(
                 &mut tokens,
                 precedence_level - 1,
                 precedence_table,
             ); // Parse next term
-            expr = Expression::BinaryOp(Box::new(Typed::new(expr)), Box::new(Typed::new(next_term)), op);
+            expr = Expression::BinaryOp(
+                Box::new(Typed::new(expr)),
+                Box::new(Typed::new(next_term)),
+                op,
+            );
         }
         next = tokens.clone().next().unwrap();
     }
@@ -1012,20 +1098,48 @@ fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Type {
             internal_tok: Token::Identifier(id),
             ..
         } => {
-			// Here we assume that the identifier is a struct name, but it could also be an enum, or just not exist
-			// in case there is no such struct/enum. We check for this in logic_checker.rs (check_if_struct_or_enum)
-			let next_tok = tokens.clone().next().unwrap();
-			if let TokenWithDebugInfo {
-				internal_tok: Token::Operator(Operator::DoubleColon),
+            // Here we assume that the identifier is a struct name, but it could also be an enum, or just not exist
+            // in case there is no such struct/enum. We check for this in logic_checker.rs (check_if_struct_or_enum)
+            let next_tok = tokens.clone().next().unwrap();
+            if let TokenWithDebugInfo {
+                internal_tok: Token::Operator(Operator::DoubleColon),
+                ..
+            } = next_tok
+            {
+                tokens.next();
+                Type::Namespace(id.to_string(), Box::new(parse_type(tokens)))
+            } else if let TokenWithDebugInfo {
+				internal_tok: Token::Operator(Operator::LessThan),
 				..
 			} = next_tok
 			{
+				// Generics bindings type<T1, T2, ...>
 				tokens.next();
-				Type::Namespace(id.to_string(), Box::new(parse_type(tokens)))
+				let mut generics = Vec::new();
+				loop {
+					generics.push(parse_type(&mut tokens));
+					let next_tok = tokens.next().unwrap();
+					if let TokenWithDebugInfo {
+						internal_tok: Token::Operator(Operator::GreaterThan),
+						..
+					} = next_tok
+					{
+						break;
+					} else if let TokenWithDebugInfo {
+						internal_tok: Token::Comma,
+						..
+					} = next_tok
+					{
+						continue;
+					} else {
+						error_unexpected_token("comma or '>'", &next_tok);
+					}
+				}
+				return Type::GenericBinding(id.to_string(), generics);
 			} else {
-				Type::Struct(id.to_string())
-			}
-		}
+                Type::Struct(id.to_string())
+            }
+        }
         _ => error_unexpected_token("valid type token", &tok),
     }
 }
@@ -1114,10 +1228,14 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
                             else_stmt = Statement::Compound(vec![Typed::new(else_stmt)]);
                         }
 
-                        statement =
-                            Statement::If(Typed::new(exp), Box::new(Typed::new(if_stmt)), Some(Box::new(Typed::new(else_stmt))));
+                        statement = Statement::If(
+                            Typed::new(exp),
+                            Box::new(Typed::new(if_stmt)),
+                            Some(Box::new(Typed::new(else_stmt))),
+                        );
                     } else {
-                        statement = Statement::If(Typed::new(exp), Box::new(Typed::new(if_stmt)), None);
+                        statement =
+                            Statement::If(Typed::new(exp), Box::new(Typed::new(if_stmt)), None);
                     }
                 } else {
                     statement = Statement::If(Typed::new(exp), Box::new(Typed::new(if_stmt)), None);
@@ -1193,7 +1311,12 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
                     for_stmt = Statement::Compound(vec![Typed::new(for_stmt)]);
                 }
 
-                statement = Statement::For(Typed::new(init), Typed::new(cond), Typed::new(step), Box::new(Typed::new(for_stmt)));
+                statement = Statement::For(
+                    Typed::new(init),
+                    Typed::new(cond),
+                    Typed::new(step),
+                    Box::new(Typed::new(for_stmt)),
+                );
             } else if k == "do" {
                 // do statement while (exp);
                 let mut do_stmt = parse_statement(tokens);
@@ -1210,7 +1333,8 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
                 {
                     if k == "while" {
                         let exp = parse_expression(tokens);
-                        statement = Statement::Dowhile(Typed::new(exp), Box::new(Typed::new(do_stmt)));
+                        statement =
+                            Statement::Dowhile(Typed::new(exp), Box::new(Typed::new(do_stmt)));
                     } else {
                         error_unexpected_token("while keyword", &next_tok);
                     }
@@ -1222,29 +1346,32 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
             } else if k == "continue" {
                 statement = Statement::Continue;
             } else if k == "asm" {
-				let mut asm = String::new();
-				let next_tok = tokens.next().unwrap();
-				if let TokenWithDebugInfo { internal_tok: Token::StringLiteral(s), .. } = next_tok {
-					asm.push_str(s);
-				} else {
-					error_unexpected_token("string literal", &next_tok);
-				}
+                let mut asm = String::new();
+                let next_tok = tokens.next().unwrap();
+                if let TokenWithDebugInfo {
+                    internal_tok: Token::StringLiteral(s),
+                    ..
+                } = next_tok
+                {
+                    asm.push_str(s);
+                } else {
+                    error_unexpected_token("string literal", &next_tok);
+                }
 
-				// Can type asm statements
-				let next_tok = tokens.clone().next().unwrap();
-				if let TokenWithDebugInfo {
-					internal_tok: Token::Colon,
-					..
-				} = next_tok
-				{
-					tokens.next();
-					let return_type = parse_type(tokens);
-					statement = Statement::Asm(asm, return_type);
-				} else {
-					statement = Statement::Asm(asm, Type::Void);
-				}
-
-			} else {
+                // Can type asm statements
+                let next_tok = tokens.clone().next().unwrap();
+                if let TokenWithDebugInfo {
+                    internal_tok: Token::Colon,
+                    ..
+                } = next_tok
+                {
+                    tokens.next();
+                    let return_type = parse_type(tokens);
+                    statement = Statement::Asm(asm, return_type);
+                } else {
+                    statement = Statement::Asm(asm, Type::Void);
+                }
+            } else {
                 error_unexpected_token("valid keyword token", &tok);
             }
         }
@@ -1381,7 +1508,45 @@ fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
         TokenWithDebugInfo { .. } => error_unexpected_token("identifier", &tok),
     };
 
-    let tok = tokens.next().unwrap();
+    let mut tok = tokens.next().unwrap();
+    // Check if any abstract types are defined
+    // fn id<type1, type2, ..>(params): type statement
+    let mut abstract_types = Vec::new();
+    if let TokenWithDebugInfo {
+        internal_tok: Token::Operator(Operator::LessThan),
+        ..
+    } = tok
+    {
+        loop {
+            let abstract_type_tok = tokens.next().unwrap();
+            if let TokenWithDebugInfo {
+                internal_tok: Token::Identifier(id),
+                ..
+            } = abstract_type_tok
+            {
+                abstract_types.push(id.clone());
+
+                let tok = tokens.next().unwrap();
+                if let TokenWithDebugInfo {
+                    internal_tok: Token::Comma,
+                    ..
+                } = tok
+                {
+                    continue;
+                } else if let TokenWithDebugInfo {
+                    internal_tok: Token::Operator(Operator::GreaterThan),
+                    ..
+                } = tok
+                {
+                    break;
+                } else {
+                    error_unexpected_token("comma or closing angle bracket", &tok);
+                }
+            }
+        }
+        tok = tokens.next().unwrap();
+    }
+
     if !matches!(
         tok,
         TokenWithDebugInfo {
@@ -1452,13 +1617,20 @@ fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
         statement = Statement::Compound(vec![Typed::new(statement)]);
     }
 
-    return Function::Function(id, params, Typed::new(statement), return_type);
+    return Function {
+        id: id,
+        args: params,
+        body: Typed::new(statement),
+        return_type: return_type,
+        generics: abstract_types,
+    };
 }
 
 #[derive(Debug, Clone)]
 pub struct Struct {
     pub id: String,
     pub members: Vec<(String, Type)>,
+	pub generics: Vec<String>,
 }
 
 fn parse_struct(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Struct {
@@ -1485,7 +1657,45 @@ fn parse_struct(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Struct {
         TokenWithDebugInfo { .. } => error_unexpected_token("identifier", &tok),
     };
 
-    let tok = tokens.next().unwrap();
+    let mut tok = tokens.next().unwrap();
+
+	// Check if any abstract types are defined
+	// struct id<type1, type2, ..> { members }
+	let mut abstract_types = Vec::new();
+	if let TokenWithDebugInfo {
+		internal_tok: Token::Operator(Operator::LessThan),
+		..
+	} = tok
+	{
+		loop {
+			let abstract_type_tok = tokens.next().unwrap();
+			if let TokenWithDebugInfo {
+				internal_tok: Token::Identifier(id),
+				..
+			} = abstract_type_tok
+			{
+				abstract_types.push(id.clone());
+				let tok = tokens.next().unwrap();
+				if let TokenWithDebugInfo {
+					internal_tok: Token::Comma,
+					..
+				} = tok
+				{
+					continue;
+				} else if let TokenWithDebugInfo {
+					internal_tok: Token::Operator(Operator::GreaterThan),
+					..
+				} = tok
+				{
+					break;
+				} else {
+					error_unexpected_token("comma or closing angle bracket", &tok);
+				}
+			}
+		}
+		tok = tokens.next().unwrap();
+	}
+
     if !matches!(
         tok,
         TokenWithDebugInfo {
@@ -1534,132 +1744,134 @@ fn parse_struct(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Struct {
         }
     }
 
-    return Struct { id, members };
+    return Struct { id, members, generics: abstract_types };
 }
 
 #[derive(Debug, Clone)]
 pub struct Enum {
-	pub id: String,
-	pub variants: Vec<String>,
+    pub id: String,
+    pub variants: Vec<String>,
 }
 
 fn parse_enum(tokens: &mut Iter<TokenWithDebugInfo>) -> Enum {
-	let tok = tokens.next().unwrap();
+    let tok = tokens.next().unwrap();
 
-	if let TokenWithDebugInfo {
-		internal_tok: Token::Keyword(ref k),
-		..
-	} = tok {
-		if k != "enum" {
-			error_unexpected_token("enum keyword", &tok)
-		}
-	} else {
-		error_unexpected_token("enum keyword", &tok)
-	}
+    if let TokenWithDebugInfo {
+        internal_tok: Token::Keyword(ref k),
+        ..
+    } = tok
+    {
+        if k != "enum" {
+            error_unexpected_token("enum keyword", &tok)
+        }
+    } else {
+        error_unexpected_token("enum keyword", &tok)
+    }
 
-	let tok = tokens.next().unwrap();
-	let id = match tok {
-		TokenWithDebugInfo {
-			internal_tok: Token::Identifier(id),
-			..
-		} => id.clone(),
-		TokenWithDebugInfo { .. } => error_unexpected_token("identifier", &tok),
-	};
+    let tok = tokens.next().unwrap();
+    let id = match tok {
+        TokenWithDebugInfo {
+            internal_tok: Token::Identifier(id),
+            ..
+        } => id.clone(),
+        TokenWithDebugInfo { .. } => error_unexpected_token("identifier", &tok),
+    };
 
-	let tok = tokens.next().unwrap();
-	if !matches!(
-		tok,
-		TokenWithDebugInfo {
-			internal_tok: Token::LBrace,
-			..
-		}
-	) {
-		error_unexpected_token("opening brace", tok);
-	}
+    let tok = tokens.next().unwrap();
+    if !matches!(
+        tok,
+        TokenWithDebugInfo {
+            internal_tok: Token::LBrace,
+            ..
+        }
+    ) {
+        error_unexpected_token("opening brace", tok);
+    }
 
-	let mut variants = Vec::new();
+    let mut variants = Vec::new();
 
-	loop {
-		let tok = tokens.next().unwrap();
+    loop {
+        let tok = tokens.next().unwrap();
 
-		if let TokenWithDebugInfo {
-			internal_tok: Token::Identifier(id),
-			..
-		} = tok {
-			variants.push(id.clone());
-			let next_tok = tokens.next().unwrap();
+        if let TokenWithDebugInfo {
+            internal_tok: Token::Identifier(id),
+            ..
+        } = tok
+        {
+            variants.push(id.clone());
+            let next_tok = tokens.next().unwrap();
 
-			if let TokenWithDebugInfo {
-				internal_tok: Token::Comma,
-				..
-			} = next_tok {
-				continue;
-			} else if let TokenWithDebugInfo {
-				internal_tok: Token::RBrace,
-				..
-			} = next_tok {
-				break;
-			} else {
-				error_unexpected_token("comma or closing brace", &next_tok);
-			}
+            if let TokenWithDebugInfo {
+                internal_tok: Token::Comma,
+                ..
+            } = next_tok
+            {
+                continue;
+            } else if let TokenWithDebugInfo {
+                internal_tok: Token::RBrace,
+                ..
+            } = next_tok
+            {
+                break;
+            } else {
+                error_unexpected_token("comma or closing brace", &next_tok);
+            }
+        } else {
+            error_unexpected_token("identifier", &tok);
+        }
+    }
 
-		} else {
-			error_unexpected_token("identifier", &tok);
-		}
-	}
-
-	return Enum { id, variants };
+    return Enum { id, variants };
 }
-
 
 /// Parses an abstract syntax tree (AST) from a list of tokens.
 pub fn parse_namespace(tokens: &mut Iter<TokenWithDebugInfo>, is_toplevel: bool) -> Namespace {
-
-	let id;
-	if !is_toplevel {
-		let tok = tokens.next().unwrap();
-		if let TokenWithDebugInfo {
-			internal_tok: Token::Keyword(ref k),
-			..
-		} = tok {
-			if k != "namespace" {
-				error_unexpected_token("namespace keyword", &tok)
-			}
-		} else {
-			error_unexpected_token("namespace keyword", &tok)
-		}
-		let tok = tokens.next().unwrap();
-		id = match tok {
-			TokenWithDebugInfo {
-				internal_tok: Token::Identifier(id),
-				..
-			} => {
-				if id.eq("toplevel") {
-					error("cannot use 'toplevel' as a namespace name", &tok);
-				}
-				id.clone()
-			},
-			TokenWithDebugInfo { .. } => error_unexpected_token("identifier", &tok),
-		};
-		let tok = tokens.next().unwrap();
-		if !matches!(
-			tok,
-			TokenWithDebugInfo {
-				internal_tok: Token::Semicolon,
-				..
-			}
-		) {
-			error_unexpected_token("semicolon", tok);
-		}
-	} else {
-		id = "toplevel".to_string();
-	}
+    let id;
+    if !is_toplevel {
+        let tok = tokens.next().unwrap();
+        if let TokenWithDebugInfo {
+            internal_tok: Token::Keyword(ref k),
+            ..
+        } = tok
+        {
+            if k != "namespace" {
+                error_unexpected_token("namespace keyword", &tok)
+            }
+        } else {
+            error_unexpected_token("namespace keyword", &tok)
+        }
+        let tok = tokens.next().unwrap();
+        id = match tok {
+            TokenWithDebugInfo {
+                internal_tok: Token::Identifier(id),
+                ..
+            } => {
+                if id.eq("toplevel") {
+                    error("cannot use 'toplevel' as a namespace name", &tok);
+                }
+                id.clone()
+            }
+            TokenWithDebugInfo { .. } => error_unexpected_token("identifier", &tok),
+        };
+        let tok = tokens.next().unwrap();
+        if !matches!(
+            tok,
+            TokenWithDebugInfo {
+                internal_tok: Token::Semicolon,
+                ..
+            }
+        ) {
+            error_unexpected_token("semicolon", tok);
+        }
+    } else {
+        id = "toplevel".to_string();
+    }
 
     let mut functions = Vec::new();
     let mut constants = Vec::new();
     let mut structs = Vec::new();
-	let mut enums = Vec::new();
-	let mut sub_namespaces = Vec::new();
+    let mut enums = Vec::new();
+    let mut sub_namespaces = Vec::new();
 
     // Parse functions until there are no more tokens
     loop {
@@ -1669,51 +1881,71 @@ pub fn parse_namespace(tokens: &mut Iter<TokenWithDebugInfo>, is_toplevel: bool)
                 internal_tok: Token::EOF,
                 ..
             } => {
-				if !is_toplevel {
-					error("unexpected EOF: Missing 'spacename' keyword", &next_tok);
-				}
-				break
-			},
+                if !is_toplevel {
+                    error("unexpected EOF: Missing 'spacename' keyword", &next_tok);
+                }
+                break;
+            }
             TokenWithDebugInfo {
                 internal_tok: Token::Keyword(ref k),
                 ..
             } => {
-				if k == "fn" {functions.push(Typed::new(parse_function(tokens)))}
-				else if k == "const" {constants.push(Typed::new(parse_const(tokens)))}
-				else if k == "struct" {structs.push(parse_struct(tokens))}
-				else if k == "enum" {enums.push(parse_enum(tokens))}
-				else if k == "union" {todo!("union")}
-				else if k == "namespace" {sub_namespaces.push(parse_namespace(tokens, false));}
-				else if k == "spacename" {
-					if is_toplevel {
-						error("cannot use 'spacename' outside of a namespace", &next_tok);
-					} else {
-						tokens.next();
-						let tok = tokens.next().unwrap();
-						if !matches!(
-							tok,
-							TokenWithDebugInfo {
-								internal_tok: Token::Semicolon,
-								..
-							}
-						) {
-							error_unexpected_token("semicolon", &tok);
-						}
-						break
-					}
-				}
-				else {error_unexpected_token("function, constant, struct, enum or union declaration", &next_tok)}
-			}
-			_ => error_unexpected_token("function, constant, struct, enum or union declaration", &next_tok),
+                if k == "fn" {
+                    functions.push(Typed::new(parse_function(tokens)))
+                } else if k == "const" {
+                    constants.push(Typed::new(parse_const(tokens)))
+                } else if k == "struct" {
+                    structs.push(parse_struct(tokens))
+                } else if k == "enum" {
+                    enums.push(parse_enum(tokens))
+                } else if k == "union" {
+                    todo!("union")
+                } else if k == "namespace" {
+                    sub_namespaces.push(parse_namespace(tokens, false));
+                } else if k == "spacename" {
+                    if is_toplevel {
+                        error("cannot use 'spacename' outside of a namespace", &next_tok);
+                    } else {
+                        tokens.next();
+                        let tok = tokens.next().unwrap();
+                        if !matches!(
+                            tok,
+                            TokenWithDebugInfo {
+                                internal_tok: Token::Semicolon,
+                                ..
+                            }
+                        ) {
+                            error_unexpected_token("semicolon", &tok);
+                        }
+                        break;
+                    }
+                } else {
+                    error_unexpected_token(
+                        "function, constant, struct, enum or union declaration",
+                        &next_tok,
+                    )
+                }
+            }
+            _ => error_unexpected_token(
+                "function, constant, struct, enum or union declaration",
+                &next_tok,
+            ),
         }
     }
 
-	Namespace { id, functions, constants, structs, enums, sub_namespaces }
+    Namespace {
+        id,
+        functions,
+        constants,
+        structs,
+        enums,
+        sub_namespaces,
+    }
 }
 
 pub fn parse(tokens: &Vec<TokenWithDebugInfo>) -> Ast {
-	let mut tokens = tokens.iter();
-	let program = parse_namespace(&mut tokens, true);
+    let mut tokens = tokens.iter();
+    let program = parse_namespace(&mut tokens, true);
 
-	Ast { program }
+    Ast { program }
 }

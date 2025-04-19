@@ -1,0 +1,19 @@
+fn return2<T>(i: T): T {
+	let tmp: T;
+	return i;
+}
+
+struct S<T, U> {
+	first_attribute: int;
+	second_attribute: T;
+	third_attribute: char;
+	fourth_attribute: U;
+}
+
+// TODO: test if nested generics are fine
+
+fn main(): int {
+	let a: S<int, str> = S:<int, str>{ 1, 2, 'a', "hi" };
+	a.second_attribute = 3;
+	return a.second_attribute + return2:<S<int, str> >(a).first_attribute;
+}

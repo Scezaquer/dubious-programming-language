@@ -181,10 +181,10 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
     let int_re = Regex::new(r"^\d+").unwrap();
 
 	// Binary literals are a sequence of 0s and 1s, prefixed by 0b
-	let bin_re = Regex::new(r"^0b[01]+").unwrap();
+	let bin_re = Regex::new(r"^0[bB][01]+").unwrap();
 
 	// Hex literals are a sequence of 0-9 and a-f/A-F, prefixed by 0x
-	let hex_re = Regex::new(r"^0x[0-9a-fA-F]+").unwrap();
+	let hex_re = Regex::new(r"^0[xX][0-9a-fA-F]+").unwrap();
 
 	let bool_re = Regex::new(r"^(true|false)$").unwrap();
 
@@ -195,7 +195,7 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
     let large_operator_re = Regex::new(r"^(==|!=|<=|>=|&&|\|\||\+\+|--|<<=|>>=|<<|>>|\+=|-=|\*=|\/=|%=|&=|\^=|\|=|\^\^|::)").unwrap();
 
     // Keywords are any of the following strings: if else while for return
-    let keyword_re = Regex::new(r"^(if|else|do|while|for|loop|return|fn|let|break|continue|const|struct|union|enum|asm|namespace|spacename)$").unwrap();
+    let keyword_re = Regex::new(r"^(if|else|do|while|for|loop|return|fn|let|break|continue|const|struct|enum|asm|namespace|spacename)$").unwrap();
 
 	let whitespace_re = Regex::new(r"^[^\S\n]+").unwrap();
 

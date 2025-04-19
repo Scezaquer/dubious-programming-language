@@ -57,8 +57,19 @@ impl std::fmt::Display for crate::ast_build::Enum {
 impl std::fmt::Display for crate::ast_build::Struct {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match &self {
-			&crate::ast_build::Struct{ id, members } => {
-				write!(f, "struct {} {{\n", id)?;
+			&crate::ast_build::Struct{ id, members, generics } => {
+				if generics.is_empty() {
+					write!(f, "struct {} {{\n", id)?;
+				} else {
+					write!(f, "struct {}<", id)?;
+					for (i, generic) in generics.iter().enumerate() {
+						write!(f, "{}", generic)?;
+						if i < generics.len() - 1 {
+							write!(f, ", ")?;
+						}
+					}
+					write!(f, "> {{\n")?;
+				}
 				for member in members {
 					write!(f, "{}: {},\n", member.0, member.1)?;
 				}
@@ -79,11 +90,22 @@ impl std::fmt::Display for Constant {
 impl std::fmt::Display for Function {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Function::Function(name, params, body, return_type) => {
-				write!(f, "fn {}(", name)?;
-				for (i, param) in params.iter().enumerate() {
+			Function{ id, args, body, return_type, generics} => {
+				if generics.is_empty() {
+					write!(f, "fn {}(", id)?;
+				} else {
+					write!(f, "fn {}<", id)?;
+					for (i, generic) in generics.iter().enumerate() {
+						write!(f, "{}", generic)?;
+						if i < generics.len() - 1 {
+							write!(f, ", ")?;
+						}
+					}
+					write!(f, ">(")?;
+				}
+				for (i, param) in args.iter().enumerate() {
 					write!(f, "{}: {}", param.0, param.1)?;
-					if i < params.len() - 1 {
+					if i < args.len() - 1 {
 						write!(f, ", ")?;
 					}
 				}
@@ -108,6 +130,16 @@ impl std::fmt::Display for Type {
 			Type::Struct(id) => write!(f, "{}", id),
 			Type::Enum(id) => write!(f, "{}", id),
 			Type::Namespace(id, t) => write!(f, "{}::{}", id, t),
+			Type::GenericBinding(id, types) => {
+				write!(f, "{}<", id)?;
+				for (i, t) in types.iter().enumerate() {
+					write!(f, "{}", t)?;
+					if i < types.len() - 1 {
+						write!(f, ", ")?;
+					}
+				}
+				write!(f, ">")
+			}
 		}
 	}
 }
@@ -193,8 +225,19 @@ impl std::fmt::Display for Atom {
 			Atom::Literal(constant) => write!(f, "{}", constant),
 			Atom::Expression(expr) => write!(f, "({})", expr),
 			Atom::Variable(var) => write!(f, "{}", var),
-			Atom::FunctionCall(name, args) => {
-				write!(f, "{}(", name)?;
+			Atom::FunctionCall(name, args, generics) => {
+				if generics.is_empty() {
+					write!(f, "{}(", name)?;
+				} else {
+					write!(f, "{}:<", name)?;
+					for (i, generic) in generics.iter().enumerate() {
+						write!(f, "{}", generic)?;
+						if i < generics.len() - 1 {
+							write!(f, ", ")?;
+						}
+					}
+					write!(f, ">(" )?;
+				}
 				for (i, arg) in args.iter().enumerate() {
 					write!(f, "{}", arg)?;
 					if i < args.len() - 1 {
@@ -213,8 +256,19 @@ impl std::fmt::Display for Atom {
 				}
 				write!(f, "]")
 			}
-			Atom::StructInstance(id, members) => {
-				write!(f, "{} {{", id)?;
+			Atom::StructInstance(id, members, generics) => {
+				if generics.is_empty() {
+					write!(f, "{} {{", id)?;
+				} else {
+					write!(f, "{}:<", id)?;
+					for (i, generic) in generics.iter().enumerate() {
+						write!(f, "{}", generic)?;
+						if i < generics.len() - 1 {
+							write!(f, ", ")?;
+						}
+					}
+					write!(f, "> {{")?;
+				}
 				for (i, member) in members.iter().enumerate() {
 					write!(f, "{}", member)?;
 					if i < members.len() - 1 {
