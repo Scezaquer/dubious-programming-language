@@ -1,4 +1,4 @@
-fn return2<T>(i: T): T {
+fn return2:<T>(i: T): T {
 	let tmp: T;
 	return i;
 }

@@ -209,7 +209,9 @@ pub enum Expression {
 }
 
 /// Gets the binary operator corresponding to the token.
-fn get_bin_operator_from_token(token: &TokenWithDebugInfo) -> BinOp {
+fn get_bin_operator_from_tokens(token: &Iter<TokenWithDebugInfo>) -> BinOp {
+	let mut cloned_tokens = token.clone();
+	let token = cloned_tokens.next().unwrap();
     match token {
         TokenWithDebugInfo {
             internal_tok: Token::Operator(op),
@@ -221,11 +223,8 @@ fn get_bin_operator_from_token(token: &TokenWithDebugInfo) -> BinOp {
             Operator::Add => BinOp::Add,
             Operator::Subtract => BinOp::Subtract,
             Operator::LeftShift => BinOp::LeftShift,
-            Operator::RightShift => BinOp::RightShift,
             Operator::LessThan => BinOp::LessThan,
-            Operator::GreaterThan => BinOp::GreaterThan,
             Operator::LessOrEqualThan => BinOp::LessOrEqualThan,
-            Operator::GreaterOrEqualThan => BinOp::GreaterOrEqualThan,
             Operator::Equal => BinOp::Equal,
             Operator::NotEqual => BinOp::NotEqual,
             Operator::BitwiseAnd => BinOp::BitwiseAnd,
@@ -236,6 +235,45 @@ fn get_bin_operator_from_token(token: &TokenWithDebugInfo) -> BinOp {
             Operator::LogicalOr => BinOp::LogicalOr,
             Operator::MemberAccess => BinOp::MemberAccess,
             Operator::DoubleColon => BinOp::NamespaceAccess,
+			Operator::GreaterThan => {
+				// We need special treatment for the greater than operator.
+				// Since there is ambiguity at the tokenization level between
+				// generics syntax and oprators that start with '>', we don't use
+				// the tokenization level to determine if it's a generic or an operator.
+
+				// e.g in 'let a: S<T>= ..;' we don't want to parse the '>=' as
+				// a 'greater than' operator, but as a generic binding followed
+				// by an assignment operator.
+
+				// Similarly for '>>' in the function call 'func:<S<T>>(args);'
+
+				let next = cloned_tokens.next().unwrap();
+
+				if let TokenWithDebugInfo {
+					internal_tok: Token::Operator(Operator::Assign),
+					..
+				} = next
+				{
+					BinOp::GreaterOrEqualThan	// >=
+				} else if let TokenWithDebugInfo {
+					internal_tok: Token::Operator(Operator::GreaterThan),
+					..
+				} = next
+				{
+					let next = cloned_tokens.next().unwrap();
+					if let TokenWithDebugInfo {
+						internal_tok: Token::Operator(Operator::Assign),
+						..
+					} = next
+					{
+						BinOp::NotABinaryOp	// >>=
+					} else {
+						BinOp::RightShift	// >>
+					}
+				} else {
+					BinOp::GreaterThan	// >
+				}
+			}
             _ => BinOp::NotABinaryOp,
         },
         _ => BinOp::NotABinaryOp,
@@ -243,7 +281,9 @@ fn get_bin_operator_from_token(token: &TokenWithDebugInfo) -> BinOp {
 }
 
 /// Gets the assignment operator corresponding to the token.
-fn get_assign_operator_from_token(token: &TokenWithDebugInfo) -> AssignmentOp {
+fn get_assign_operator_from_tokens(token: &Iter<TokenWithDebugInfo>) -> AssignmentOp {
+	let mut cloned_tokens = token.clone();
+	let token = cloned_tokens.next().unwrap();	
     match token {
         TokenWithDebugInfo {
             internal_tok: Token::Operator(op),
@@ -256,7 +296,31 @@ fn get_assign_operator_from_token(token: &TokenWithDebugInfo) -> AssignmentOp {
             Operator::DivideAssign => AssignmentOp::DivideAssign,
             Operator::ModulusAssign => AssignmentOp::ModulusAssign,
             Operator::LeftShiftAssign => AssignmentOp::LeftShiftAssign,
-            Operator::RightShiftAssign => AssignmentOp::RightShiftAssign,
+			Operator::GreaterThan => {
+				// For the same reason as in get_bin_operator_from_tokens, we
+				// need to make sure the '>>=' in 'let a: S<T<U>>= ..;' is not
+				// parsed as a 'rightshift assignment' operator.
+
+				let next = cloned_tokens.next().unwrap();
+				if let TokenWithDebugInfo {
+					internal_tok: Token::Operator(Operator::GreaterThan),
+					..
+				} = next
+				{
+					let next = cloned_tokens.next().unwrap();
+					if let TokenWithDebugInfo {
+						internal_tok: Token::Operator(Operator::Assign),
+						..
+					} = next
+					{
+						AssignmentOp::RightShiftAssign	// >>=
+					} else {
+						AssignmentOp::NotAnAssignmentOp	// >>
+					}
+				} else {
+					AssignmentOp::NotAnAssignmentOp	// >
+				}
+			},
             Operator::BitwiseAndAssign => AssignmentOp::BitwiseAndAssign,
             Operator::BitwiseXorAssign => AssignmentOp::BitwiseXorAssign,
             Operator::BitwiseOrAssign => AssignmentOp::BitwiseOrAssign,
@@ -485,53 +549,46 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Typed<Atom> {
             internal_tok: Token::Identifier(s),
             ..
         } => {
-			let mut lookahead_tokens = tokens.clone();
-            let mut next_tok = lookahead_tokens.next().unwrap();
+            let mut next_tok = tokens.clone().next().unwrap();
 
 			// Function call / struct instance with generic binding
 			// id:<T1, T2, ...>(args)
 			// The colon is necessary or else there is ambiguity with the
-			// "less than" and "greater than" operators. We do need to make
-			// sure it's not the colon of a typecast though.
+			// "less than" and "greater than" operators.
 
 			let mut generics = Vec::new();
 
 			if let TokenWithDebugInfo {
-				internal_tok: Token::Colon,
+				internal_tok: Token::BeginGeneric,
 				..
 			} = next_tok 
 			{
-				let generics_tok = lookahead_tokens.next().unwrap();
+				tokens.next();
+				loop {
+					generics.push(parse_type(&mut tokens));
+					let next_tok = tokens.next().unwrap();
+					if let TokenWithDebugInfo {
+						internal_tok: Token::Operator(Operator::GreaterThan),
+						..
+					} = next_tok
+					{
+						break;
+					} else if let TokenWithDebugInfo {
+						internal_tok: Token::Comma,
+						..
+					} = next_tok
+					{
+						continue;
+					} else {
+						error_unexpected_token("comma or '>'", &next_tok);
+					}
+				}
 
-				if matches!(generics_tok.internal_tok, Token::Operator(Operator::LessThan)) {
-					tokens.next();
-					tokens.next();
-					loop {
-						generics.push(parse_type(&mut tokens));
-						let next_tok = tokens.next().unwrap();
-						if let TokenWithDebugInfo {
-							internal_tok: Token::Operator(Operator::GreaterThan),
-							..
-						} = next_tok
-						{
-							break;
-						} else if let TokenWithDebugInfo {
-							internal_tok: Token::Comma,
-							..
-						} = next_tok
-						{
-							continue;
-						} else {
-							error_unexpected_token("comma or '>'", &next_tok);
-						}
-					}
-	
-					next_tok = tokens.clone().next().unwrap();
-	
-					if !matches!(next_tok.internal_tok, Token::LParen) & 
-					   !matches!(next_tok.internal_tok, Token::LBrace) {
-						error_unexpected_token("function call '(' ( fn_id:<T1, T2, ..>(args) )", &next_tok);
-					}
+				next_tok = tokens.clone().next().unwrap();
+
+				if !matches!(next_tok.internal_tok, Token::LParen) & 
+					!matches!(next_tok.internal_tok, Token::LBrace) {
+					error_unexpected_token("function call '(' ( fn_id:<T1, T2, ..>(args) )", &next_tok);
 				}
 			}
 
@@ -854,20 +911,30 @@ fn parse_expression_with_precedence(
     }
 
     // Now handle binary and assignment operators for the current precedence level
-    next = tokens.clone().next().unwrap();
     while precedence_table[precedence_level]
         .binary_ops
-        .contains(&get_bin_operator_from_token(&next))
+        .contains(&get_bin_operator_from_tokens(tokens))
         || precedence_table[precedence_level]
             .assignment_ops
-            .contains(&get_assign_operator_from_token(&next))
+            .contains(&get_assign_operator_from_tokens(tokens))
     {
-        let tok = tokens.next().unwrap();
-        let op = get_bin_operator_from_token(tok); // Get the binary operator
+        let op = get_bin_operator_from_tokens(tokens); // Get the binary operator
 
         if op == BinOp::NotABinaryOp {
             // If it's not a binary operator, it must be an assignment operator
-            let op = get_assign_operator_from_token(tok); // Get the assignment operator
+            let op = get_assign_operator_from_tokens(tokens); // Get the assignment operator
+
+			// Skip forward the appropriate number of tokens
+			match op {
+				AssignmentOp::RightShiftAssign => {
+					// This specific operator is made of three tokens
+					tokens.next();
+					tokens.next();
+					tokens.next();
+				}
+				_ => {tokens.next();}
+			}
+
             let next_term = parse_expression_with_precedence(
                 &mut tokens,
                 precedence_level - 1,
@@ -882,6 +949,16 @@ fn parse_expression_with_precedence(
                 op,
             );
         } else {
+			// Skip forward the appropriate number of tokens
+			match op {
+				BinOp::GreaterOrEqualThan | BinOp::RightShift => {
+					// There specific operators are made of two tokens
+					tokens.next();
+					tokens.next();
+				}
+				_ => {tokens.next();}
+			}
+
             let next_term = parse_expression_with_precedence(
                 &mut tokens,
                 precedence_level - 1,
@@ -1109,11 +1186,11 @@ fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Type {
                 tokens.next();
                 Type::Namespace(id.to_string(), Box::new(parse_type(tokens)))
             } else if let TokenWithDebugInfo {
-				internal_tok: Token::Operator(Operator::LessThan),
+				internal_tok: Token::BeginGeneric,
 				..
 			} = next_tok
 			{
-				// Generics bindings type<T1, T2, ...>
+				// Generics bindings type:<T1, T2, ...>
 				tokens.next();
 				let mut generics = Vec::new();
 				loop {
@@ -1510,10 +1587,10 @@ fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
 
     let mut tok = tokens.next().unwrap();
     // Check if any abstract types are defined
-    // fn id<type1, type2, ..>(params): type statement
+    // fn id:<type1, type2, ..>(params): type statement
     let mut abstract_types = Vec::new();
     if let TokenWithDebugInfo {
-        internal_tok: Token::Operator(Operator::LessThan),
+        internal_tok: Token::BeginGeneric,
         ..
     } = tok
     {
@@ -1660,10 +1737,10 @@ fn parse_struct(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Struct {
     let mut tok = tokens.next().unwrap();
 
 	// Check if any abstract types are defined
-	// struct id<type1, type2, ..> { members }
+	// struct id:<type1, type2, ..> { members }
 	let mut abstract_types = Vec::new();
 	if let TokenWithDebugInfo {
-		internal_tok: Token::Operator(Operator::LessThan),
+		internal_tok: Token::BeginGeneric,
 		..
 	} = tok
 	{

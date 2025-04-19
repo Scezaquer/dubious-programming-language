@@ -1,4 +1,4 @@
-fn return2<T, U, V, W>(i: T, j: U, k: V, l: W): T {
+fn return2:<T, U, V, W>(i: T, j: U, k: V, l: W): T {
 	let tmp: T = i;
 	let tmp2: U = tmp + j;
 	let tmp3: V = tmp2 + k;

@@ -30,18 +30,15 @@ pub enum Operator {
     Equal,              // ==
     NotEqual,           // !=
     LessOrEqualThan,    // <=
-    GreaterOrEqualThan, // >=
     Increment,          // ++
     Decrement,          // --
     LeftShift,          // <<
-    RightShift,         // >>
     AddAssign,          // +=
     SubtractAssign,     // -=
     MultiplyAssign,     // *=
     DivideAssign,       // /=
     ModulusAssign,      // %=
     LeftShiftAssign,    // <<=
-    RightShiftAssign,   // >>=
     BitwiseAndAssign,   // &=
     BitwiseXorAssign,   // ^=
     BitwiseOrAssign,    // |=
@@ -49,6 +46,16 @@ pub enum Operator {
 	MemberAccess,       // .
 	DoubleColon,		// ::
 }
+
+// We need special treatment for the operators that start with a '>'.
+// Since there is ambiguity at the tokenization level between
+// generics syntax and oprators that start with '>', we don't use
+// the tokenization level to determine if it's a generic or an operator.
+
+// e.g in 'let a: S<T>= ..;' we don't want to parse the '>=' as
+// a 'greater than' operator, but as a generic binding followed
+// by an assignment operator.
+
 
 /// All the tokens that the lexer can recognize.
 /// 
@@ -79,6 +86,7 @@ pub enum Token {
     RBrace,
     LBracket,
     RBracket,
+	BeginGeneric, // :<
     Keyword(String),
     EOF
 }
@@ -192,7 +200,7 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
     let operator_re = Regex::new(r"^[\+\-\*/%\^&~\|<>=!\.,]").unwrap();
 
     // Large operators are any of the following strings: == != <= >= && || ++ -- << >> += -= *= /= %= <<= >>= &= ^= |= ^^
-    let large_operator_re = Regex::new(r"^(==|!=|<=|>=|&&|\|\||\+\+|--|<<=|>>=|<<|>>|\+=|-=|\*=|\/=|%=|&=|\^=|\|=|\^\^|::)").unwrap();
+    let large_operator_re = Regex::new(r"^(==|!=|<=|&&|\|\||\+\+|--|<<=|<<|\+=|-=|\*=|\/=|%=|&=|\^=|\|=|\^\^|::)").unwrap();
 
     // Keywords are any of the following strings: if else while for return
     let keyword_re = Regex::new(r"^(if|else|do|while|for|loop|return|fn|let|break|continue|const|struct|enum|asm|namespace|spacename)$").unwrap();
@@ -291,15 +299,15 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
                 "==" => Operator::Equal,
                 "!=" => Operator::NotEqual,
                 "<=" => Operator::LessOrEqualThan,
-                ">=" => Operator::GreaterOrEqualThan,
+                // ">=" => Operator::GreaterOrEqualThan,
                 "&&" => Operator::LogicalAnd,
                 "||" => Operator::LogicalOr,
                 "++" => Operator::Increment,
                 "--" => Operator::Decrement,
                 "<<=" => Operator::LeftShiftAssign,
-                ">>=" => Operator::RightShiftAssign,
+                // ">>=" => Operator::RightShiftAssign,
                 "<<" => Operator::LeftShift,
-                ">>" => Operator::RightShift,
+                // ">>" => Operator::RightShift,
                 "+=" => Operator::AddAssign,
                 "-=" => Operator::SubtractAssign,
                 "*=" => Operator::MultiplyAssign,
@@ -335,7 +343,10 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
             };
             tok = Token::Operator(op);
             pos += caps.get(0).unwrap().end();
-        } else if rest.starts_with(":") {
+        } else if rest.starts_with(":<") {
+			tok = Token::BeginGeneric;
+			pos += 2;
+		} else if rest.starts_with(":") {
             tok = Token::Colon;
             pos += 1;
         } else if let Some(caps) = identifier_re.captures(rest) {

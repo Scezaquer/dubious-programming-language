@@ -1,4 +1,4 @@
-struct S<T> {
+struct S:<T> {
 	first_attribute: int;
 	second_attribute: T;
 	third_attribute: char;
@@ -6,6 +6,6 @@ struct S<T> {
 }
 
 fn main(): int {
-	let a: S<int> = S:<int>{ 1, 2, 'a', 3 };
+	let a: S:<int> = S:<int>{ 1, 2, 'a', 3 };
 	return a.second_attribute + a.fourth_attribute + a.first_attribute;
 }

@@ -12,7 +12,7 @@ A simple compiler for the Dubious programming language (DPL).
 - TODO: std library
 - TODO: Upload vscode syntax highlighting to marketplace
 - TODO: Wiki
-- TODO: Generic types tests + operator conflicts >> >>= >=
+- TODO: Generic types tests
 - TODO: Void pointers?  Im not entirely sure I need it as I can already freely cast anything to anything but that would make for more explicit code. This may be an alternative/complementary to generics, but I feel like it would be worse
 - TODO: let strings be defined over multiple lines like "hello "\n"world" in code would evaluate to the literal "hello world"
 
