@@ -1,3 +1,6 @@
+#ifndef INCLUDE_STD_IO
+#define INCLUDE_STD_IO
+
 #namespace io
 
 #include <print.dpl>

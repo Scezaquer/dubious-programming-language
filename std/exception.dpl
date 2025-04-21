@@ -1,0 +1,16 @@
+#ifndef INCLUDE_STD_EXCEPTION
+#define INCLUDE_STD_EXCEPTION
+
+#include <io>
+
+fn exception(e: str, error_code: int): int {
+	io::print("Exception: ");
+	io::print(e);
+	io::print("\n");
+
+	error_code;
+	asm "	mov rdi, rax
+	mov rax, 60
+	syscall
+	";
+}

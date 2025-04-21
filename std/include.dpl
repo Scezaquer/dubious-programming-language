@@ -2,3 +2,5 @@
 
 #include <io>
 #include <math>
+#include <string.dpl>
+#include <exception.dpl>

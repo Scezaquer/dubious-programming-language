@@ -1,3 +1,6 @@
+#ifndef INCLUDE_STD_MATH
+#define INCLUDE_STD_MATH
+
 #namespace math
 
 #include <cast.dpl>
