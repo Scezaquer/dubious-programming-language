@@ -3,33 +3,12 @@ section .text
 
 global _start
 _start:
-    call .toplevel.main
+    call main
     mov rdi, rax
     mov rax, 60
     syscall
 
-.toplevel.ftoint:
-    push rbp		;save previous base pointer
-    push rbx		;functions should preserve rbx
-    mov rbp, rsp	;set base pointer
-    movsd xmm0, [rbp+24]
-	cvtsd2si rax, xmm0  ; Convert double in xmm0 to 64-bit integer in rax
-    add rsp, 0		;end of block, pop local variables
-    pop rbx			;restore rbx for caller function
-    pop rbp			;restore base pointer
-    ret				;return by default if no return statement was reached
-
-.toplevel.inttof:
-    push rbp		;save previous base pointer
-    push rbx		;functions should preserve rbx
-    mov rbp, rsp	;set base pointer
-    mov rax, [rbp+24]
-	cvtsi2sd xmm0, rax	; Convert 64-bit integer in rax to double in xmm0
-    add rsp, 0		;end of block, pop local variables
-    pop rbx			;restore rbx for caller function
-    pop rbp			;restore base pointer
-    ret				;return by default if no return statement was reached
-
+main:
 .toplevel.main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
@@ -103,13 +82,35 @@ _start:
     pop rbp			;restore base pointer
     ret				;return by default if no return statement was reached
 
+.toplevel.ftoint:
+    push rbp		;save previous base pointer
+    push rbx		;functions should preserve rbx
+    mov rbp, rsp	;set base pointer
+    movsd xmm0, [rbp+24]
+	cvtsd2si rax, xmm0  ; Convert double in xmm0 to 64-bit integer in rax
+    add rsp, 0		;end of block, pop local variables
+    pop rbx			;restore rbx for caller function
+    pop rbp			;restore base pointer
+    ret				;return by default if no return statement was reached
+
+.toplevel.inttof:
+    push rbp		;save previous base pointer
+    push rbx		;functions should preserve rbx
+    mov rbp, rsp	;set base pointer
+    mov rax, [rbp+24]
+	cvtsi2sd xmm0, rax	; Convert 64-bit integer in rax to double in xmm0
+    add rsp, 0		;end of block, pop local variables
+    pop rbx			;restore rbx for caller function
+    pop rbp			;restore base pointer
+    ret				;return by default if no return statement was reached
+
 section .data
-	.float.0: dq 20.0
-	.float.1: dq 3.1415926535
-	.float.5: dq 1.41
-	.float.3: dq 1.3
-	.float.6: dq 0.3
-	.float.7: dq 0.5
-	.float.8: dq 2.5
 	.float.4: dq 1.2
+	.float.5: dq 1.41
+	.float.1: dq 3.1415926535
+	.float.6: dq 0.3
 	.float.2: dq 6.821
+	.float.8: dq 2.5
+	.float.7: dq 0.5
+	.float.3: dq 1.3
+	.float.0: dq 20.0

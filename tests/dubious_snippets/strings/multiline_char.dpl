@@ -2,5 +2,5 @@ fn main(): int {
 	let a: char = 'He
 l
 lo';
-	return a : int; //o = 111
+	return a : int >> (6*8) ; //o = 111
 }

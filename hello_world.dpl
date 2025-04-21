@@ -1,0 +1,6 @@
+#include <std>
+
+fn main(): int {
+	std::io::println("Hello, World!");
+	return 0;
+}

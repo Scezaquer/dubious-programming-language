@@ -1,4 +1,4 @@
 fn main(): int {
 	let a: str = "abcdefghijklmnopqrstuvwxyz1234567890";
-	return a[3] : int >> (4*8); // '2' = 50
+	return a[3] : int >> (4*8); // '3' = 51
 }

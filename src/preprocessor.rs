@@ -85,7 +85,7 @@ pub fn preprocessor(file: &str, filename: &str, include_path: HashSet<String>) -
 			match directive{
 				"include" => {
 					// #include <[FILE]>
-					// Include the contents of the file
+					// Include the contents of the file or folder (if folder, looks for include.dpl)
 					// If the file is not found, print an error message
 
 					// Get the file
@@ -107,36 +107,53 @@ pub fn preprocessor(file: &str, filename: &str, include_path: HashSet<String>) -
 					// Construct the full path by joining the current directory and included file
 					let full_path = current_dir.join(file);
 
+					// Check if we are including a directory
+					let (actual_path, is_directory) = if full_path.is_dir() {
+						// Check if directory contains include.dpl
+						let include_file = full_path.join("include.dpl");
+						if include_file.exists() {
+							(include_file, true)
+						} else {
+							panic!("{} Line {}: Directory does not contain include.dpl: {}", filename, line, full_path.display());
+						}
+					} else {
+						(full_path.clone(), false)
+					};
+
 					// Check if we are in a circular include situation
-					if include_path.contains(full_path.to_str().unwrap()) {
-						panic!("{} Line {}: Circular include detected: {}", filename, line, full_path.display());
+					if include_path.contains(actual_path.to_str().unwrap()) {
+						panic!("{} Line {}: Circular include detected: {}", filename, line, actual_path.display());
 					}
 
 					{
 						// Lock the mutex to access the included files
 						// This is in a separate block to ensure the lock is released
 						let included_files = INCLUDED_FILES.lock().unwrap();
-						if included_files.contains(full_path.to_str().unwrap()){
+						if included_files.contains(actual_path.to_str().unwrap()){
 							// We don't panic here in case it's deliberate (like
 							// if different namespaces import the same lib). Note that
 							// if this causes functions/structs/etc to be defined
 							// multiple times in the same namespace, it will
 							// cause a compilation error later down the line.
-							println!("{} Line {} Warning: File '{}' is already included somewhere else", filename, line, full_path.display());
+							println!("{} Line {} Warning: File '{}' is already included somewhere else", filename, line, actual_path.display());
 						}
 					}
 
 					// Read the file
-					let included_file = match std::fs::read_to_string(&full_path) {
+					let included_file = match std::fs::read_to_string(&actual_path) {
 						Ok(file) => file,
-						Err(_) => panic!("{} Line {}: File not found: {}", filename, line, full_path.display())
+						Err(_) => panic!("{} Line {}: File not found: {}", filename, line, actual_path.display())
 					};
 
 					// Preprocess the included file
-					let included_file = preprocessor(&included_file, full_path.to_str().unwrap(), include_path.clone());
+					let included_file = preprocessor(&included_file, actual_path.to_str().unwrap(), include_path.clone());
 
 					// Add a comment to indicate the start of the included file to track the source of errors
-					processed_file.push_str(format!("// <{}>\n", full_path.display()).as_str());
+					if is_directory {
+						processed_file.push_str(format!("// <{}/include.dpl>\n", full_path.display()).as_str());
+					} else {
+						processed_file.push_str(format!("// <{}>\n", actual_path.display()).as_str());
+					}
 					processed_file.push_str(&included_file);
 					processed_file.push_str(format!("// <{}>\n", filename).as_str());
 				},

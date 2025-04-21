@@ -1,4 +1,4 @@
 fn main(): int {
-	let a: char = '12\n4567\'';
+	let a: char = '\'12\n4567';
 	return a : int; //' = 39
 }

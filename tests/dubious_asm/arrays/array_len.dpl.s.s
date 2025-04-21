@@ -3,11 +3,12 @@ section .text
 
 global _start
 _start:
-    call .toplevel.main
+    call main
     mov rdi, rax
     mov rax, 60
     syscall
 
+main:
 .toplevel.main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx

@@ -1,4 +1,4 @@
 fn main(): int {
 	let a: str = "hi\nthere\":))\"";
-	return a[1] : int; //" = 34
+	return a[1] : int >> (4*8); //" = 34
 }

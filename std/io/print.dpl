@@ -1,0 +1,14 @@
+fn print(s: str): int {
+	s[-1] : int * 8;	// Move the length of the string into rax
+	asm "	mov rdx, rax	; length of string";
+	s;	// Move the pointer to the string into rax
+	asm "	mov rsi, rax	; pointer to string
+	mov rax, 1		; syscall: sys_write
+	mov rdi, 1		; file descriptor: stdout
+	syscall" : int;
+}
+
+fn println(s: str): int {
+	print(s);
+	print("\n");
+}

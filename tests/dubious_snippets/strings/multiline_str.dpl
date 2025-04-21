@@ -2,5 +2,5 @@ fn main(): int {
 	let a: str = "Hello
 	worl
 d";
-	return a[1] : int; //d = 100
+	return a[1] : int; //o = 111
 }

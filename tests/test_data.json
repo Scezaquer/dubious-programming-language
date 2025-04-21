@@ -571,21 +571,21 @@
 		"description" : "char with 8 characters, and shift it's bits to access one of the middle values",
 		"filename": "strings/long_char_shift.dpl",
 		"input": [],
-		"output": 99
+		"output": 102
 	},
 	{
 		"name": "long_char",
 		"description" : "char with 8 characters, return first one",
 		"filename": "strings/long_char.dpl",
 		"input": [],
-		"output": 104
+		"output": 97
 	},
 	{
 		"name": "long_str_shift",
 		"description" : "long string, access one character in the middle",
 		"filename": "strings/long_str_shift.dpl",
 		"input": [],
-		"output": 50
+		"output": 51
 	},
 	{
 		"name": "str_shift",
@@ -599,7 +599,7 @@
 		"description" : "declare a short string, return it's first character",
 		"filename": "strings/str.dpl",
 		"input": [],
-		"output": 99
+		"output": 97
 	},
 	{
 		"name": "multiline_char",
@@ -613,7 +613,7 @@
 		"description" : "multiline string literal",
 		"filename": "strings/multiline_str.dpl",
 		"input": [],
-		"output": 100
+		"output": 111
 	},
 	{
 		"name": "char_escape_characters",

@@ -43,7 +43,7 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 
 				let mut display_chars = String::new();
 				let mut encoding: i64 = 0;
-				for character in c.chars() {
+				for (i, character) in c.chars().enumerate() {
 					if !character.is_ascii() { // Continue checking each character
 						panic!("Non ASCII character");
 					}
@@ -59,7 +59,8 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 					};
 					
 					// Stack each byte into the encoding
-					encoding = (encoding << 8) | (character as i64);
+					// encoding = (encoding << 8) | (character as i64);
+					encoding = encoding | ((character as i64) << (i * 8));
 				}
 				
 				writeln!(file, "    mov rax, 0x{:x}	;{}", encoding, display_chars).unwrap();
@@ -107,9 +108,13 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
                 "	;push function arguments to the stack in reverse order"
             )
             .unwrap();
+			let mut pop_counter = 0;
+			let mut stack_index = context.stack_index;
             for arg in args.iter().rev() {
                 // Push arguments in reverse order (C convention)
                 generate_expression(file, arg, context);
+				pop_counter += stack_index - context.stack_index;
+				stack_index = context.stack_index;
 
 				if arg.type_ == Type::Float {
 					writeln!(file, "    movq rax, xmm0").unwrap();
@@ -118,7 +123,9 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
                 writeln!(file, "    push rax").unwrap();
             }
             writeln!(file, "    call .{}", name.replace("::", ".")).unwrap();
-            writeln!(file, "    add rsp, {}	;pop arguments", args.len() * 8).unwrap();
+            writeln!(file, "    add rsp, {}	;pop arguments", pop_counter + 8 * args.len() as i64).unwrap();
+			context.stack_index += pop_counter;
+			context.len -= (pop_counter/8) as usize;
             // Pop arguments from stack
         }
         Typed{expr: Atom::Array(expressions, _), ..} | Typed{expr: Atom::StructInstance(_, expressions, _), ..} => {
@@ -1008,6 +1015,8 @@ fn generate_function(file: &mut File, function: &Typed<Function>, context: &Cont
     context.stack_index = 0;
 
     writeln!(file, "").unwrap();
+	// It's important to have the "main" label for gdb to work properly
+	if name == "toplevel::main" {writeln!(file, "main:").unwrap();}
     writeln!(file, ".{}:", name.replace("::", ".")).unwrap();
     writeln!(file, "    push rbp		;save previous base pointer").unwrap();
     writeln!(file, "    push rbx		;functions should preserve rbx").unwrap();
@@ -1056,7 +1065,7 @@ pub fn generate(ast: &Ast, out_path: &str) {
     writeln!(file, "").unwrap();
     writeln!(file, "global _start").unwrap();
     writeln!(file, "_start:").unwrap(); // Entry point
-    writeln!(file, "    call .toplevel.main").unwrap(); // Call main
+    writeln!(file, "    call main").unwrap(); // Call main
     writeln!(file, "    mov rdi, rax").unwrap(); // Return value of main
     writeln!(file, "    mov rax, 60").unwrap(); // Exit syscall
     writeln!(file, "    syscall").unwrap();
@@ -1084,9 +1093,22 @@ pub fn generate(ast: &Ast, out_path: &str) {
         context.structs.insert(id.clone(), member_names);
     }
 
-    for function in function_vector.iter() {
-        generate_function(&mut file, function, &context);
-    }
+	// Since gdb needs the 'main' label to be toplevel, and since all our
+	// other labels are local labels, we need to generate the main function first
+
+	// Generate toplevel::main first
+	for function in function_vector.iter() {
+		if function.expr.id == "toplevel::main" {
+			generate_function(&mut file, function, &context);
+		}
+	}
+	
+	// Generate all other functions
+	for function in function_vector.iter() {
+		if function.expr.id != "toplevel::main" {
+			generate_function(&mut file, function, &context);
+		}
+	}
 
     writeln!(file, "").unwrap();
     writeln!(file, "section .data").unwrap();

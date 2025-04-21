@@ -198,9 +198,10 @@ when manipulating long strings or text files. So `char` can actually contain
 up to 8 characters. This means that `'a'` is a char, but `'abcdefgh'` is also a char.
 However, `'abcdefghi'` is not.
 
-In memory, characters in the char are in order, padded to the left, such that
-`'abcd'` corresponds to hex `0x61626364`. Char `'a'` corresponds to hex `0x61`
-(instead of `0x6100000000000000`).
+In memory, characters in the char are in reverse order, padded to the left, such that
+`'abcd'` corresponds to hex `0x64636261`. Char `'a'` corresponds to hex `0x61`
+(instead of `0x6100000000000000`). This is the order that lets the print syscall
+works properly on strings.
 
 This also means that `str` are actually chunked into groups of 8 characters,
 which is important to keep in mind when indexing them. I.e., `let a: str = "abcdefghij"`
@@ -343,6 +344,15 @@ less than ideal scenarios, and if you're lucky, a crash.
 
 TODO: explan how type casting works, what you could theoretically do with it,
 and how you can typecast asm statements.
+
+## Include
+
+The `#include <relative_path>` preprocessor macro is what allows you to split
+code into multiple files. The way it works is extremely simple: it will essentially
+be substituted with the code from the included file.
+
+It is also possible to include a folder, in which case the preprocessor will
+look for an `include.dpl` file in that folder, and include this file.
 
 ## Namespaces
 

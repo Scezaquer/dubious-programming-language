@@ -1,0 +1,12 @@
+fn print(s: str): int {
+	return 0;
+}
+
+fn println(s: str): int {
+	print(s);
+	print("\n");
+}
+fn main(): int {
+	println("Hello, world!");
+	return 0;
+}
