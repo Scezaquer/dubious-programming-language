@@ -12,30 +12,51 @@ _start:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
-    mov rax, 0x61	;a
+    mov rax, 6
     push rax
-    mov rax, 1
+    mov rax, 5
+    push rax
+    mov rax, 4
+    push rax
+    mov rax, 3		; length of the array
     push rax
     mov rax, rsp	; Move the address of the array to rax
+    add rax, 8		; we also pushed the array's length so we need to add 8 to point to the right address
+    mov rax, 3
     push rax
-    mov rax, [.constant.toplevel.test.c]
+    mov rax, 2
     push rax
+    mov rax, 2		; length of the array
+    push rax
+    mov rax, rsp	; Move the address of the array to rax
+    add rax, 8		; we also pushed the array's length so we need to add 8 to point to the right address
     mov rax, 1
     push rax
-	;push function arguments to the stack in reverse order
-    call .toplevel.test.return_2
-    add rsp, 0	;pop arguments
+    mov rax, 1		; length of the array
     push rax
-    mov rax, [rbp-24]
-    mov rcx, 0
+    mov rax, rsp	; Move the address of the array to rax
+    add rax, 8		; we also pushed the array's length so we need to add 8 to point to the right address
+    mov rax, rsp
+    add rax, 72
+    sub rax, 32
+    push rax
+    sub rax, 24
+    push rax
+    sub rax, 16
+    push rax
+    mov rax, 3		; length of the array
+    push rax
+    mov rax, rsp	; Move the address of the array to rax
+    add rax, 8		; we also pushed the array's length so we need to add 8 to point to the right address
+    push rax
+    mov rax, [rbp-112]
+    mov rcx, 1
     mov rax, [rax + rcx * 8]
+    push rax
+    mov rax, 1
     pop rcx
-    add rax, rcx
-    pop rcx
-    add rax, rcx
-    pop rcx
-    add rax, rcx
-    add rsp, 24		;pop local variables before return
+    mov rax, [rcx + rax * 8]
+    add rsp, 112		;pop local variables before return
     pop rbx		;restore rbx for caller function
     pop rbp		;restore base pointer
     ret
@@ -44,19 +65,4 @@ _start:
     pop rbp			;restore base pointer
     ret				;return by default if no return statement was reached
 
-.toplevel.test.return_2:
-    push rbp		;save previous base pointer
-    push rbx		;functions should preserve rbx
-    mov rbp, rsp	;set base pointer
-    mov rax, 2
-    add rsp, 0		;pop local variables before return
-    pop rbx		;restore rbx for caller function
-    pop rbp		;restore base pointer
-    ret
-    add rsp, 0		;end of block, pop local variables
-    pop rbx			;restore rbx for caller function
-    pop rbp			;restore base pointer
-    ret				;return by default if no return statement was reached
-
 section .data
-    .constant.toplevel.test.c: dq 5

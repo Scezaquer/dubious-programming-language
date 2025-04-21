@@ -144,8 +144,6 @@ arr2d[3, 4] = 3; // TODO: Special syntax that initializes all entries to 3
 The compiler should treat all arrays as flat and substitute dimensional indexing by it's equivalent flat indexing,
 so that the dimensions of the array don't have to be saved at runtime, only a value containing the size (in words).
 
-In memory, there should be a variable on the stack containing the length of the array, and additional variables with the array's dimensions if needed. Then elements of the array one after the other in a continuous block of memory on the stack.
-
 At runtime, check before accessing an array's element that it's within the array's length,
 otherwise throw some error (need an error routine? Otherwise just do something that segfaults
 but that's pretty dirty). It's technically an extra instruction (and a branch so extra bad)
@@ -185,8 +183,10 @@ TODO: element-wise operations on arrays?
 TODO: array literals are glitched as fuck if you do weird dimension things. So
 don't. Ideally stick to either rectangular or 1/2d arrays. If you do something
 else, you're on your own, and expect fucked up indexing behavior.
-TODO: make arr.len a variable accessible in code
-TODO: Can't change elements in arrays yet
+
+The length of an array is stored in the 64 bits right before the start of the array.
+This means that `arr[-1]` is the length of the array. 
+
 
 ## Strings
 
@@ -241,6 +241,10 @@ or a struct member as left hand side.
 
 Similarly to functions, structs and enums are both defined everywhere, even before
 they are declared. This allows circular definitions and recursive structures.
+
+The 'len' attribute is reserved, and s.len refers to the number of attributes in
+the struct. In memory, the length of a struct is stored in the 64 bits that precede
+the first element of the struct, similarly to how array length is stored.
 
 ## Enums
 

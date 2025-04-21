@@ -553,6 +553,13 @@
 		"output": 4
 	},
 	{
+		"name": "array_len",
+		"description": "Length of an array",
+		"filename": "arrays/array_len.dpl",
+		"input": [],
+		"output": 3
+	},
+	{
 		"name": "char",
 		"description" : "char type declaration with single character and cast to int to return",
 		"filename": "strings/char.dpl",
@@ -698,6 +705,20 @@
 		"filename": "structs/enum_struct.dpl",
 		"input": [],
 		"output": 0
+	},
+	{
+		"name": "nested_struct_array",
+		"description": "Nested struct with array member",
+		"filename": "structs/nested_struct_array.dpl",
+		"input": [],
+		"output": 9
+	},
+	{
+		"name": "struct_length",
+		"description": "Length of a struct",
+		"filename": "structs/struct_length.dpl",
+		"input": [],
+		"output": 5
 	},
 	{
 		"name": "inline_asm",

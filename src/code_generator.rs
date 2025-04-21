@@ -140,10 +140,13 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 			// for [S{a, b}, S{c, d}] would actually look like
 			// 	| d |
 			// 	| c |
-			//  | ptr(S{c, d}) |
+			// 	| len(S{c, d}) |
+			//  | ptr(c) |
 			// 	| b |
 			// 	| a |
-			//  | ptr(S{a, b}) | <- rsp, we get a ptr to this
+			//  | len(S{a, b}) |
+			//  | ptr(a) | < rax, we get a ptr to this
+			//  | len([S{a, b}, S{c, d}]) | <- rsp
 			// But if we try to access arr[1], we would get rsp-8, which is the
 			// address of the first attribute of the first struct, not the address
 			// of the second struct.
@@ -153,11 +156,17 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 			// looks like
 			// 	| d |
 			// 	| c |
+			// 	| len(S{c, d}) |
 			// 	| b |
 			// 	| a |
-			//  | ptr(S{c, d}) |
-			//  | ptr(S{a, b}) | <- rsp, we get a ptr to this
+			// 	| len(S{a, b}) |
+			//  | ptr(c) |
+			//  | ptr(a) | <- rax, we get a ptr to this
+			//  | len([S{a, b}, S{c, d}]) | <- rsp
 			// Where array indexing works as expected.
+
+			// The length of an array is stored in the word right before the
+			// first element of the array. This means arr[-1] is len(arr)
 
 			// Now aditionally, we note that since structs work in the same way,
 			// we must correctly handle the cases where some expressions push
@@ -179,8 +188,8 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 			let sum = stack_indices.iter().sum::<i64>(); // Size of all the structs values together
 
 			if sum != 0 {
-				writeln!(file, "    mov rax, rsp").unwrap();
-				writeln!(file, "    add rax, {}", sum).unwrap();
+				writeln!(file, "    mov rax, rsp").unwrap();		// rsp actually points one word too low because of the
+				writeln!(file, "    add rax, {}", sum+8).unwrap();	// len of the array being pushed on stack so we need to add 8
 
 				if !matches!(expressions[0], Typed{expr: Expression::Atom(Typed{expr: Atom::StructInstance(..) | Atom::Array(..), ..}), ..}){
 					writeln!(file, "    push rax").unwrap();
@@ -217,12 +226,19 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 				}
 			}
 
+			// Write the length of the array at [array_address - 8]
+			writeln!(file, "    mov rax, {}		; length of the array", expressions.len()).unwrap();
+			writeln!(file, "    push rax").unwrap();
+			context.stack_index -= 8;
+			context.len += 1;
+
             // Move the address of the array/struct to rax
             writeln!(
                 file,
                 "    mov rax, rsp	; Move the address of the array to rax"
             )
             .unwrap();
+			writeln!(file, "    add rax, 8		; we also pushed the array's length so we need to add 8 to point to the right address").unwrap();
         }
     }
 }

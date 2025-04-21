@@ -1,0 +1,20 @@
+struct S1 {
+	first_attribute: S2;
+	second_attribute: S2;
+	third_attribute: S2;
+}
+
+struct S2 {
+	first_attribute: array[int];
+	second_attribute: array[int];
+	third_attribute: array[int];
+}
+
+fn main(): int {
+	let a: S1 = S1{ 
+		S2{ [1], [2, 3], [4, 5, 6] },
+		S2{ [7], [8, 9], [10, 11, 12] },
+		S2{ [13], [14, 15], [16, 17, 18] }
+	};
+	return a.second_attribute.second_attribute[1];
+}

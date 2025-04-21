@@ -1,0 +1,12 @@
+struct S {
+	first_attribute: int;
+	second_attribute: int;
+	third_attribute: int;
+	fourth_attribute: int;
+	fifth_attribute: int;
+}
+
+fn main(): int {
+	let a: S = S{ 3, 4, 5, 6, 7 };
+	return a.len;
+}

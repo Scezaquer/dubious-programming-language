@@ -355,37 +355,47 @@ fn type_member_access(
                 .get(&s)
                 .expect(format!("Undefined struct {}", lhs_type).as_str());
 
-            if let Some(t) = unordered_list.get(attribute) {
-                // Slow but whatever. Don't make structs with a bajillion members,
-                // or if you do change this to a hashmap
-                let index = ordered_list
-                    .iter()
-                    .position(|(attr, _)| attr == attribute)
-                    .expect("Attribute not found in ordered list")
-                    as i64;
-                return Typed {
-                    expr: Expression::BinaryOp(
-                        Box::new(Typed {
-                            expr: lhs_expr,
-                            type_: lhs_type,
-                        }),
-                        Box::new(Typed {
-                            expr: Expression::Atom(Typed {
-                                expr: Atom::Literal(Typed {
-                                    expr: Literal::Int(index),
-                                    type_: Type::Int,
-                                }),
-                                type_: Type::Int,
-                            }),
-                            type_: Type::Int,
-                        }),
-                        op.clone(),
-                    ),
-                    type_: t.clone(),
-                };
-            } else {
-                panic!("Struct '{}' does not have member '{}'", lhs, rhs);
-            }
+			// Slow but whatever. Don't make structs with a bajillion members,
+			// or if you do change this to a hashmap
+
+			let index;
+			let t;
+			if attribute.eq("len") { // reserved member name for struct length
+				index = -1;
+				t = Type::Int;
+			} else {
+				if let Some(t_) = unordered_list.get(attribute) {
+					t = t_.clone();
+				} else {
+					panic!("Struct '{}' does not have member '{}'", lhs, rhs);
+				}
+				index = ordered_list
+					.iter()
+					.position(|(attr, _)| attr == attribute)
+					.expect("Attribute not found in ordered list")
+					as i64;
+			}
+
+			return Typed {
+				expr: Expression::BinaryOp(
+					Box::new(Typed {
+						expr: lhs_expr,
+						type_: lhs_type,
+					}),
+					Box::new(Typed {
+						expr: Expression::Atom(Typed {
+							expr: Atom::Literal(Typed {
+								expr: Literal::Int(index),
+								type_: Type::Int,
+							}),
+							type_: Type::Int,
+						}),
+						type_: Type::Int,
+					}),
+					op.clone(),
+				),
+				type_: t,
+			};
         } else {
             panic!("Member access must be on a variable");
         }
@@ -1366,7 +1376,9 @@ fn type_struct(
     for (name, _) in members.clone() {
         if !member_names.insert(name.clone()) {
             panic!("Struct '{}' has duplicate member '{}'", id, name);
-        }
+        } else if name == "len" {
+			panic!("Struct '{}' has a member named 'len': 'len' is a reserved member name", id);
+		}
     }
 
     let mut unordered_lookup_table = HashMap::new();

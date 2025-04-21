@@ -40,9 +40,12 @@ _start:
     movsd xmm0, [.float.1]	; Load float into xmm0
     movq rax, xmm0
     push rax
-    mov rax, rsp	; Move the address of the array to rax
+    mov rax, 2		; length of the array
     push rax
-    mov rax, [rbp-24]
+    mov rax, rsp	; Move the address of the array to rax
+    add rax, 8		; we also pushed the array's length so we need to add 8 to point to the right address
+    push rax
+    mov rax, [rbp-32]
     push rax
     movsd xmm0, [.float.2]	; Load float into xmm0
     pcmpeqd xmm1, xmm1	; xmm1 = all ones (0xFFFFFFFFFFFFFFFF)
@@ -50,17 +53,20 @@ _start:
     xorpd xmm0, xmm1	; Flip the sign bit of xmm0
     movq rax, xmm0
     push rax
+    mov rax, 2		; length of the array
+    push rax
     mov rax, rsp	; Move the address of the array to rax
+    add rax, 8		; we also pushed the array's length so we need to add 8 to point to the right address
     push rax
 	;push function arguments to the stack in reverse order
-    mov rax, [rbp-48]
+    mov rax, [rbp-64]
     mov rcx, 1
     mov rax, [rax + rcx * 8]
     mov rcx, 1
     movq xmm0, [rax + rcx * 8]
     movq rax, xmm0
     push rax
-    mov rax, [rbp-48]
+    mov rax, [rbp-64]
     mov rcx, 0
     movq xmm0, [rax + rcx * 8]
 	pop rcx
@@ -70,7 +76,7 @@ _start:
     push rax
     call .toplevel.ftoint
     add rsp, 8	;pop arguments
-    add rsp, 48		;pop local variables before return
+    add rsp, 64		;pop local variables before return
     pop rbx		;restore rbx for caller function
     pop rbp		;restore base pointer
     ret

@@ -18,13 +18,16 @@ _start:
     push rax
     mov rax, 0
     push rax
+    mov rax, 3		; length of the array
+    push rax
     mov rax, rsp	; Move the address of the array to rax
+    add rax, 8		; we also pushed the array's length so we need to add 8 to point to the right address
     push rax
     mov rax, 3
     push rax	;pushing array dimensions onto stack
     mov rax, 4
     push rax
-    mov rax, [rbp-32]
+    mov rax, [rbp-40]
     push rax
     mov rax, 0
     mov r8, rax
@@ -33,12 +36,12 @@ _start:
     add r8, rax
     pop rax
     mov [r8], rax
-    mov rax, [rbp-32]
+    mov rax, [rbp-40]
     push rax
     mov rax, 0
     pop rcx
     mov rax, [rcx + rax * 8]
-    add rsp, 40		;pop local variables before return
+    add rsp, 48		;pop local variables before return
     pop rbx		;restore rbx for caller function
     pop rbp		;restore base pointer
     ret

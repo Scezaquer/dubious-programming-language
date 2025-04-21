@@ -67,13 +67,16 @@ _start:
     movsd xmm0, [.float.8]	; Load float into xmm0
     movq rax, xmm0
     push rax
+    mov rax, 9		; length of the array
+    push rax
     mov rax, rsp	; Move the address of the array to rax
+    add rax, 8		; we also pushed the array's length so we need to add 8 to point to the right address
     push rax
     mov rax, 3
     push rax	;pushing array dimensions onto stack
     mov rax, 3
     push rax	;pushing array dimensions onto stack
-    mov rax, [rbp-80]
+    mov rax, [rbp-88]
     push rax
     mov rax, 0
     push rax
@@ -96,7 +99,7 @@ _start:
     movq xmm0, [rcx + rax * 8]
     movq rax, xmm0
     push rax
-    mov rax, [rbp-80]
+    mov rax, [rbp-88]
     push rax
     mov rax, 1
     push rax
@@ -126,7 +129,7 @@ _start:
     subsd xmm0, xmm1
     movq [r8], xmm0
 	;push function arguments to the stack in reverse order
-    mov rax, [rbp-80]
+    mov rax, [rbp-88]
     push rax
     mov rax, 1
     push rax
@@ -149,7 +152,7 @@ _start:
     movq xmm0, [rcx + rax * 8]
     movq rax, xmm0
     push rax
-    mov rax, [rbp-80]
+    mov rax, [rbp-88]
     push rax
     mov rax, 1
     push rax
@@ -177,7 +180,7 @@ _start:
     push rax
     call .toplevel.ftoint
     add rsp, 8	;pop arguments
-    add rsp, 96		;pop local variables before return
+    add rsp, 104		;pop local variables before return
     pop rbx		;restore rbx for caller function
     pop rbp		;restore base pointer
     ret
@@ -188,11 +191,11 @@ _start:
 
 section .data
 	.float.3: dq 3.14159
-	.float.6: dq 0.7
-	.float.4: dq 6.71
-	.float.2: dq 2.0
-	.float.1: dq 7.0
-	.float.8: dq 0.2
 	.float.0: dq 3.99
-	.float.5: dq 1.3
+	.float.8: dq 0.2
+	.float.4: dq 6.71
+	.float.1: dq 7.0
 	.float.7: dq 0.3
+	.float.6: dq 0.7
+	.float.5: dq 1.3
+	.float.2: dq 2.0
