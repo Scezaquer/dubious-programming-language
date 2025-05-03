@@ -1,4 +1,5 @@
 fn ftoint(x : float) : int {
+	// Cast float to int
 
 	// This method rounds to the nearest integer.
 	// x.5 gets rounded up or down, depends, see cvtsd2si doc.
@@ -8,6 +9,8 @@ fn ftoint(x : float) : int {
 }
 
 fn inttof(x : int) : float {
+	// Cast int to float
+
 	x; // Move x into rax
 	asm "	cvtsi2sd xmm0, rax	; Convert 64-bit integer in rax to double in xmm0" : float;
 }

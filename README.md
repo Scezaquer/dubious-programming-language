@@ -10,19 +10,25 @@ A simple compiler for the Dubious programming language (DPL).
 - TODO: better checker error messages
 - TODO: heap memory stuff
 - TODO: std library
-- TODO: Upload vscode syntax highlighting to marketplace
 - TODO: Wiki
-- TODO: Generic types tests
 - TODO: Void pointers?  Im not entirely sure I need it as I can already freely cast anything to anything but that would make for more explicit code. This may be an alternative/complementary to generics, but I feel like it would be worse
 - TODO: let strings be defined over multiple lines like "hello "\n"world" in code would evaluate to the literal "hello world"
+- TODO: fix problem in std::exception
+- TODO: fix problem where structs in function prototypes don't get the path added during typechecking
+- TODO: better handle multiple files importing the same file
+- TODO: ellipses in function args
+- TODO: import from parent folder
+- TODO: fix problem in std::io::printi
+- TODO: expressions inside function calls use the fonction's namespace path rather than the caller's namespace path
 
 ### Optional
 
-- TODO: register allocation ?
+- TODO: optimized register allocation ?
 - TODO: default function parameters ?
 - TODO: kwargs ?
 - TODO: Give the option to generate LLVM IR instead of x86_64
 - TODO: improve #include
+- TODO: exclude functions that are never called from code generation
 
 # Usage
 

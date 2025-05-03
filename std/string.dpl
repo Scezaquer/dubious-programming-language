@@ -4,6 +4,7 @@
 #include <exception.dpl>
 
 fn strget(s: str, i: int): char {
+	// Get the character at index i from the string s
 	let a: int = i % 8;
 	let b: int = i / 8;
 
@@ -17,6 +18,7 @@ fn strget(s: str, i: int): char {
 }
 
 fn strset(s: str, i: int, c: char): str {
+	// Set the character at index i in the string s to c
 	let a: int = i % 8;
 	let b: int = i / 8;
 
@@ -32,6 +34,7 @@ fn strset(s: str, i: int, c: char): str {
 }
 
 fn strlen(s: str): int {
+	// Get the number of bytes in the string s
 	let len: int = s[-1] : int - 1;
 
 	if len == 0 {
@@ -48,6 +51,7 @@ fn strlen(s: str): int {
 }
 
 fn strcpy(s: str, t: str): str {
+	// Copy the string t into s
 	let len: int = t[-1] : int;
 	if (len != s[-1] : int) {
 		exception("Mismatched string lengths", 1);

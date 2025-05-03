@@ -15,5 +15,5 @@ struct S:<T, U> {
 fn main(): int {
 	let a: S:<int, str> = S:<int, str>{ 1, 2, 'a', "hi" };
 	a.second_attribute = 3;
-	return a.second_attribute + return2:<S:<int, str>>(a).first_attribute;
+	return a.second_attribute + return2:<S:<int, str>>(a).first_attribute; // 3 + 1 = 4
 }

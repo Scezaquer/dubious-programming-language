@@ -560,6 +560,13 @@
 		"output": 3
 	},
 	{
+		"name": "declare_array_before_fn_call",
+		"description": "Declare an array before a function is called",
+		"filename": "arrays/declare_array_before_fn_call.dpl",
+		"input": [],
+		"output": 0
+	},
+	{
 		"name": "char",
 		"description" : "char type declaration with single character and cast to int to return",
 		"filename": "strings/char.dpl",
@@ -880,5 +887,40 @@
 		"filename": "namespaces/namespace_toplevel.dpl",
 		"input": [],
 		"output": 62
+	},
+	{
+		"name": "generics",
+		"description": "Generic struct and function",
+		"filename": "generics/generics.dpl",
+		"input": [],
+		"output": 4
+	},
+	{
+		"name": "generic_struct",
+		"description": "Struct ",
+		"filename": "generics/generic_struct.dpl",
+		"input": [],
+		"output": 6
+	},
+	{
+		"name": "generic_function",
+		"description": "Generic function",
+		"filename": "generics/generic_function.dpl",
+		"input": [],
+		"output": 9
+	},
+	{
+		"name": "generic_simple_function",
+		"description": "Simple generic function",
+		"filename": "generics/generic_simple_function.dpl",
+		"input": [],
+		"output": 2
+	},
+	{
+		"name": "generics_function",
+		"description": "Function with multiple generic types",
+		"filename": "generics/generics_function.dpl",
+		"input": [],
+		"output": 14
 	}
 ]

@@ -1,0 +1,4 @@
+fn sin(x : float) : float {
+	// This takes radians as input, and returns radians as output.
+
+}

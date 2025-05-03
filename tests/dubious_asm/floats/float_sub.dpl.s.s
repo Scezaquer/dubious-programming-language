@@ -57,5 +57,5 @@ main:
     ret				;return by default if no return statement was reached
 
 section .data
-	.float.0: dq 1.25
 	.float.1: dq 3.25
+	.float.0: dq 1.25

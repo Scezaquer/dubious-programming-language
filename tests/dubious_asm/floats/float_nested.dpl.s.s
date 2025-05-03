@@ -105,12 +105,12 @@ main:
     ret				;return by default if no return statement was reached
 
 section .data
-	.float.4: dq 1.2
-	.float.5: dq 1.41
-	.float.1: dq 3.1415926535
-	.float.6: dq 0.3
-	.float.2: dq 6.821
-	.float.8: dq 2.5
 	.float.7: dq 0.5
+	.float.2: dq 6.821
 	.float.3: dq 1.3
 	.float.0: dq 20.0
+	.float.8: dq 2.5
+	.float.1: dq 3.1415926535
+	.float.5: dq 1.41
+	.float.4: dq 1.2
+	.float.6: dq 0.3

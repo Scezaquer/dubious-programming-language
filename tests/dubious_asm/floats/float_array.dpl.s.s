@@ -163,7 +163,7 @@ main:
     pop rbx		;restore rbx for caller function
     pop rbp		;restore base pointer
     ret
-    add rsp, 24		;end of block, pop local variables
+    add rsp, 104		;end of block, pop local variables
     pop rbx			;restore rbx for caller function
     pop rbp			;restore base pointer
     ret				;return by default if no return statement was reached
@@ -191,12 +191,12 @@ main:
     ret				;return by default if no return statement was reached
 
 section .data
-	.float.2: dq 2.0
-	.float.7: dq 0.3
-	.float.3: dq 3.14159
-	.float.8: dq 0.2
-	.float.4: dq 6.71
 	.float.6: dq 0.7
+	.float.3: dq 3.14159
+	.float.4: dq 6.71
+	.float.7: dq 0.3
+	.float.8: dq 0.2
 	.float.5: dq 1.3
-	.float.1: dq 7.0
 	.float.0: dq 3.99
+	.float.2: dq 2.0
+	.float.1: dq 7.0

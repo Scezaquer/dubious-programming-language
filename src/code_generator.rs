@@ -996,7 +996,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>
     writeln!(
         file,
         "    add rsp, {}		;end of block, pop local variables",
-        context.local_variables.len() * 8
+        context.len * 8
     )
     .unwrap();
 }

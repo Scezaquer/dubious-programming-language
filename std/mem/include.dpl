@@ -1,0 +1,5 @@
+#ifndef INCLUDE_STD_MEM
+#define INCLUDE_STD_MEM
+
+#namespace mem
+

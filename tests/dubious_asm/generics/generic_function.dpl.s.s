@@ -1,0 +1,62 @@
+[BITS 64]
+section .text
+
+global _start
+_start:
+    call main
+    mov rdi, rax
+    mov rax, 60
+    syscall
+
+main:
+.toplevel.main:
+    push rbp		;save previous base pointer
+    push rbx		;functions should preserve rbx
+    mov rbp, rsp	;set base pointer
+	;push function arguments to the stack in reverse order
+    mov rax, 4
+    push rax
+    mov rax, 3
+    push rax
+    mov rax, 2
+    push rax
+    call .toplevel.return2..int
+    add rsp, 24	;pop arguments
+    add rsp, 0		;pop local variables before return
+    pop rbx		;restore rbx for caller function
+    pop rbp		;restore base pointer
+    ret
+    add rsp, 0		;end of block, pop local variables
+    pop rbx			;restore rbx for caller function
+    pop rbp			;restore base pointer
+    ret				;return by default if no return statement was reached
+
+.toplevel.return2..int:
+    push rbp		;save previous base pointer
+    push rbx		;functions should preserve rbx
+    mov rbp, rsp	;set base pointer
+    mov rax, [rbp+24]
+    push rax
+    mov rax, [rbp+32]
+    push rax
+    mov rax, [rbp-8]
+    pop rcx
+    add rax, rcx
+    push rax
+    mov rax, [rbp+40]
+    push rax
+    mov rax, [rbp-16]
+    pop rcx
+    add rax, rcx
+    push rax
+    mov rax, [rbp-24]
+    add rsp, 24		;pop local variables before return
+    pop rbx		;restore rbx for caller function
+    pop rbp		;restore base pointer
+    ret
+    add rsp, 24		;end of block, pop local variables
+    pop rbx			;restore rbx for caller function
+    pop rbp			;restore base pointer
+    ret				;return by default if no return statement was reached
+
+section .data

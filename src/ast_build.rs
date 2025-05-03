@@ -1128,7 +1128,7 @@ fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Type {
             } else if k == "float" {
                 return Type::Float;
             } else if k == "bool" {
-                return Type::Int;
+                return Type::Bool;
             } else if k == "void" {
                 return Type::Void;
             } else if k == "char" {

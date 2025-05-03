@@ -1,0 +1,13 @@
+fn hello2(s: str): int {
+	return 0;
+}
+
+fn hello(c: char): int {
+	let s: str = [c];
+	hello2(s);	// This used to segfault if there was no "return" after this
+}
+
+fn main(): int {
+	hello('c');
+	return 0;
+}

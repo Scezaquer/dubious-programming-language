@@ -1,0 +1,8 @@
+fn hi(b: bool): bool {
+	if (b) {}
+	return b;
+}
+
+fn main(): int {
+	return 0;
+}

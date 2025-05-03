@@ -4,3 +4,5 @@
 #namespace math
 
 #include <cast.dpl>
+// #include <trig.dpl>
+#include <combinatorics.dpl>
