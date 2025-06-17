@@ -1112,7 +1112,7 @@ pub fn generate(ast: &Ast, out_path: &str) {
 
     writeln!(file, "").unwrap();
     writeln!(file, "section .data").unwrap();
-
 	generate_constants(&mut file, const_vector);
 	generate_float_literals(&mut file);
+	writeln!(file, "	mxcsr_val dd 0").unwrap();
 }

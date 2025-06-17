@@ -1,3 +1,5 @@
+#include <../math/cast.dpl>
+
 fn print(s: str): int {
 	// Print s to stdout
 
@@ -58,6 +60,28 @@ fn printiln(i: int): int {
 	// Print the integer i to stdout, followed by a newline
 
 	printi(i);
+	print("\n");
+}
+
+fn printf(f: float): int {
+	// Print the float f to stdout
+
+	let i: int = floor(f); // Convert float to int
+	printi(i); // Print the integer part
+
+	let frac: float = f - inttof(i); // Get the fractional part
+	print("."); // Print the decimal point
+	frac *= 1000000.0; // Scale the fractional part to 6 decimal places
+	i = floor(frac); // Convert the scaled fractional part to int
+	printi(i); // Print the fractional part
+
+	return 0;
+}
+
+fn printfln(f: float): int {
+	// Print the float f to stdout, followed by a newline
+
+	printf(f);
 	print("\n");
 }
 

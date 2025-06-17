@@ -14,6 +14,7 @@ use std::collections::{HashMap, HashSet};
 #[derive(Debug, Clone)]
 struct Context {
     namespace: String,
+	namespace_root: String,
     variables: HashMap<String, Type>,
     concrete_functions: HashMap<String, (Type, Vec<Type>)>, // Hashmap<id, (return_type, Vec<arg_types>)>
     generic_functions: HashMap<String, Function>, // Hashmap<id, (return_type, Vec<arg_types>, Vec<generic>)>
@@ -226,11 +227,13 @@ fn type_atom(
                     );
                 }
 
+				let mut tmp_ctx = context.clone();
+				tmp_ctx.namespace = context.namespace_root.clone();
                 for (i, (arg, expected_type)) in args.iter().zip(args_types.iter()).enumerate() {
-                    let Typed {
+					let Typed {
                         expr: new_arg,
                         type_: arg_type,
-                    } = type_expression(fn_array, &arg.expr, context);
+                    } = type_expression(fn_array, &arg.expr, &mut tmp_ctx);
 
                     if arg_type != *expected_type {
                         panic!(
@@ -254,7 +257,7 @@ fn type_atom(
                     type_: return_type.clone(),
                 }
             } else {
-                panic!("Function '{}' not in scope", name)
+                panic!("Function '{}' not in scope", name);
             }
         }
         Atom::Expression(expr) => type_expression(fn_array, &expr.expr, context),
@@ -1603,6 +1606,7 @@ fn typechecking(
 
     let mut context = Context {
         namespace: namespace_path.clone(),
+		namespace_root: namespace_path.clone(),
         variables: all_constants.clone(),
         concrete_functions: all_concrete_functions.clone(),
         generic_functions: all_generic_functions.clone(),

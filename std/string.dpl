@@ -1,6 +1,3 @@
-#ifndef INCLUDE_STD_STRING
-#define INCLUDE_STD_STRING
-
 #include <exception.dpl>
 
 fn strget(s: str, i: int): char {

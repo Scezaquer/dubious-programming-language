@@ -4,8 +4,8 @@ use lazy_static::lazy_static;
 use std::sync::Mutex;
 
 lazy_static! {
-    static ref INCLUDED_FILES: Mutex<HashSet<String>> = {
-        let m = HashSet::new();
+    static ref INCLUDED_FILES: Mutex<HashMap<String, HashSet<String>>> = {
+        let m = HashMap::new();
         Mutex::new(m)
     };
 	static ref DEFINED_EXPRESSIONS: Mutex<HashMap<String, String>> = {
@@ -49,12 +49,13 @@ lazy_static! {
 /// 
 /// ## `#print [MESSAGE]`
 /// Displays a message during compilation.
-pub fn preprocessor(file: &str, filename: &str, include_path: HashSet<String>) -> String {
+pub fn preprocessor(file: &str, filename: &str, include_path: HashSet<String>, mut full_namespace: Vec<String>) -> String {
 	{
 		// Lock the mutex to access the included files
 		// This is in a separate block to ensure the lock is released
 		let mut included_files = INCLUDED_FILES.lock().unwrap();
-		included_files.insert(filename.to_string());
+		let namespace = full_namespace.join("::");
+		included_files.entry(namespace).or_insert_with(HashSet::new).insert(filename.to_string());
 	}
 
 	let mut include_path = include_path;
@@ -129,13 +130,11 @@ pub fn preprocessor(file: &str, filename: &str, include_path: HashSet<String>) -
 						// Lock the mutex to access the included files
 						// This is in a separate block to ensure the lock is released
 						let included_files = INCLUDED_FILES.lock().unwrap();
-						if included_files.contains(actual_path.to_str().unwrap()){
-							// We don't panic here in case it's deliberate (like
-							// if different namespaces import the same lib). Note that
-							// if this causes functions/structs/etc to be defined
-							// multiple times in the same namespace, it will
-							// cause a compilation error later down the line.
-							println!("{} Line {} Warning: File '{}' is already included somewhere else", filename, line, actual_path.display());
+						if let Some(x) = included_files.get(&full_namespace.join("::")){
+							if x.contains(actual_path.to_str().unwrap()){
+								// println!("{} Line {} Warning: File '{}' is already included somewhere else", filename, line, actual_path.display());
+								continue;
+							}
 						}
 					}
 
@@ -146,7 +145,7 @@ pub fn preprocessor(file: &str, filename: &str, include_path: HashSet<String>) -
 					};
 
 					// Preprocess the included file
-					let included_file = preprocessor(&included_file, actual_path.to_str().unwrap(), include_path.clone());
+					let included_file = preprocessor(&included_file, actual_path.to_str().unwrap(), include_path.clone(), full_namespace.clone());
 
 					// Add a comment to indicate the start of the included file to track the source of errors
 					if is_directory {
@@ -386,6 +385,7 @@ pub fn preprocessor(file: &str, filename: &str, include_path: HashSet<String>) -
 
 					namespace_counter += 1;
 					processed_file.push_str(format!("namespace {};\n", namespace).as_str());
+					full_namespace.push(namespace.trim().to_string());
 				}
 				"spacename" => {
 					// #spacename
@@ -397,6 +397,7 @@ pub fn preprocessor(file: &str, filename: &str, include_path: HashSet<String>) -
 						panic!("{} Line {}: #spacename directive without matching #namespace", filename, line);
 					}
 					processed_file.push_str("spacename;\n");
+					full_namespace.pop();
 				}
 				_ => {
 					panic!("{} Line {}: Invalid preprocessor directive", filename, line);
@@ -435,6 +436,7 @@ pub fn preprocessor(file: &str, filename: &str, include_path: HashSet<String>) -
 	}
 	for _ in 0..namespace_counter{
 		processed_file.push_str("spacename;\n");
+		full_namespace.pop();
 	}
 	return processed_file;
 }

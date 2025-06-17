@@ -1,8 +1,8 @@
-#ifndef INCLUDE_STD_MATH
-#define INCLUDE_STD_MATH
-
 #namespace math
 
+#include <constants.dpl>
 #include <cast.dpl>
-// #include <trig.dpl>
+#include <arithmetic.dpl>
 #include <combinatorics.dpl>
+#include <exp.dpl>
+#include <trig.dpl>

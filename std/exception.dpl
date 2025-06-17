@@ -1,14 +1,10 @@
-#ifndef INCLUDE_STD_EXCEPTION
-#define INCLUDE_STD_EXCEPTION
-
 #include <io>
 
 fn exception(e: str, error_code: int): int {
 	// Print the exception message to standard error and exit with the error code
 
 	io::print("Exception: ");
-	io::print(e);
-	io::print("\n");
+	io::println(e);
 
 	// TODO: This exits with the wrong code, it actually outputs the length of e
 	// because error_code points to the wrong place in memory

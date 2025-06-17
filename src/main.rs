@@ -85,7 +85,7 @@ fn main() {
     let file = fs::read_to_string(&args.input_file).expect("Failed to read file");
     //let file = fs::read_to_string("return_2.dpl").expect("Failed to read file");
 
-	let preprocessed_file = preprocessor(&file, &args.input_file, HashSet::new());
+	let preprocessed_file = preprocessor(&file, &args.input_file, HashSet::new(), vec!["toplevel".to_string()]);
 
     let tokens = lex(preprocessed_file.as_str());
 

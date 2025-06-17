@@ -1,4 +1,34 @@
-fn sin(x : float) : float {
-	// This takes radians as input, and returns radians as output.
+#include <arithmetic.dpl>
+#include <combinatorics.dpl>
+#include <constants.dpl>
+#include <exp.dpl>
 
+fn sin(x : float) : float {
+	// This takes radians as input
+
+	// Reduce x to a value between 0 and pi/2:
+	let neg: bool = false;
+	if (x < 0.0) {
+		neg = !neg;
+		x = -x;
+	}
+
+	x = mod(x, 2.0 * PI);
+	if (x > PI) {
+		neg = !neg;
+		x = 2.0 * PI - x;
+	}
+
+	if (x > PI / 2.0) {
+		x = PI - x;
+	}
+
+	let s: float = 0.0;
+	let i: int;
+	for (i = 0; i < 10; i += 1) {
+		s += inttof(ipow(-1, i)) * fipow(x, 2 * i + 1) / inttof(factorial(2 * i + 1));
+	}
+
+	if (neg) { s *= -1.0; }
+	return s;
 }
