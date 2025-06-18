@@ -420,6 +420,13 @@
 		"output": 2
 	},
 	{
+		"name": "recursive_fn",
+		"description": "Recursive function",
+		"filename": "functions/recursive_fn.dpl",
+		"input": [],
+		"output": 8
+	},
+	{
 		"name": "fibonacci_recursive",
 		"description": "Recursive fibonacci function",
 		"filename": "complicated_programs/fibonacci_recursive.dpl",
@@ -565,6 +572,13 @@
 		"filename": "arrays/declare_array_before_fn_call.dpl",
 		"input": [],
 		"output": 0
+	},
+	{
+		"name": "arr_as_arg",
+		"description": "Array as argument to a function",
+		"filename": "arrays/arr_as_arg.dpl",
+		"input": [],
+		"output": 23
 	},
 	{
 		"name": "char",

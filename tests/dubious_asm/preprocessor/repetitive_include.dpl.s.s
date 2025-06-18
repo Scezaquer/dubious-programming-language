@@ -14,9 +14,6 @@ main:
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
 	;push function arguments to the stack in reverse order
-    mov rax, 2
-    push rax
-	;push function arguments to the stack in reverse order
     mov rax, 5
     push rax
     mov rax, 1
@@ -24,8 +21,13 @@ main:
     call .toplevel.add
     add rsp, 16	;pop arguments
     push rax
+	;push function arguments to the stack in reverse order
+    mov rax, 2
+    push rax
+    mov rax, [rbp-8]
+    push rax
     call .toplevel.sub
-    add rsp, 16	;pop arguments
+    add rsp, 24	;pop arguments
     add rsp, 0		;pop local variables before return
     pop rbx		;restore rbx for caller function
     pop rbp		;restore base pointer

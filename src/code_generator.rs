@@ -103,18 +103,40 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
             generate_expression(file, expression, context);
         }
         Typed{expr: Atom::FunctionCall(name, args, _), ..} => {
-            writeln!(
+			let stack_index = context.stack_index;
+
+			// If the arg isn't a variable or a literal, we create a "ghost"
+			// variable that will be used to store the value of the expression
+			let mut args = args.clone();
+
+			for arg in args.iter_mut() {
+				if !matches!(arg.expr, Expression::Atom(Typed{expr: Atom::Literal(_) | Atom::Variable(_), ..})) {
+
+					generate_expression(file, arg, context);
+
+					if Type::Float == arg.type_ {
+						writeln!(file, "    movq rax, xmm0").unwrap();
+					}
+                    writeln!(file, "    push rax").unwrap();
+
+					let ghost_var = format!(".ghost.{}", context.len);
+					context.stack_index -= 8;
+					context.insert(ghost_var.clone(), context.stack_index, arg.type_.to_string());					
+
+					arg.expr = Expression::Atom(Typed{expr: Atom::Variable(ghost_var), type_: arg.type_.clone()});
+				}
+			}
+
+			writeln!(
                 file,
                 "	;push function arguments to the stack in reverse order"
             )
             .unwrap();
-			let mut pop_counter = 0;
-			let mut stack_index = context.stack_index;
             for arg in args.iter().rev() {
                 // Push arguments in reverse order (C convention)
                 generate_expression(file, arg, context);
-				pop_counter += stack_index - context.stack_index;
-				stack_index = context.stack_index;
+				// pop_counter += stack_index - context.stack_index;
+				// stack_index = context.stack_index;
 
 				if arg.type_ == Type::Float {
 					writeln!(file, "    movq rax, xmm0").unwrap();
@@ -122,9 +144,11 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 
                 writeln!(file, "    push rax").unwrap();
             }
+			let pop_counter = stack_index - context.stack_index;
             writeln!(file, "    call .{}", name.replace("::", ".")).unwrap();
             writeln!(file, "    add rsp, {}	;pop arguments", pop_counter + 8 * args.len() as i64).unwrap();
 			context.stack_index += pop_counter;
+			// dbg!(format!("Pop counter: {}, stack index: {}, len: {}", pop_counter, context.stack_index, context.len));
 			context.len -= (pop_counter/8) as usize;
             // Pop arguments from stack
         }
@@ -458,6 +482,8 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 					writeln!(file, "    movq rax, xmm0").unwrap();
 				}
                 writeln!(file, "    push rax").unwrap();
+				context.stack_index -= 8;
+				context.len += 1;
 				generate_expression(file, left, context);
             } else {
                 if let Expression::Atom(Typed{expr: Atom::Literal(Typed{expr: Literal::Int(i), ..}), ..}) = right.expr {
@@ -475,6 +501,8 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
             }
 
 			if type_ == &Type::Float || (left_type == Type::Float && type_ == &Type::Bool) {
+				context.stack_index += 8;
+				context.len -= 1;
 				writeln!(file, "	pop rcx").unwrap();
 				writeln!(file, "	movq xmm1, rcx").unwrap();
 
@@ -560,6 +588,8 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 					}
 				}
 			} else {
+				context.stack_index += 8;
+				context.len -= 1;
 				writeln!(file, "    pop rcx").unwrap();
 				match bin_op {
 					BinOp::Add => {
@@ -667,9 +697,13 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 						writeln!(file, "    movq rax, xmm0").unwrap();
 					}
                     writeln!(file, "    push rax").unwrap();
+					context.stack_index -= 8;
+					context.len += 1;
 
                     generate_expression(file, variable, context);
                     writeln!(file, "    push rax").unwrap();
+					context.stack_index -= 8;
+					context.len += 1;
                     generate_expression(file, &indices[0], context);
                     writeln!(file, "    mov r8, rax").unwrap();
                     writeln!(file, "    imul r8, 8").unwrap();
@@ -677,6 +711,8 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
                     writeln!(file, "    add r8, rax").unwrap();
 
                     writeln!(file, "    pop rax").unwrap();
+					context.stack_index += 16;
+					context.len -= 2;
 					if type_ == &Type::Float {
 						writeln!(file, "    movq xmm0, rax").unwrap();
 					}
@@ -692,11 +728,15 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 						writeln!(file, "    movq rax, xmm0").unwrap();
 					}
 					writeln!(file, "    push rax").unwrap();
+					context.stack_index -= 8;
+					context.len += 1;
                     
                     generate_expression(file, v, context);
                     writeln!(file, "    mov r8, rax").unwrap();
 
                     writeln!(file, "    pop rax").unwrap();
+					context.stack_index += 8;
+					context.len -= 1;
 					if type_ == &Type::Float {
 						writeln!(file, "    movq xmm0, rax").unwrap();
 					}
@@ -720,7 +760,11 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
             let index = indices.get(0).expect("Array access without index");
 
             writeln!(file, "    push rax").unwrap();
+			context.stack_index -= 8;
+			context.len += 1;
             generate_expression(file, index, context);
+			context.stack_index += 8;
+			context.len -= 1;
             writeln!(file, "    pop rcx").unwrap();
 
 			if type_ == &Type::Float {

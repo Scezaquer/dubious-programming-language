@@ -6,9 +6,6 @@ A simple compiler for the Dubious programming language (DPL).
 
 ### Priority features
 
-- TODO: optimize multiple files importing the same methods (only generate code for one of them instead of having redundant asm)
-- TODO: fix problem in std::io::printi
-- TODO: fix problem in std::exception
 - TODO: fix problem where structs in function prototypes don't get the path added during typechecking
 - TODO: Helpful compiler error messages at the code generation stage (make &lt;T>TokenWithDebugInfo generic?)
 - TODO: better checker error messages
@@ -18,10 +15,11 @@ A simple compiler for the Dubious programming language (DPL).
 - TODO: Void pointers?  Im not entirely sure I need it as I can already freely cast anything to anything but that would make for more explicit code. This may be an alternative/complementary to generics, but I feel like it would be worse
 - TODO: let strings be defined over multiple lines like "hello "\n"world" in code would evaluate to the literal "hello world"
 - TODO: ellipses in function args
-- TODO: import from parent folder
+- TODO: circular imports when the two files are in different namespaces cause a compilation crash (infinite import loop)
 
 ### Optional
 
+- TODO: optimize multiple files importing the same methods (only generate code for one of them instead of having redundant asm)
 - TODO: optimized register allocation ?
 - TODO: default function parameters ?
 - TODO: kwargs ?

@@ -1,0 +1,11 @@
+fn test(n: int): int {
+	if n == 0 {
+		return 0;
+	} else {
+		return test(n-1) + 2;
+	}
+}
+
+fn main(): int{
+	return test(4);
+}

@@ -13,7 +13,6 @@ main:
     push rbp		;save previous base pointer
     push rbx		;functions should preserve rbx
     mov rbp, rsp	;set base pointer
-	;push function arguments to the stack in reverse order
     movsd xmm0, [.float.0]	; Load float into xmm0
     movq rax, xmm0
     push rax
@@ -71,8 +70,12 @@ main:
 	addsd xmm0, xmm1
     movq rax, xmm0
     push rax
+	;push function arguments to the stack in reverse order
+    movsd xmm0, [rbp-8]
+    movq rax, xmm0
+    push rax
     call .toplevel.ftoint
-    add rsp, 8	;pop arguments
+    add rsp, 16	;pop arguments
     add rsp, 0		;pop local variables before return
     pop rbx		;restore rbx for caller function
     pop rbp		;restore base pointer
@@ -105,13 +108,13 @@ main:
     ret				;return by default if no return statement was reached
 
 section .data
-	.float.2: dq 6.821
-	.float.6: dq 0.3
-	.float.1: dq 3.1415926535
-	.float.3: dq 1.3
 	.float.4: dq 1.2
-	.float.7: dq 0.5
-	.float.8: dq 2.5
+	.float.6: dq 0.3
+	.float.2: dq 6.821
+	.float.1: dq 3.1415926535
 	.float.5: dq 1.41
 	.float.0: dq 20.0
+	.float.8: dq 2.5
+	.float.7: dq 0.5
+	.float.3: dq 1.3
 	mxcsr_val dd 0

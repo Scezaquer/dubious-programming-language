@@ -1,0 +1,13 @@
+fn test(arr: array[int], x: int): int {
+	let sum: int = 0;
+	let i: int;
+	for (i = 0; i < arr[-1]; i = i + 1) {
+		sum += arr[i];
+	}
+	return sum + x;
+}
+
+fn main(): int {
+	let arr: array[int] = [4, 5, 6];
+	return test(arr, 8);
+}

@@ -1,6 +1,0 @@
-fn main(): int{
-	if (0.1 == 0.0){
-		return 1; // This should not happen
-	}
-	return 0; // This should happen
-}

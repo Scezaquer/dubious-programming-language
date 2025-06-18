@@ -37,7 +37,6 @@ main:
     mov rax, rsp	; Move the address of the array to rax
     add rax, 8		; we also pushed the array's length so we need to add 8 to point to the right address
     push rax
-	;push function arguments to the stack in reverse order
     mov rax, [rbp-64]
     mov rcx, 1
     mov rax, [rax + rcx * 8]
@@ -53,8 +52,12 @@ main:
 	addsd xmm0, xmm1
     movq rax, xmm0
     push rax
+	;push function arguments to the stack in reverse order
+    movsd xmm0, [rbp-72]
+    movq rax, xmm0
+    push rax
     call .toplevel.ftoint
-    add rsp, 8	;pop arguments
+    add rsp, 16	;pop arguments
     add rsp, 64		;pop local variables before return
     pop rbx		;restore rbx for caller function
     pop rbp		;restore base pointer

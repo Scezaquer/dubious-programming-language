@@ -69,25 +69,29 @@ main:
     jmp .end_1
 .else_1:
 .end_1:
-	;push function arguments to the stack in reverse order
     mov rax, 2
     push rax
     mov rax, [rbp+24]
     pop rcx
     sub rax, rcx
     push rax
-    call .toplevel.fib
-    add rsp, 8	;pop arguments
-    push rax
 	;push function arguments to the stack in reverse order
+    mov rax, [rbp-8]
+    push rax
+    call .toplevel.fib
+    add rsp, 16	;pop arguments
+    push rax
     mov rax, 1
     push rax
     mov rax, [rbp+24]
     pop rcx
     sub rax, rcx
     push rax
+	;push function arguments to the stack in reverse order
+    mov rax, [rbp-16]
+    push rax
     call .toplevel.fib
-    add rsp, 8	;pop arguments
+    add rsp, 16	;pop arguments
     pop rcx
     add rax, rcx
     add rsp, 0		;pop local variables before return
