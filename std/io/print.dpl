@@ -66,6 +66,11 @@ fn printiln(i: int): int {
 fn printf(f: float): int {
 	// Print the float f to stdout
 
+	if (f < 0.0) {
+		print("-");
+		f = -f;
+	}
+
 	let i: int = floor(f); // Convert float to int
 	printi(i); // Print the integer part
 

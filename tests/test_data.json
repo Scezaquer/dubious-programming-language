@@ -812,6 +812,27 @@
 		"output": 1
 	},
 	{
+		"name": "float_gt",
+		"description": "Floating point greater than comparison",
+		"filename": "floats/float_gt.dpl",
+		"input": [],
+		"output": 0
+	},
+	{
+		"name": "float_lt",
+		"description": "Floating point less than comparison",
+		"filename": "floats/float_lt.dpl",
+		"input": [],
+		"output": 0
+	},
+	{
+		"name": "float_eq",
+		"description": "Floating point equality comparison",
+		"filename": "floats/float_eq.dpl",
+		"input": [],
+		"output": 0
+	},
+	{
 		"name": "namespace",
 		"description": "Testing namespaces with multiple elements",
 		"filename": "namespaces/namespace.dpl",

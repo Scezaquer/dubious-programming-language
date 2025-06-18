@@ -35,3 +35,4 @@ section .data
     .constant.toplevel.a: dq 10
     .constant.toplevel.b: dq 15
     .constant.toplevel.c: dq 3
+	mxcsr_val dd 0

@@ -15,13 +15,26 @@ fn main(): int {
 	std::io::printfln(std::math::sqrt(2.0));
 	std::io::printfln(std::math::ln(2.0));
 	std::io::printfln(std::math::exp(2.0));
-	std::io::printiln(std::math::ipow(2, 10));
+	std::io::printiln(std::math::powi(2, 10));
 	std::io::printiln(std::math::floor(2.7));
 	std::io::printfln(3.14159265);
 	std::io::printfln(std::math::PI);
-	// std::io::printfln(std::math::sin(2.0));
+	std::io::printfln(std::math::sin(-1.0));
+	std::io::printfln(std::math::sin(0.0));
+	std::io::printfln(std::math::sin(1.0));
+	std::io::printfln(std::math::sin(2.0));
+	std::io::printfln(std::math::sin(3.0));
+	std::io::printfln(std::math::sin(4.0));
+	std::io::printfln(std::math::cos(2.0));
 
-	std::io::printboolln(0.1 == 0.0);
+	std::io::printboolln(0.0 == 0.0);
+
+	std::io::printfln(std::math::mod(-1.0*std::math::PI+1.234, std::math::PI));
+
+	std::io::printfln(std::math::tan(1.0));
+	std::io::printfln(std::math::cot(1.0));
+	std::io::printfln(std::math::sec(1.0));
+	std::io::printfln(std::math::csc(1.0));
 
 	return 0;
 }

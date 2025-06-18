@@ -75,3 +75,4 @@ main:
 
 section .data
     .constant.toplevel.test.c: dq 5
+	mxcsr_val dd 0

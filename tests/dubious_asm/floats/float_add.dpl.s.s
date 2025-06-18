@@ -59,3 +59,4 @@ main:
 section .data
 	.float.0: dq 0.75
 	.float.1: dq 0.25
+	mxcsr_val dd 0

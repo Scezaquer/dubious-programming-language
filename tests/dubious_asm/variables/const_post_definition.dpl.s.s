@@ -25,3 +25,4 @@ main:
 
 section .data
     .constant.toplevel.a: dq 10
+	mxcsr_val dd 0

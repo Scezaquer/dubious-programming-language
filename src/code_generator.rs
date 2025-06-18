@@ -474,7 +474,7 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
                 }
             }
 
-			if type_ == &Type::Float {
+			if type_ == &Type::Float || (left_type == Type::Float && type_ == &Type::Bool) {
 				writeln!(file, "	pop rcx").unwrap();
 				writeln!(file, "	movq xmm1, rcx").unwrap();
 

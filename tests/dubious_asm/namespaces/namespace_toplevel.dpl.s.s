@@ -143,3 +143,4 @@ main:
 section .data
     .constant.toplevel.test.c: dq 5
     .constant.toplevel.second_test.c: dq 36
+	mxcsr_val dd 0

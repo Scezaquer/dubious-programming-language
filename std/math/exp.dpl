@@ -12,9 +12,9 @@ fn sqrt(x: float): float {
 }
 
 fn ln(x: float): float{
-	// if (x <= 0.0) {
-	// 	exception("Logarithm of non-positive number", 1);
-	// }
+	if (x <= 0.0) {
+		exception("Logarithm of non-positive number", 1);
+	}
 
 	let iter: int = 35;
 
@@ -30,7 +30,7 @@ fn ln(x: float): float{
 	return z;
 }
 
-fn ipow(x: int, n: int): int {
+fn powi(x: int, n: int): int {
 	if (n < 0) {
 		exception("Negative exponent", 1);
 	}
@@ -43,7 +43,7 @@ fn ipow(x: int, n: int): int {
 	return result;
 }
 
-fn fipow(x: float, n: int): float {
+fn powfi(x: float, n: int): float {
 	if (n < 0) {
 		exception("Negative exponent", 1);
 	}
@@ -57,9 +57,9 @@ fn fipow(x: float, n: int): float {
 }
 
 fn exp(x: float): float {
-	if (x < -88.0) {
+	if (x < -700.0) {
 		exception("Exponent too small", 1);
-	} else if (x > 88.0) {
+	} else if (x > 700.0) {
 		exception("Exponent too large", 1);
 	}
 

@@ -43,3 +43,4 @@ main:
     ret				;return by default if no return statement was reached
 
 section .data
+	mxcsr_val dd 0

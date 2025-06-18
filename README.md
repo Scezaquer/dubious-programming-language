@@ -6,7 +6,6 @@ A simple compiler for the Dubious programming language (DPL).
 
 ### Priority features
 
-- TODO: Floating point comparison operators are broken
 - TODO: optimize multiple files importing the same methods (only generate code for one of them instead of having redundant asm)
 - TODO: fix problem in std::io::printi
 - TODO: fix problem in std::exception
