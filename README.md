@@ -7,8 +7,6 @@ A simple compiler for the Dubious programming language (DPL).
 ### Priority features
 
 - TODO: fix problem where structs in function prototypes don't get the path added during typechecking
-- TODO: Helpful compiler error messages at the code generation stage (make &lt;T>TokenWithDebugInfo generic?)
-- TODO: better checker error messages
 - TODO: heap memory stuff
 - TODO: std library
 - TODO: Wiki

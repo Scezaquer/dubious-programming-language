@@ -48,6 +48,6 @@ main:
     ret				;return by default if no return statement was reached
 
 section .data
-	.float.0: dq 0.0
 	.float.1: dq 0.1
+	.float.0: dq 0.0
 	mxcsr_val dd 0

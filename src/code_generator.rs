@@ -1,7 +1,8 @@
 use crate::ast_build::{
     AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Literal,
-    Namespace, ReassignmentIdentifier, Statement, Struct, UnOp, Typed, Type
+    Namespace, ReassignmentIdentifier, Statement, Struct, UnOp
 };
+use crate::shared::{Typed, Type, TokenWithDebugInfo, error};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Write;
@@ -26,17 +27,17 @@ lazy_static! {
 }
 
 /// Generates the assembly code for an atom
-fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
+fn generate_atom(file: &mut File, atom: &Typed<TokenWithDebugInfo<Atom>>, context: &mut Context) {
     match atom {
-        Typed{expr: Atom::Literal(constant), ..} => {
-			if let Literal::Float(f) = constant.expr {
+        Typed{expr: TokenWithDebugInfo{internal_tok: Atom::Literal(constant), ..}, ..} => {
+			if let Literal::Float(f) = constant.expr.internal_tok {
                 let label = format!(".float.{}", FLOAT_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst));
 
                 let mut float_label_map = FLOAT_LABEL_MAP.lock().unwrap();
                 float_label_map.insert(label.clone(), f);
 
 				writeln!(file, "    movsd xmm0, [{}]	; Load float into xmm0", label.replace("::", "..")).unwrap();
-			} else if let Literal::Char(c) = &constant.expr {
+			} else if let Literal::Char(c) = &constant.expr.internal_tok {
 				// Turn the character into the corresponding ASCII
 				// We need this encoding otherwise weird characters may cause
 				// malformed asm to be generated
@@ -45,7 +46,7 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 				let mut encoding: i64 = 0;
 				for (i, character) in c.chars().enumerate() {
 					if !character.is_ascii() { // Continue checking each character
-						panic!("Non ASCII character");
+						error(format!("Non ASCII character in constant: {}", c).as_str(), &atom.expr);
 					}
 					
 					// Build the display string for comments
@@ -71,8 +72,8 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 				writeln!(file, "    mov rax, {}", constant).unwrap();
 			}
         }
-        Typed{expr: Atom::Variable(variable), type_} => {
-            let var_address = context.var_map.get(variable);
+        Typed{expr: TokenWithDebugInfo{internal_tok: Atom::Variable(variable), ..}, type_} => {
+            let var_address = context.var_map.get(&variable.internal_tok);
 
 			let mut instruction = "mov";
 			let mut register = "rax";
@@ -94,15 +95,15 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
             } else {
 				let constant = context
                 	.constants
-                	.get(variable)
+                	.get(&variable.internal_tok)
                 	.expect(format!("Undeclared variable {}", variable).as_str());
             	writeln!(file, "    {} {}, [.constant.{}]", instruction, register, constant.replace("::", ".")).unwrap();
 			}
         }
-        Typed{expr: Atom::Expression(expression), ..} => {
+        Typed{expr: TokenWithDebugInfo{internal_tok: Atom::Expression(expression), ..}, ..} => {
             generate_expression(file, expression, context);
         }
-        Typed{expr: Atom::FunctionCall(name, args, _), ..} => {
+        Typed{expr: TokenWithDebugInfo{internal_tok: Atom::FunctionCall(name, args, _), line: debug_line, file: debug_file}, ..} => {
 			let stack_index = context.stack_index;
 
 			// If the arg isn't a variable or a literal, we create a "ghost"
@@ -110,7 +111,7 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 			let mut args = args.clone();
 
 			for arg in args.iter_mut() {
-				if !matches!(arg.expr, Expression::Atom(Typed{expr: Atom::Literal(_) | Atom::Variable(_), ..})) {
+				if !matches!(arg.expr.internal_tok, Expression::Atom(Typed{expr: TokenWithDebugInfo{internal_tok: Atom::Literal(_) | Atom::Variable(_), ..}, ..})) {
 
 					generate_expression(file, arg, context);
 
@@ -123,7 +124,7 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 					context.stack_index -= 8;
 					context.insert(ghost_var.clone(), context.stack_index, arg.type_.to_string());					
 
-					arg.expr = Expression::Atom(Typed{expr: Atom::Variable(ghost_var), type_: arg.type_.clone()});
+					arg.expr.internal_tok = Expression::Atom(Typed{expr: TokenWithDebugInfo{internal_tok: Atom::Variable(TokenWithDebugInfo{internal_tok: ghost_var, line: debug_line.clone(), file: debug_file.clone()}), line: debug_line.clone(), file: debug_file.clone()}, type_: arg.type_.clone()});
 				}
 			}
 
@@ -145,14 +146,14 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
                 writeln!(file, "    push rax").unwrap();
             }
 			let pop_counter = stack_index - context.stack_index;
-            writeln!(file, "    call .{}", name.replace("::", ".")).unwrap();
+            writeln!(file, "    call .{}", name.internal_tok.replace("::", ".")).unwrap();
             writeln!(file, "    add rsp, {}	;pop arguments", pop_counter + 8 * args.len() as i64).unwrap();
 			context.stack_index += pop_counter;
 			// dbg!(format!("Pop counter: {}, stack index: {}, len: {}", pop_counter, context.stack_index, context.len));
 			context.len -= (pop_counter/8) as usize;
             // Pop arguments from stack
         }
-        Typed{expr: Atom::Array(expressions, _), ..} | Typed{expr: Atom::StructInstance(_, expressions, _), ..} => {
+        Typed{expr: TokenWithDebugInfo{internal_tok: Atom::Array(expressions, _) | Atom::StructInstance(_, expressions, _), ..}, ..} => {
 			// Careful, this section of the code is technical because we want
 			// to be able to define arrays of structs such that
 			//  [
@@ -209,7 +210,7 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 			for expr in expressions.iter().rev() {
 				// If the expression is a struct or an array, we need to push the
 				// values on the stack first
-				if matches!(expr, Typed{expr: Expression::Atom(Typed{expr: Atom::StructInstance(..) | Atom::Array(..), ..}), ..}) {
+				if matches!(expr, Typed{expr: TokenWithDebugInfo{internal_tok: Expression::Atom(Typed{expr: TokenWithDebugInfo{internal_tok: Atom::StructInstance(..) | Atom::Array(..), ..}, ..}), ..}, ..}) {
 					generate_expression(file, expr, context);
 					stack_indices.push(stack_index - context.stack_index);
 					stack_index = context.stack_index;
@@ -222,7 +223,7 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 				writeln!(file, "    mov rax, rsp").unwrap();		// rsp actually points one word too low because of the
 				writeln!(file, "    add rax, {}", sum+8).unwrap();	// len of the array being pushed on stack so we need to add 8
 
-				if !matches!(expressions[0], Typed{expr: Expression::Atom(Typed{expr: Atom::StructInstance(..) | Atom::Array(..), ..}), ..}){
+				if !matches!(expressions[0], Typed{expr: TokenWithDebugInfo{internal_tok: Expression::Atom(Typed{expr: TokenWithDebugInfo{internal_tok: Atom::StructInstance(..) | Atom::Array(..), ..}, ..}), ..}, ..}){
 					writeln!(file, "    push rax").unwrap();
 					context.stack_index -= 8;
 					context.len += 1;
@@ -231,7 +232,7 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 
 			let mut iterator = stack_indices.iter();
 			for expr in expressions.iter().rev() {
-				if matches!(expr, Typed{expr: Expression::Atom(Typed{expr: Atom::StructInstance(..) | Atom::Array(..), ..}), ..}) {
+				if matches!(expr, Typed{expr: TokenWithDebugInfo{internal_tok: Expression::Atom(Typed{expr: TokenWithDebugInfo{internal_tok: Atom::StructInstance(..) | Atom::Array(..), ..}, ..}), ..}, ..}) {
 					let i = iterator.next().unwrap();
 					writeln!(file, "    sub rax, {}", i).unwrap();
 					writeln!(file, "    push rax").unwrap(); // If generate_expression pushes stuff, this is broken. Same for StructInstance
@@ -276,7 +277,7 @@ fn generate_atom(file: &mut File, atom: &Typed<Atom>, context: &mut Context) {
 
 /// Generates the assembly code for an assignment operation
 fn generate_assignment(
-    op: &AssignmentOp,
+    op: &TokenWithDebugInfo<AssignmentOp>,
     file: &mut File,
     var_address: &i64,
     pointer_dereference: bool,
@@ -294,7 +295,7 @@ fn generate_assignment(
     }
 
 	if type_ == &Type::Float {
-		match op {
+		match op.internal_tok {
 			AssignmentOp::Assign => {
 				writeln!(file, "    movq {}, xmm0", write_address).unwrap();
 			}
@@ -319,29 +320,29 @@ fn generate_assignment(
 				writeln!(file, "    movq {}, xmm0", write_address).unwrap();
 			}
 			AssignmentOp::ModulusAssign => {
-				panic!("Modulus not implemented for floats");
+				error("Modulus not implemented for floats", &op);
 			}
 			AssignmentOp::LeftShiftAssign => {
-				panic!("Left shift not implemented for floats");
+				error("Left shift not implemented for floats", &op);
 			}
 			AssignmentOp::RightShiftAssign => {
-				panic!("Right shift not implemented for floats");
+				error("Right shift not implemented for floats", &op);
 			}
 			AssignmentOp::BitwiseAndAssign => {
-				panic!("Bitwise and not implemented for floats");
+				error("Bitwise and not implemented for floats", &op);
 			}
 			AssignmentOp::BitwiseXorAssign => {
-				panic!("Bitwise xor not implemented for floats");
+				error("Bitwise xor not implemented for floats", &op);
 			}
 			AssignmentOp::BitwiseOrAssign => {
-				panic!("Bitwise or not implemented for floats");
+				error("Bitwise or not implemented for floats", &op);
 			}
 			AssignmentOp::NotAnAssignmentOp => {
-				panic!("Not an assignment op");
+				error("Not an assignment op", &op);
 			}
 		}
 	} else {
-		match op {
+		match op.internal_tok {
 			AssignmentOp::Assign => {
 				writeln!(file, "    mov {}, rax", write_address).unwrap();
 			}
@@ -392,19 +393,19 @@ fn generate_assignment(
 				writeln!(file, "    or {}, rax", write_address).unwrap();
 			}
 			AssignmentOp::NotAnAssignmentOp => {
-				panic!("Not an assignment op");
+				error("Not an assignment op", &op);
 			}
 		}
 	}
 }
 
 /// Generates the assembly code for an expression
-fn generate_expression(file: &mut File, expression: &Typed<Expression>, context: &mut Context) {
+fn generate_expression(file: &mut File, expression: &Typed<TokenWithDebugInfo<Expression>>, context: &mut Context) {
     match expression {
-        Typed{expr: Expression::Atom(atom), ..} => {
+        Typed{expr: TokenWithDebugInfo{internal_tok: Expression::Atom(atom), ..}, ..} => {
             generate_atom(file, atom, context);
         }
-        Typed{expr: Expression::UnaryOp(expr, unop), type_} => {
+        Typed{expr: TokenWithDebugInfo{internal_tok: Expression::UnaryOp(expr, unop), ..}, type_} => {
             generate_expression(file, expr, context);
 			if type_ == &Type::Float {
 				match unop {
@@ -433,13 +434,13 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 						// Do nothing
 					}
 					UnOp::Dereference => {
-						panic!("Cannot dereference a float");
+						error("Cannot dereference a float", &expression.expr);
 					}
 					UnOp::AddressOf => {
-						panic!("Cannot take the address of a float");
+						error("Cannot take the address of a float", &expression.expr);
 					}
 					UnOp::NotAUnaryOp => {
-						panic!("Not a unary op");
+						error("Not a unary op", &expression.expr);
 					}
 				}
 			} else {
@@ -469,12 +470,12 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 						// Do nothing
 					}
 					UnOp::NotAUnaryOp => {
-						panic!("Not a unary op");
+						error("Not a unary op", &expression.expr);
 					}
 				}
 			}
         }
-        Typed{expr: Expression::BinaryOp(left, right, bin_op), type_} => {
+        Typed{expr: TokenWithDebugInfo{internal_tok: Expression::BinaryOp(left, right, bin_op), ..}, type_} => {
 			let left_type = left.type_.clone();
             if bin_op != &BinOp::MemberAccess {
 				generate_expression(file, right, context);
@@ -486,7 +487,7 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 				context.len += 1;
 				generate_expression(file, left, context);
             } else {
-                if let Expression::Atom(Typed{expr: Atom::Literal(Typed{expr: Literal::Int(i), ..}), ..}) = right.expr {
+                if let Expression::Atom(Typed{expr: TokenWithDebugInfo{internal_tok: Atom::Literal(Typed{expr: TokenWithDebugInfo{internal_tok: Literal::Int(i), ..}, ..}), ..}, ..}) = right.expr.internal_tok {
 					generate_expression(file, left, context);
                     writeln!(file, "    mov rcx, {}", i).unwrap();
 					if type_ == &Type::Float {
@@ -496,7 +497,7 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 					}
                     return;
                 } else {
-                    panic!("Unreachable code, something went very wrong");
+					error("Unreachable code, something went very wrong", &right.expr);
                 }
             }
 
@@ -560,31 +561,31 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 					}
 					
 					BinOp::Modulus => {
-						panic!("Modulus not implemented for floats");
+						error("Modulus not implemented for floats", &right.expr);
 					}
 					BinOp::LogicalAnd => {
-						panic!("Logical and not implemented for floats");
+						error("Logical and not implemented for floats", &right.expr);
 					}
 					BinOp::LogicalOr => {
-						panic!("Logical or not implemented for floats");
+						error("Logical or not implemented for floats", &right.expr);
 					}
 					BinOp::LogicalXor => {
-						panic!("Logical xor not implemented for floats");
+						error("Logical xor not implemented for floats", &right.expr);
 					}
 					BinOp::LeftShift => {
-						panic!("Left shift not implemented for floats");
+						error("Left shift not implemented for floats", &right.expr);
 					}
 					BinOp::RightShift => {
-						panic!("Right shift not implemented for floats");
+						error("Right shift not implemented for floats", &right.expr);
 					}
 					BinOp::MemberAccess => {
-						panic!("Member access not implemented for floats");
+						error("Member access not implemented for floats", &right.expr);
 					}
 					BinOp::NamespaceAccess => {
-						panic!("Namespace access not implemented for floats");
+						error("Namespace access not implemented for floats", &right.expr);
 					}
 					BinOp::NotABinaryOp => {
-						panic!("Not a binary op");
+						error("Not a binary op", &right.expr);
 					}
 				}
 			} else {
@@ -665,34 +666,34 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 						writeln!(file, "    shr rax, cl").unwrap();
 					}
 					BinOp::MemberAccess => {
-						panic!("Unreachable code, member access is turned into array access much earlier");
+						error("Unreachable code, member access is turned into array access much earlier", &right.expr);
 					}
 					BinOp::NamespaceAccess => {
-						panic!("Namespace access not implemented");
+						error("Namespace access not implemented", &right.expr);
 					}
 					BinOp::NotABinaryOp => {
-						panic!("Not a binary op");
+						error("Not a binary op", &right.expr);
 					}
 				}
 			}
         }
-        Typed{expr: Expression::Assignment(lvalue, expr, op), type_} => {
+        Typed{expr: TokenWithDebugInfo{internal_tok: Expression::Assignment(lvalue, expr, op), ..}, type_} => {
             generate_expression(file, expr, context);
 
             match lvalue {
-                Typed{expr: ReassignmentIdentifier::Variable(s), ..} => {
-                    let var_address = context.var_map.get(s);
+                Typed{expr: TokenWithDebugInfo{internal_tok: ReassignmentIdentifier::Variable(s), line: debug_line, file: debug_file}, ..} => {
+                    let var_address = context.var_map.get(&s.internal_tok);
                     if let Some(var_address) = var_address {
-                        generate_assignment(op, file, var_address, false, type_);
+                        generate_assignment(&TokenWithDebugInfo { internal_tok: op.clone(), line: debug_line.clone(), file: debug_file.clone()}, file, var_address, false, type_);
                         return;
                     }
 
-                    if let Some(_) = context.constants.get(s) {
-                        panic!("Cannot assign to a constant variable");
+                    if let Some(_) = context.constants.get(&s.internal_tok) {
+						error(format!("Cannot assign to constant variable {}", s.internal_tok).as_str(), &s);
                     }
-                    panic!("Undeclared variable {:?}", s);
+					error(format!("Undeclared variable {}", s.internal_tok).as_str(), &s);
                 }
-                Typed{expr: ReassignmentIdentifier::Array(variable, indices), ..} => {
+                Typed{expr: TokenWithDebugInfo{internal_tok: ReassignmentIdentifier::Array(variable, indices), line: debug_line, file: debug_file}, ..} => {
 					if type_ == &Type::Float {
 						writeln!(file, "    movq rax, xmm0").unwrap();
 					}
@@ -716,14 +717,12 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 					if type_ == &Type::Float {
 						writeln!(file, "    movq xmm0, rax").unwrap();
 					}
-                    generate_assignment(op, file, &0, true, type_);
+                    generate_assignment(&TokenWithDebugInfo { internal_tok: op.clone(), line: debug_line.clone(), file: debug_file.clone()}, file, &0, true, type_);
                 }
-                Typed{expr: ReassignmentIdentifier::MemberAccess(_, _), ..} => {
-                    panic!(
-                        "Unreachable code, member access is turned into array access much earlier"
-                    );
+                Typed{expr: TokenWithDebugInfo{internal_tok: ReassignmentIdentifier::MemberAccess(_, _), ..}, ..} => {
+					error("Unreachable code, member access is turned into array access much earlier", &lvalue.expr);
                 }
-                Typed{expr: ReassignmentIdentifier::Dereference(v), ..} => {
+                Typed{expr: TokenWithDebugInfo{internal_tok: ReassignmentIdentifier::Dereference(v), line: debug_line, file: debug_file}, ..} => {
 					if type_ == &Type::Float {
 						writeln!(file, "    movq rax, xmm0").unwrap();
 					}
@@ -741,11 +740,11 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 						writeln!(file, "    movq xmm0, rax").unwrap();
 					}
 
-                    generate_assignment(op, file, &0, true, type_);
+                    generate_assignment(&TokenWithDebugInfo { internal_tok: op.clone(), line: debug_line.clone(), file: debug_file.clone()}, file, &0, true, type_);
                 }
             }
         }
-        Typed{expr: Expression::TypeCast(expr, _), type_: cast_type} => {
+        Typed{expr: TokenWithDebugInfo{internal_tok: Expression::TypeCast(expr, _), ..}, type_: cast_type} => {
 			let expr_type = expr.type_.clone();
             generate_expression(file, expr, context);
 
@@ -755,7 +754,7 @@ fn generate_expression(file: &mut File, expression: &Typed<Expression>, context:
 				writeln!(file, "    movq xmm0, rax").unwrap();
 			}
         }
-        Typed{expr: Expression::ArrayAccess(variable, indices), type_} => {
+        Typed{expr: TokenWithDebugInfo{internal_tok: Expression::ArrayAccess(variable, indices), ..}, type_} => {
             generate_expression(file, variable, context);
             let index = indices.get(0).expect("Array access without index");
 
@@ -844,16 +843,16 @@ impl Context {
 }
 
 /// Generates the assembly code for a compound statement
-fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>, last_context: &Context) {
+fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<TokenWithDebugInfo<Statement>>, last_context: &Context) {
     let mut context = Context::from_last_context(last_context);
 
     // Yes I do need to generate compound statements like that otherwise
     // local variables can't be a thing
 
-    if let Typed{expr: Statement::Compound(statements), ..} = cmp_statement {
+    if let Typed{expr: TokenWithDebugInfo{internal_tok: Statement::Compound(statements), ..}, ..} = cmp_statement {
         for statement in statements.iter() {
             match statement {
-                Typed{expr: Statement::Return(expression), ..} => {
+                Typed{expr: TokenWithDebugInfo{internal_tok: Statement::Return(expression), ..}, ..} => {
                     generate_expression(file, expression, &mut context);
                     // Pop all the variables from the stack
                     writeln!(
@@ -866,10 +865,10 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>
                     writeln!(file, "    pop rbp		;restore base pointer").unwrap();
                     writeln!(file, "    ret").unwrap();
                 }
-                Typed{expr: Statement::Expression(expression), ..} => {
+                Typed{expr: TokenWithDebugInfo{internal_tok: Statement::Expression(expression), ..}, ..} => {
                     generate_expression(file, expression, &mut context);
                 }
-                Typed{expr: Statement::Let(variable, expr, _), type_: var_type} => {
+                Typed{expr: TokenWithDebugInfo{internal_tok: Statement::Let(variable, expr, _), ..}, type_: var_type} => {
                     if let Some(expr) = expr {
                         generate_expression(file, expr, &mut context);
                     }
@@ -878,7 +877,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>
                     let mut number_of_dereferences = 0;
                     let mut variable = variable;
 					let mut type_ = var_type;
-                    while let AssignmentIdentifier::Dereference(new_expr) = variable {
+                    while let TokenWithDebugInfo{internal_tok: AssignmentIdentifier::Dereference(new_expr), ..} = variable {
                         variable = &new_expr.expr;
                         number_of_dereferences += 1;
 						type_ = &new_expr.type_;
@@ -901,15 +900,15 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>
                         context.len += 1;
                     }
 
-                    if let AssignmentIdentifier::Variable(variable) = variable {
-                        context.insert(variable.clone(), context.stack_index, var_type.to_string());
-                    } else if let AssignmentIdentifier::Array(variable, dimensions) = variable {
-                        context.insert(variable.clone(), context.stack_index, var_type.to_string());
+                    if let AssignmentIdentifier::Variable(variable) = variable.internal_tok.clone() {
+                        context.insert(variable.internal_tok.clone(), context.stack_index, var_type.to_string());
+                    } else if let AssignmentIdentifier::Array(variable, dimensions) = variable.internal_tok.clone() {
+                        context.insert(variable.internal_tok.clone(), context.stack_index, var_type.to_string());
 
                         let mut dimensions = dimensions.clone();
                         context
                             .dimensions
-                            .insert(variable.clone(), dimensions.len());
+                            .insert(variable.internal_tok.clone(), dimensions.len());
                         // Push the dimensions on the stack
                         while let Some(expr) = dimensions.pop() {
                             generate_expression(file, &expr, &mut context);
@@ -923,13 +922,13 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>
                             );
                         }
                     } else {
-                        panic!("Expected a variable or an array, got {:?}", variable);
+						error(format!("Expected a variable or an array, got {:?}", variable).as_str(), &variable);
                     }
                 }
-                Typed{expr: Statement::Compound(_), ..} => {
+                Typed{expr: TokenWithDebugInfo{internal_tok: Statement::Compound(_), ..}, ..} => {
                     generate_compound_statement(file, statement, &context);
                 }
-                Typed{expr: Statement::If(condition, if_statement, else_statement), ..} => {
+                Typed{expr: TokenWithDebugInfo{internal_tok: Statement::If(condition, if_statement, else_statement), ..}, ..} => {
                     let branch_label =
                         BRANCH_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     let else_label = format!(".else_{}", branch_label);
@@ -947,7 +946,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>
                     }
                     writeln!(file, "{}:", end_label).unwrap();
                 }
-                Typed{expr: Statement::While(condition, statement), ..} => {
+                Typed{expr: TokenWithDebugInfo{internal_tok: Statement::While(condition, statement), ..}, ..} => {
                     let loop_label = LOOP_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     let start_label = format!(".while_start_{}", loop_label);
                     let end_label = format!(".while_end_{}", loop_label);
@@ -964,7 +963,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>
                     writeln!(file, "    jmp {}", start_label).unwrap();
                     writeln!(file, "{}:", end_label).unwrap();
                 }
-                Typed{expr: Statement::Loop(statement), ..} => {
+                Typed{expr: TokenWithDebugInfo{internal_tok: Statement::Loop(statement), ..}, ..} => {
                     let loop_label = LOOP_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     let start_label = format!(".loop_start_{}", loop_label);
                     let end_label = format!(".loop_end_{}", loop_label);
@@ -978,7 +977,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>
                     writeln!(file, "    jmp {}", start_label).unwrap();
                     writeln!(file, "{}:", end_label).unwrap();
                 }
-                Typed{expr: Statement::Dowhile(condition, statement), ..} => {
+                Typed{expr: TokenWithDebugInfo{internal_tok: Statement::Dowhile(condition, statement), ..}, ..} => {
                     let loop_label = LOOP_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     let start_label = format!(".dowhile_start_{}", loop_label);
                     let end_label = format!(".dowhile_end_{}", loop_label);
@@ -994,7 +993,7 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>
                     writeln!(file, "    jne {}", start_label).unwrap();
                     writeln!(file, "{}:", end_label).unwrap();
                 }
-                Typed{expr: Statement::For(init, condition, update, statement), ..} => {
+                Typed{expr: TokenWithDebugInfo{internal_tok: Statement::For(init, condition, update, statement), ..}, ..} => {
                     let loop_label = LOOP_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     let start_label = format!(".for_start_{}", loop_label);
                     let end_label = format!(".for_end_{}", loop_label);
@@ -1013,27 +1012,27 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>
                     writeln!(file, "    jmp {}", start_label).unwrap();
                     writeln!(file, "{}:", end_label).unwrap();
                 }
-                Typed{expr: Statement::Break, ..} => {
+                Typed{expr: TokenWithDebugInfo{internal_tok: Statement::Break, ..}, ..} => {
                     if let Some(label) = &context.break_label {
                         writeln!(file, "    jmp {}	;break statement", label).unwrap();
                     } else {
-                        panic!("Break statement outside of loop");
+						error("Break statement outside of loop", &statement.expr);
                     }
                 }
-                Typed{expr: Statement::Continue, ..} => {
+                Typed{expr: TokenWithDebugInfo{internal_tok: Statement::Continue, ..}, ..} => {
                     if let Some(label) = &context.continue_label {
                         writeln!(file, "    jmp {}	;continue statement", label).unwrap();
                     } else {
-                        panic!("Continue statement outside of loop");
+						error("Continue statement outside of loop", &statement.expr);
                     }
                 }
-				Typed{expr: Statement::Asm(asm, _), ..} => {
+				Typed{expr: TokenWithDebugInfo{internal_tok: Statement::Asm(asm, _), ..}, ..} => {
 					writeln!(file, "{}", asm).unwrap();
 				}
             }
         }
     } else {
-        panic!("Expected a compound statement, got {:?}", cmp_statement);
+		error(format!("Expected a compound statement, got {:?}", cmp_statement).as_str(), &cmp_statement.expr);
     }
 
     // Pop all the variables from the stack
@@ -1046,22 +1045,22 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<Statement>
 }
 
 /// Generates the assembly code for a function
-fn generate_function(file: &mut File, function: &Typed<Function>, context: &Context) {
+fn generate_function(file: &mut File, function: &Typed<TokenWithDebugInfo<Function>>, context: &Context) {
     let mut context = Context::from_last_context(context);
 
-    let Typed{expr: Function{id: name, args: params, body: statement, ..}, ..} = function;
+    let Typed{expr: TokenWithDebugInfo{internal_tok: Function{id: name, args: params, body: statement, ..}, ..}, ..} = function;
 
     context.stack_index = 24; // Skip rbp, rbx and the return address
     for param in params.iter() {
-        context.insert(param.0.clone(), context.stack_index, param.1.to_string());
+        context.insert(param.0.internal_tok.clone(), context.stack_index, param.1.to_string());
         context.stack_index += 8;
     }
     context.stack_index = 0;
 
     writeln!(file, "").unwrap();
 	// It's important to have the "main" label for gdb to work properly
-	if name == "toplevel::main" {writeln!(file, "main:").unwrap();}
-    writeln!(file, ".{}:", name.replace("::", ".")).unwrap();
+	if name.internal_tok == "toplevel::main" {writeln!(file, "main:").unwrap();}
+    writeln!(file, ".{}:", name.internal_tok.replace("::", ".")).unwrap();
     writeln!(file, "    push rbp		;save previous base pointer").unwrap();
     writeln!(file, "    push rbx		;functions should preserve rbx").unwrap();
     writeln!(file, "    mov rbp, rsp	;set base pointer").unwrap();
@@ -1075,10 +1074,10 @@ fn generate_function(file: &mut File, function: &Typed<Function>, context: &Cont
     .unwrap();
 }
 
-fn generate_constants(file: &mut File, const_vector: &Vec<Typed<Constant>>) {
+fn generate_constants(file: &mut File, const_vector: &Vec<Typed<TokenWithDebugInfo<Constant>>>) {
 	for constant in const_vector.iter(){
-		let Typed{expr: Constant::Constant(name, constant, _), ..} = constant;
-    	writeln!(file, "    .constant.{}: dq {}", name.replace("::", "."), constant).unwrap();
+		let Typed{expr: TokenWithDebugInfo{internal_tok: Constant::Constant(name, constant, _), ..}, ..} = constant;
+    	writeln!(file, "    .constant.{}: dq {}", name.internal_tok.replace("::", "."), constant).unwrap();
 	}
 }
 
@@ -1102,7 +1101,7 @@ pub fn generate(ast: &Ast, out_path: &str) {
 		constants: const_vector,
 		structs, enums: _enums,
 		..
-	} = &ast.program;
+	} = &ast.program.internal_tok;
     
 	writeln!(file, "[BITS 64]").unwrap();
     writeln!(file, "section .text").unwrap();
@@ -1117,24 +1116,28 @@ pub fn generate(ast: &Ast, out_path: &str) {
     let mut context = Context::new();
 
     for constant in const_vector.iter() {
-        let Typed{expr: Constant::Constant(name, _, _), ..} = constant;
-        if let Some(_) = context.var_map.get(name) {
-            panic!(
-                "Variable {} already declared as a constant. Constants cannot be declared twice",
-                name
-            );
+        let Typed{expr: TokenWithDebugInfo{internal_tok: Constant::Constant(name, _, _), ..}, ..} = constant;
+        if let Some(_) = context.var_map.get(&name.internal_tok) {
+			error(
+				format!(
+					"Variable {} already declared as a constant. Constants cannot be declared twice",
+					name.internal_tok
+				)
+				.as_str(),
+				&name,
+			);
         }
-        context.constants.insert(name.clone());
+        context.constants.insert(name.internal_tok.clone());
     }
 
     for struct_ in structs.iter() {
-        let Struct { id, members, .. } = struct_;
+        let Struct { id, members, .. } = struct_.internal_tok.clone();
         let mut member_names = HashMap::new();
         for (i, member) in members.iter().enumerate() {
             let (name, _) = member;
-            member_names.insert(name.clone(), i as i64);
+            member_names.insert(name.internal_tok.clone(), i as i64);
         }
-        context.structs.insert(id.clone(), member_names);
+        context.structs.insert(id.internal_tok.clone(), member_names);
     }
 
 	// Since gdb needs the 'main' label to be toplevel, and since all our
@@ -1142,14 +1145,14 @@ pub fn generate(ast: &Ast, out_path: &str) {
 
 	// Generate toplevel::main first
 	for function in function_vector.iter() {
-		if function.expr.id == "toplevel::main" {
+		if function.expr.internal_tok.id.internal_tok == "toplevel::main" {
 			generate_function(&mut file, function, &context);
 		}
 	}
 	
 	// Generate all other functions
 	for function in function_vector.iter() {
-		if function.expr.id != "toplevel::main" {
+		if function.expr.internal_tok.id.internal_tok != "toplevel::main" {
 			generate_function(&mut file, function, &context);
 		}
 	}

@@ -1,6 +1,9 @@
 use crate::lexer::Operator;
 use crate::lexer::Token;
-use crate::lexer::TokenWithDebugInfo;
+use crate::shared::TokenWithDebugInfo;
+use crate::shared::{
+	Type, Typed, error, error_unexpected_token,
+};
 use core::panic;
 use std::slice::Iter;
 use std::vec;
@@ -21,31 +24,6 @@ use std::vec;
 // 13. Logical or (a || b)
 // 14. Assignment (a = b) Add assignment (a += b) Subtract assignment (a -= b) Multiply assignment (a *= b) Divide assignment (a /= b) Modulus assignment (a %= b) Left shift assignment (a <<= b) Right shift assignment (a >>= b) Bitwise and assignment (a &= b) Bitwise xor assignment (a ^= b) Bitwise or assignment (a |= b)
 
-/// Monad to attach types to elements of the AST
-#[derive(Debug, Clone)]
-pub struct Typed<T> {
-    pub expr: T,
-    pub type_: Type,
-}
-
-impl<T> Typed<T> {
-    /// Creates a new Typed instance with a void type.
-    pub fn new(expr: T) -> Self {
-        Typed {
-            expr,
-            type_: Type::Void,
-        }
-    }
-
-    pub fn new_with_type(expr: T, type_: Type) -> Self {
-        Typed { expr, type_ }
-    }
-
-    pub fn get_type(&self) -> &Type {
-        &self.type_
-    }
-}
-
 /// Represents a literal value in the AST.
 #[derive(Debug, Clone)]
 pub enum Literal {
@@ -62,20 +40,31 @@ pub enum Literal {
 /// An atom is the smallest unit of an expression. It can be a constant, an expression, a variable, a function call or an array access.
 #[derive(Debug, Clone)]
 pub enum Atom {
-    Literal(Typed<Literal>),
-    Expression(Box<Typed<Expression>>),
-    Variable(String),
-    FunctionCall(String, Vec<Typed<Expression>>, Vec<Type>), // id<T1, T2, ...>(args)
-    Array(Vec<Typed<Expression>>, i64), // Array literal with a given number of dimensions
-    StructInstance(String, Vec<Typed<Expression>>, Vec<Type>), // Struct instance with a given number of fields
+    Literal(Typed<TokenWithDebugInfo<Literal>>),
+    Expression(Box<Typed<TokenWithDebugInfo<Expression>>>),
+    Variable(TokenWithDebugInfo<String>),
+    FunctionCall(
+        TokenWithDebugInfo<String>,
+        Vec<Typed<TokenWithDebugInfo<Expression>>>,
+        Vec<TokenWithDebugInfo<Type>>,
+    ), // id<T1, T2, ...>(args)
+    Array(Vec<Typed<TokenWithDebugInfo<Expression>>>, i64), // Array literal with a given number of dimensions
+    StructInstance(
+        TokenWithDebugInfo<String>,
+        Vec<Typed<TokenWithDebugInfo<Expression>>>,
+        Vec<TokenWithDebugInfo<Type>>,
+    ), // Struct instance with a given number of fields
 }
 
 // In let bindings, the left hand side of the assignment
 #[derive(Debug, Clone)]
 pub enum AssignmentIdentifier {
-    Variable(String),
-    Dereference(Box<Typed<AssignmentIdentifier>>),
-    Array(String, Vec<Typed<Expression>>), // identifier[dim1, dim2, ...]
+    Variable(TokenWithDebugInfo<String>),
+    Dereference(Box<Typed<TokenWithDebugInfo<AssignmentIdentifier>>>),
+    Array(
+        TokenWithDebugInfo<String>,
+        Vec<Typed<TokenWithDebugInfo<Expression>>>,
+    ), // identifier[dim1, dim2, ...]
 }
 
 // In assignments, the left hand side of the assignment. This is NOT the same
@@ -83,25 +72,16 @@ pub enum AssignmentIdentifier {
 // struct.member = ... is a ReassignmentIdentifier, but not an AssignmentIdentifier
 #[derive(Debug, Clone)]
 pub enum ReassignmentIdentifier {
-    Variable(String),
-    Dereference(Box<Typed<Expression>>),
-    Array(Box<Typed<Expression>>, Vec<Typed<Expression>>),
-    MemberAccess(Box<Typed<Expression>>, Box<Typed<Expression>>),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Type {
-    Int,
-    Float,
-    Void,
-    Char,
-    Bool,
-    Pointer(Box<Type>),
-    Array(Box<Type>), // array[type]. Strings are array[char]
-    Struct(String),
-    Enum(String),
-    Namespace(String, Box<Type>),
-	GenericBinding(String, Vec<Type>),
+    Variable(TokenWithDebugInfo<String>),
+    Dereference(Box<Typed<TokenWithDebugInfo<Expression>>>),
+    Array(
+        Box<Typed<TokenWithDebugInfo<Expression>>>,
+        Vec<Typed<TokenWithDebugInfo<Expression>>>,
+    ),
+    MemberAccess(
+        Box<Typed<TokenWithDebugInfo<Expression>>>,
+        Box<Typed<TokenWithDebugInfo<Expression>>>,
+    ),
 }
 
 /// Represents a unary operator in the AST.
@@ -196,23 +176,35 @@ pub struct PrecedenceLevel {
 /// Expressions can be atoms, unary operations, binary operations, or assignments.
 #[derive(Debug, Clone)]
 pub enum Expression {
-    Atom(Typed<Atom>),
-    UnaryOp(Box<Typed<Expression>>, UnOp),
-    BinaryOp(Box<Typed<Expression>>, Box<Typed<Expression>>, BinOp),
+    Atom(Typed<TokenWithDebugInfo<Atom>>),
+    UnaryOp(Box<Typed<TokenWithDebugInfo<Expression>>>, UnOp),
+    BinaryOp(
+        Box<Typed<TokenWithDebugInfo<Expression>>>,
+        Box<Typed<TokenWithDebugInfo<Expression>>>,
+        BinOp,
+    ),
     Assignment(
-        Typed<ReassignmentIdentifier>,
-        Box<Typed<Expression>>,
+        Typed<TokenWithDebugInfo<ReassignmentIdentifier>>,
+        Box<Typed<TokenWithDebugInfo<Expression>>>,
         AssignmentOp,
     ),
-    TypeCast(Box<Typed<Expression>>, Type),
-    ArrayAccess(Box<Typed<Expression>>, Vec<Typed<Expression>>),
+    TypeCast(Box<Typed<TokenWithDebugInfo<Expression>>>, TokenWithDebugInfo<Type>),
+    ArrayAccess(
+        Box<Typed<TokenWithDebugInfo<Expression>>>,
+        Vec<Typed<TokenWithDebugInfo<Expression>>>,
+    ),
 }
 
 /// Gets the binary operator corresponding to the token.
-fn get_bin_operator_from_tokens(token: &Iter<TokenWithDebugInfo>) -> BinOp {
-	let mut cloned_tokens = token.clone();
-	let token = cloned_tokens.next().unwrap();
-    match token {
+fn get_bin_operator_from_tokens(
+    token: &Iter<TokenWithDebugInfo<Token>>,
+) -> TokenWithDebugInfo<BinOp> {
+    let mut cloned_tokens = token.clone();
+    let token = cloned_tokens.next().unwrap();
+
+    let (line, file) = (token.line.clone(), token.file.clone());
+
+    let op = match token {
         TokenWithDebugInfo {
             internal_tok: Token::Operator(op),
             ..
@@ -235,56 +227,66 @@ fn get_bin_operator_from_tokens(token: &Iter<TokenWithDebugInfo>) -> BinOp {
             Operator::LogicalOr => BinOp::LogicalOr,
             Operator::MemberAccess => BinOp::MemberAccess,
             Operator::DoubleColon => BinOp::NamespaceAccess,
-			Operator::GreaterThan => {
-				// We need special treatment for the greater than operator.
-				// Since there is ambiguity at the tokenization level between
-				// generics syntax and oprators that start with '>', we don't use
-				// the tokenization level to determine if it's a generic or an operator.
+            Operator::GreaterThan => {
+                // We need special treatment for the greater than operator.
+                // Since there is ambiguity at the tokenization level between
+                // generics syntax and oprators that start with '>', we don't use
+                // the tokenization level to determine if it's a generic or an operator.
 
-				// e.g in 'let a: S<T>= ..;' we don't want to parse the '>=' as
-				// a 'greater than' operator, but as a generic binding followed
-				// by an assignment operator.
+                // e.g in 'let a: S<T>= ..;' we don't want to parse the '>=' as
+                // a 'greater than' operator, but as a generic binding followed
+                // by an assignment operator.
 
-				// Similarly for '>>' in the function call 'func:<S<T>>(args);'
+                // Similarly for '>>' in the function call 'func:<S<T>>(args);'
 
-				let next = cloned_tokens.next().unwrap();
+                let next = cloned_tokens.next().unwrap();
 
-				if let TokenWithDebugInfo {
-					internal_tok: Token::Operator(Operator::Assign),
-					..
-				} = next
-				{
-					BinOp::GreaterOrEqualThan	// >=
-				} else if let TokenWithDebugInfo {
-					internal_tok: Token::Operator(Operator::GreaterThan),
-					..
-				} = next
-				{
-					let next = cloned_tokens.next().unwrap();
-					if let TokenWithDebugInfo {
-						internal_tok: Token::Operator(Operator::Assign),
-						..
-					} = next
-					{
-						BinOp::NotABinaryOp	// >>=
-					} else {
-						BinOp::RightShift	// >>
-					}
-				} else {
-					BinOp::GreaterThan	// >
-				}
-			}
+                if let TokenWithDebugInfo {
+                    internal_tok: Token::Operator(Operator::Assign),
+                    ..
+                } = next
+                {
+                    BinOp::GreaterOrEqualThan // >=
+                } else if let TokenWithDebugInfo {
+                    internal_tok: Token::Operator(Operator::GreaterThan),
+                    ..
+                } = next
+                {
+                    let next = cloned_tokens.next().unwrap();
+                    if let TokenWithDebugInfo {
+                        internal_tok: Token::Operator(Operator::Assign),
+                        ..
+                    } = next
+                    {
+                        BinOp::NotABinaryOp // >>=
+                    } else {
+                        BinOp::RightShift // >>
+                    }
+                } else {
+                    BinOp::GreaterThan // >
+                }
+            }
             _ => BinOp::NotABinaryOp,
         },
         _ => BinOp::NotABinaryOp,
+    };
+
+    TokenWithDebugInfo {
+        internal_tok: op,
+        line,
+        file,
     }
 }
 
 /// Gets the assignment operator corresponding to the token.
-fn get_assign_operator_from_tokens(token: &Iter<TokenWithDebugInfo>) -> AssignmentOp {
-	let mut cloned_tokens = token.clone();
-	let token = cloned_tokens.next().unwrap();	
-    match token {
+fn get_assign_operator_from_tokens(
+    token: &Iter<TokenWithDebugInfo<Token>>,
+) -> TokenWithDebugInfo<AssignmentOp> {
+    let mut cloned_tokens = token.clone();
+    let token = cloned_tokens.next().unwrap();
+    let (line, file) = (token.line.clone(), token.file.clone());
+
+    let op = match token {
         TokenWithDebugInfo {
             internal_tok: Token::Operator(op),
             ..
@@ -296,43 +298,51 @@ fn get_assign_operator_from_tokens(token: &Iter<TokenWithDebugInfo>) -> Assignme
             Operator::DivideAssign => AssignmentOp::DivideAssign,
             Operator::ModulusAssign => AssignmentOp::ModulusAssign,
             Operator::LeftShiftAssign => AssignmentOp::LeftShiftAssign,
-			Operator::GreaterThan => {
-				// For the same reason as in get_bin_operator_from_tokens, we
-				// need to make sure the '>>=' in 'let a: S<T<U>>= ..;' is not
-				// parsed as a 'rightshift assignment' operator.
+            Operator::GreaterThan => {
+                // For the same reason as in get_bin_operator_from_tokens, we
+                // need to make sure the '>>=' in 'let a: S<T<U>>= ..;' is not
+                // parsed as a 'rightshift assignment' operator.
 
-				let next = cloned_tokens.next().unwrap();
-				if let TokenWithDebugInfo {
-					internal_tok: Token::Operator(Operator::GreaterThan),
-					..
-				} = next
-				{
-					let next = cloned_tokens.next().unwrap();
-					if let TokenWithDebugInfo {
-						internal_tok: Token::Operator(Operator::Assign),
-						..
-					} = next
-					{
-						AssignmentOp::RightShiftAssign	// >>=
-					} else {
-						AssignmentOp::NotAnAssignmentOp	// >>
-					}
-				} else {
-					AssignmentOp::NotAnAssignmentOp	// >
-				}
-			},
+                let next = cloned_tokens.next().unwrap();
+                if let TokenWithDebugInfo {
+                    internal_tok: Token::Operator(Operator::GreaterThan),
+                    ..
+                } = next
+                {
+                    let next = cloned_tokens.next().unwrap();
+                    if let TokenWithDebugInfo {
+                        internal_tok: Token::Operator(Operator::Assign),
+                        ..
+                    } = next
+                    {
+                        AssignmentOp::RightShiftAssign // >>=
+                    } else {
+                        AssignmentOp::NotAnAssignmentOp // >>
+                    }
+                } else {
+                    AssignmentOp::NotAnAssignmentOp // >
+                }
+            }
             Operator::BitwiseAndAssign => AssignmentOp::BitwiseAndAssign,
             Operator::BitwiseXorAssign => AssignmentOp::BitwiseXorAssign,
             Operator::BitwiseOrAssign => AssignmentOp::BitwiseOrAssign,
             _ => AssignmentOp::NotAnAssignmentOp,
         },
         _ => AssignmentOp::NotAnAssignmentOp,
+    };
+
+    TokenWithDebugInfo {
+        internal_tok: op,
+        line,
+        file,
     }
 }
 
 /// Gets the unary operator corresponding to the token.
-fn get_un_operator_from_token(token: &TokenWithDebugInfo) -> UnOp {
-    match token {
+fn get_un_operator_from_token(token: &TokenWithDebugInfo<Token>) -> TokenWithDebugInfo<UnOp> {
+    let (line, file) = (token.line.clone(), token.file.clone());
+
+    let op = match token {
         TokenWithDebugInfo {
             internal_tok: Token::Operator(op),
             ..
@@ -348,6 +358,12 @@ fn get_un_operator_from_token(token: &TokenWithDebugInfo) -> UnOp {
             _ => error_unexpected_token("valid unary operator", token),
         },
         _ => UnOp::NotAUnaryOp,
+    };
+
+    TokenWithDebugInfo {
+        internal_tok: op,
+        line,
+        file,
     }
 }
 
@@ -357,37 +373,47 @@ fn get_un_operator_from_token(token: &TokenWithDebugInfo) -> UnOp {
 /// Statements can be assignments, let bindings, if statements, while loops, loops, do-while loops, for loops, return statements, expressions, compound statements, break statements, or continue statements.
 #[derive(Debug, Clone)]
 pub enum Statement {
-    Let(AssignmentIdentifier, Option<Typed<Expression>>, Type),
+    Let(
+        TokenWithDebugInfo<AssignmentIdentifier>,
+        Option<Typed<TokenWithDebugInfo<Expression>>>,
+        TokenWithDebugInfo<Type>,
+    ),
     If(
-        Typed<Expression>,
-        Box<Typed<Statement>>,
-        Option<Box<Typed<Statement>>>,
+        Typed<TokenWithDebugInfo<Expression>>,
+        Box<Typed<TokenWithDebugInfo<Statement>>>,
+        Option<Box<Typed<TokenWithDebugInfo<Statement>>>>,
     ),
-    While(Typed<Expression>, Box<Typed<Statement>>),
-    Loop(Box<Typed<Statement>>),
-    Dowhile(Typed<Expression>, Box<Typed<Statement>>),
+    While(
+        Typed<TokenWithDebugInfo<Expression>>,
+        Box<Typed<TokenWithDebugInfo<Statement>>>,
+    ),
+    Loop(Box<Typed<TokenWithDebugInfo<Statement>>>),
+    Dowhile(
+        Typed<TokenWithDebugInfo<Expression>>,
+        Box<Typed<TokenWithDebugInfo<Statement>>>,
+    ),
     For(
-        Typed<Expression>,
-        Typed<Expression>,
-        Typed<Expression>,
-        Box<Typed<Statement>>,
+        Typed<TokenWithDebugInfo<Expression>>,
+        Typed<TokenWithDebugInfo<Expression>>,
+        Typed<TokenWithDebugInfo<Expression>>,
+        Box<Typed<TokenWithDebugInfo<Statement>>>,
     ),
-    Return(Typed<Expression>),
-    Expression(Typed<Expression>),
-    Compound(Vec<Typed<Statement>>),
+    Return(Typed<TokenWithDebugInfo<Expression>>),
+    Expression(Typed<TokenWithDebugInfo<Expression>>),
+    Compound(Vec<Typed<TokenWithDebugInfo<Statement>>>),
     Break,
     Continue,
-    Asm(String, Type),
+    Asm(TokenWithDebugInfo<String>, TokenWithDebugInfo<Type>),
 }
 
 /// Represents a function in the AST.
 #[derive(Debug, Clone)]
 pub struct Function {
-    pub id: String,
-    pub args: Vec<(String, Type)>,
-    pub body: Typed<Statement>,
-    pub return_type: Type,
-    pub generics: Vec<String>,
+    pub id: TokenWithDebugInfo<String>,
+    pub args: Vec<(TokenWithDebugInfo<String>, TokenWithDebugInfo<Type>)>,
+    pub body: Typed<TokenWithDebugInfo<Statement>>,
+    pub return_type: TokenWithDebugInfo<Type>,
+    pub generics: Vec<TokenWithDebugInfo<String>>,
 }
 
 /// Represents a constant in the AST.
@@ -396,23 +422,27 @@ pub struct Function {
 #[derive(Debug, Clone)]
 pub enum Constant {
     //TODO: should be a struct instead of enum
-    Constant(String, Typed<Literal>, Type),
+    Constant(
+        TokenWithDebugInfo<String>,
+        Typed<TokenWithDebugInfo<Literal>>,
+        TokenWithDebugInfo<Type>,
+    ),
 }
 
 #[derive(Debug, Clone)]
 pub struct Namespace {
     pub id: String,
-    pub functions: Vec<Typed<Function>>,
-    pub constants: Vec<Typed<Constant>>,
-    pub structs: Vec<Struct>,
-    pub enums: Vec<Enum>,
-    pub sub_namespaces: Vec<Namespace>,
+    pub functions: Vec<Typed<TokenWithDebugInfo<Function>>>,
+    pub constants: Vec<Typed<TokenWithDebugInfo<Constant>>>,
+    pub structs: Vec<TokenWithDebugInfo<Struct>>,
+    pub enums: Vec<TokenWithDebugInfo<Enum>>,
+    pub sub_namespaces: Vec<TokenWithDebugInfo<Namespace>>,
 }
 
 /// Represents the abstract syntax tree (AST) of a program.
 #[derive(Debug, Clone)]
 pub struct Ast {
-    pub program: Namespace,
+    pub program: TokenWithDebugInfo<Namespace>,
 }
 
 impl std::fmt::Display for Literal {
@@ -428,50 +458,87 @@ impl std::fmt::Display for Literal {
     }
 }
 
-fn error(msg: &str, token: &TokenWithDebugInfo) -> ! {
-    panic!("{} Line {}: {}", token.file, token.line, msg);
-}
-
-fn error_unexpected_token(expected: &str, token: &TokenWithDebugInfo) -> ! {
-    error(
-        &format!("Expected {}, found: {:?}", expected, token.internal_tok),
-        token,
-    );
-}
-
 /// Parses a constant from a token.
-fn parse_literal(token: &TokenWithDebugInfo) -> Typed<Literal> {
+fn parse_literal(token: &TokenWithDebugInfo<Token>) -> Typed<TokenWithDebugInfo<Literal>> {
     match token {
         TokenWithDebugInfo {
             internal_tok: Token::IntLiteral(i),
-            ..
-        } => Typed::new_with_type(Literal::Int(*i), Type::Int),
+            line,
+            file,
+        } => Typed::new_with_type(
+            TokenWithDebugInfo {
+                internal_tok: Literal::Int(*i),
+                line: *line,
+                file: file.clone(),
+            },
+            Type::Int,
+        ),
         TokenWithDebugInfo {
             internal_tok: Token::FloatLiteral(f),
-            ..
-        } => Typed::new_with_type(Literal::Float(*f), Type::Float),
+            line,
+            file,
+        } => Typed::new_with_type(
+            TokenWithDebugInfo {
+                internal_tok: Literal::Float(*f),
+                line: *line,
+                file: file.clone(),
+            },
+            Type::Float,
+        ),
         TokenWithDebugInfo {
             internal_tok: Token::HexLiteral(h),
-            ..
-        } => Typed::new_with_type(Literal::Hex(*h), Type::Int),
+            line,
+            file,
+        } => Typed::new_with_type(
+            TokenWithDebugInfo {
+                internal_tok: Literal::Hex(*h),
+                line: *line,
+                file: file.clone(),
+            },
+            Type::Int,
+        ),
         TokenWithDebugInfo {
             internal_tok: Token::BinLiteral(b),
-            ..
-        } => Typed::new_with_type(Literal::Binary(*b), Type::Int),
+            line,
+            file,
+        } => Typed::new_with_type(
+            TokenWithDebugInfo {
+                internal_tok: Literal::Binary(*b),
+                line: *line,
+                file: file.clone(),
+            },
+            Type::Int,
+        ),
         TokenWithDebugInfo {
             internal_tok: Token::BoolLiteral(b),
-            ..
-        } => Typed::new_with_type(Literal::Bool(*b), Type::Bool),
+            line,
+            file,
+        } => Typed::new_with_type(
+            TokenWithDebugInfo {
+                internal_tok: Literal::Bool(*b),
+                line: *line,
+                file: file.clone(),
+            },
+            Type::Bool,
+        ),
         TokenWithDebugInfo {
             internal_tok: Token::CharLiteral(c),
-            ..
-        } => Typed::new_with_type(Literal::Char(c.to_string()), Type::Char),
+            line,
+            file,
+        } => Typed::new_with_type(
+            TokenWithDebugInfo {
+                internal_tok: Literal::Char(c.to_string()),
+                line: *line,
+                file: file.clone(),
+            },
+            Type::Char,
+        ),
         _ => error_unexpected_token("constant", token),
     }
 }
 
 /// Parses an atom from a list of tokens.
-fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Typed<Atom> {
+fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo<Token>>) -> Typed<TokenWithDebugInfo<Atom>> {
     let tok = tokens.next().unwrap();
 
     // Check if what we're parsing is an array literal
@@ -486,7 +553,8 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Typed<Atom> {
     match tok {
         TokenWithDebugInfo {
             internal_tok: Token::LParen,
-            ..
+            line,
+            file,
         } => {
             let inner_exp = parse_expression(&mut tokens);
 
@@ -495,106 +563,144 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Typed<Atom> {
                 ..
             } = tokens.next().unwrap()
             {
-                return Typed::new(Atom::Expression(Box::new(Typed::new(inner_exp))));
+                return Typed::new(TokenWithDebugInfo {
+                    internal_tok: Atom::Expression(Box::new(Typed::new(inner_exp))),
+                    line: line.clone(),
+                    file: file.clone(),
+                });
             } else {
                 error_unexpected_token("closing parenthesis", &tok);
             }
         }
         TokenWithDebugInfo {
             internal_tok: Token::IntLiteral(_),
-            ..
+            line,
+            file,
         }
         | TokenWithDebugInfo {
             internal_tok: Token::FloatLiteral(_),
-            ..
+            line,
+            file,
         }
         | TokenWithDebugInfo {
             internal_tok: Token::BinLiteral(_),
-            ..
+            line,
+            file,
         }
         | TokenWithDebugInfo {
             internal_tok: Token::HexLiteral(_),
-            ..
+            line,
+            file,
         }
         | TokenWithDebugInfo {
             internal_tok: Token::BoolLiteral(_),
-            ..
+            line,
+            file,
         }
         | TokenWithDebugInfo {
             internal_tok: Token::CharLiteral(_),
-            ..
+            line,
+            file,
         } => {
             let lit = parse_literal(&tok);
             let t = lit.get_type().clone();
-            return Typed::new_with_type(Atom::Literal(lit), t);
+            return Typed::new_with_type(
+                TokenWithDebugInfo {
+                    internal_tok: Atom::Literal(lit),
+                    line: line.clone(),
+                    file: file.clone(),
+                },
+                t,
+            );
         }
         TokenWithDebugInfo {
             internal_tok: Token::StringLiteral(s),
-            ..
+            line,
+            file,
         } => {
-            return Typed::new(Atom::Array(
-                s.chars()
-                    .collect::<Vec<_>>()
-                    .chunks(8)
-                    .map(|chunk| {
-                        Typed::new(Expression::Atom(Typed::new(Atom::Literal(Typed::new(
-                            Literal::Char(chunk.iter().collect()),
-                        )))))
-                    })
-                    .collect(),
-                (s.len() as i64 + 3) / 8,
-            ));
+            return Typed::new(TokenWithDebugInfo {
+                internal_tok: Atom::Array(
+                    s.chars()
+                        .collect::<Vec<_>>()
+                        .chunks(8)
+                        .map(|chunk| {
+                            Typed::new(TokenWithDebugInfo {
+                                internal_tok: Expression::Atom(Typed::new(TokenWithDebugInfo {
+                                    internal_tok: Atom::Literal(Typed::new(TokenWithDebugInfo {
+                                        internal_tok: Literal::Char(chunk.iter().collect()),
+                                        line: line.clone(),
+                                        file: file.clone(),
+                                    })),
+                                    line: line.clone(),
+                                    file: file.clone(),
+                                })),
+                                line: line.clone(),
+                                file: file.clone(),
+                            })
+                        })
+                        .collect(),
+                    (s.len() as i64 + 3) / 8,
+                ),
+                line: line.clone(),
+                file: file.clone(),
+            });
         }
         TokenWithDebugInfo {
             internal_tok: Token::Identifier(s),
-            ..
+            line: id_line,
+            file: id_file,
         } => {
             let mut next_tok = tokens.clone().next().unwrap();
 
-			// Function call / struct instance with generic binding
-			// id:<T1, T2, ...>(args)
-			// The colon is necessary or else there is ambiguity with the
-			// "less than" and "greater than" operators.
+            // Function call / struct instance with generic binding
+            // id:<T1, T2, ...>(args)
+            // The colon is necessary or else there is ambiguity with the
+            // "less than" and "greater than" operators.
 
-			let mut generics = Vec::new();
+            let mut generics = Vec::new();
 
-			if let TokenWithDebugInfo {
-				internal_tok: Token::BeginGeneric,
-				..
-			} = next_tok 
-			{
-				tokens.next();
-				loop {
-					generics.push(parse_type(&mut tokens));
-					let next_tok = tokens.next().unwrap();
-					if let TokenWithDebugInfo {
-						internal_tok: Token::Operator(Operator::GreaterThan),
-						..
-					} = next_tok
-					{
-						break;
-					} else if let TokenWithDebugInfo {
-						internal_tok: Token::Comma,
-						..
-					} = next_tok
-					{
-						continue;
-					} else {
-						error_unexpected_token("comma or '>'", &next_tok);
-					}
-				}
+            if let TokenWithDebugInfo {
+                internal_tok: Token::BeginGeneric,
+                ..
+            } = next_tok
+            {
+                tokens.next();
+                loop {
+                    generics.push(parse_type(&mut tokens));
+                    let next_tok = tokens.next().unwrap();
+                    if let TokenWithDebugInfo {
+                        internal_tok: Token::Operator(Operator::GreaterThan),
+                        ..
+                    } = next_tok
+                    {
+                        break;
+                    } else if let TokenWithDebugInfo {
+                        internal_tok: Token::Comma,
+                        ..
+                    } = next_tok
+                    {
+                        continue;
+                    } else {
+                        error_unexpected_token("comma or '>'", &next_tok);
+                    }
+                }
 
-				next_tok = tokens.clone().next().unwrap();
+                next_tok = tokens.clone().next().unwrap();
 
-				if !matches!(next_tok.internal_tok, Token::LParen) & 
-					!matches!(next_tok.internal_tok, Token::LBrace) {
-					error_unexpected_token("function call '(' ( fn_id:<T1, T2, ..>(args) )", &next_tok);
-				}
-			}
+                if !matches!(next_tok.internal_tok, Token::LParen)
+                    & !matches!(next_tok.internal_tok, Token::LBrace)
+                {
+                    error_unexpected_token(
+                        "function call '(' ( fn_id:<T1, T2, ..>(args) )",
+                        &next_tok,
+                    );
+                }
+            }
 
             if let TokenWithDebugInfo {
                 internal_tok: Token::LParen,
-                ..
+                line,
+                file,
             } = next_tok
             {
                 // Function call
@@ -619,10 +725,23 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Typed<Atom> {
                         args.push(Typed::new(parse_expression(&mut tokens)));
                     }
                 }
-                return Typed::new(Atom::FunctionCall(s.to_string(), args, generics));
+                return Typed::new(TokenWithDebugInfo {
+                    internal_tok: Atom::FunctionCall(
+                        TokenWithDebugInfo {
+                            internal_tok: s.to_string(),
+                            line: *id_line,
+                            file: id_file.clone(),
+                        },
+                        args,
+                        generics,
+                    ),
+                    line: line.clone(),
+                    file: file.clone(),
+                });
             } else if let TokenWithDebugInfo {
                 internal_tok: Token::LBrace,
-                ..
+                line,
+                file,
             } = next_tok
             {
                 // Struct instance
@@ -647,31 +766,59 @@ fn parse_atom(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Typed<Atom> {
                         fields.push(Typed::new(parse_expression(&mut tokens)));
                     }
                 }
-                return Typed::new(Atom::StructInstance(s.to_string(), fields, generics));
+                return Typed::new(TokenWithDebugInfo {
+                    internal_tok: Atom::StructInstance(
+                        TokenWithDebugInfo {
+                            internal_tok: s.to_string(),
+                            line: *id_line,
+                            file: id_file.clone(),
+                        },
+                        fields,
+                        generics,
+                    ),
+                    line: line.clone(),
+                    file: file.clone(),
+                });
             }
 
             // Variable
-            return Typed::new(Atom::Variable(s.to_string()));
+            return Typed::new(TokenWithDebugInfo {
+                internal_tok: Atom::Variable(TokenWithDebugInfo {
+                    internal_tok: s.to_string(),
+                    line: *id_line,
+                    file: id_file.clone(),
+                }),
+                line: id_line.clone(),
+                file: id_file.clone(),
+            });
         }
         _ => error_unexpected_token("valid atom token", &tok),
     }
 }
 
-fn parse_assignment_identifier(mut tokens: &mut Iter<TokenWithDebugInfo>) -> AssignmentIdentifier {
+fn parse_assignment_identifier(
+    mut tokens: &mut Iter<TokenWithDebugInfo<Token>>,
+) -> TokenWithDebugInfo<AssignmentIdentifier> {
     let tok = tokens.next().unwrap();
 
     match tok {
         TokenWithDebugInfo {
             internal_tok: Token::Operator(Operator::Multiply),
-            ..
+            line,
+            file,
         } => {
-            return AssignmentIdentifier::Dereference(Box::new(Typed::new(
-                parse_assignment_identifier(&mut tokens),
-            )));
+            return TokenWithDebugInfo {
+                internal_tok: AssignmentIdentifier::Dereference(Box::new(Typed::new(
+                    parse_assignment_identifier(&mut tokens),
+                ))),
+                line: line.clone(),
+                file: file.clone(),
+            };
         }
         TokenWithDebugInfo {
             internal_tok: Token::Identifier(s),
-            ..
+            line: id_line,
+            file: id_file,
         } => {
             let next_tok = tokens.clone().next().unwrap();
             if let TokenWithDebugInfo {
@@ -701,15 +848,34 @@ fn parse_assignment_identifier(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Ass
                         args.push(Typed::new(parse_expression(&mut tokens)));
                     }
                 }
-                return AssignmentIdentifier::Array(s.to_string(), args);
+                return TokenWithDebugInfo {
+                    internal_tok: AssignmentIdentifier::Array(
+                        TokenWithDebugInfo {
+                            internal_tok: s.to_string(),
+                            line: id_line.clone(),
+                            file: id_file.clone(),
+                        },
+                        args,
+                    ),
+                    line: id_line.clone(),
+                    file: id_file.clone(),
+                };
             }
-            return AssignmentIdentifier::Variable(s.to_string());
+            return TokenWithDebugInfo {
+                internal_tok: AssignmentIdentifier::Variable(TokenWithDebugInfo {
+                    internal_tok: s.to_string(),
+                    line: id_line.clone(),
+                    file: id_file.clone(),
+                }),
+                line: id_line.clone(),
+                file: id_file.clone(),
+            };
         }
         _ => error_unexpected_token("valid assignment identifier", &tok),
     }
 }
 
-fn parse_reassignment_identifier(expr: Expression) -> ReassignmentIdentifier {
+fn parse_reassignment_identifier(expr: Expression) -> TokenWithDebugInfo<ReassignmentIdentifier> {
     // pub enum ReassignmentIdentifier {
     // 	Variable(String),
     // 	Dereference(Box<Expression>),
@@ -719,14 +885,42 @@ fn parse_reassignment_identifier(expr: Expression) -> ReassignmentIdentifier {
 
     match expr {
         Expression::Atom(Typed {
-            expr: Atom::Variable(s),
+            expr:
+                TokenWithDebugInfo {
+                    internal_tok:
+                        Atom::Variable(TokenWithDebugInfo {
+                            internal_tok: s,
+                            line: line1,
+                            file: file1,
+                        }),
+                    line,
+                    file,
+                },
             ..
-        }) => ReassignmentIdentifier::Variable(s),
-        Expression::UnaryOp(expr, UnOp::Dereference) => ReassignmentIdentifier::Dereference(expr),
-        Expression::ArrayAccess(expr, args) => ReassignmentIdentifier::Array(expr, args),
-        Expression::BinaryOp(expr1, expr2, BinOp::MemberAccess) => {
-            ReassignmentIdentifier::MemberAccess(expr1, expr2)
-        }
+        }) => TokenWithDebugInfo {
+            internal_tok: ReassignmentIdentifier::Variable(TokenWithDebugInfo {
+                internal_tok: s,
+                line: line1.clone(),
+                file: file1.clone(),
+            }),
+            line: line.clone(),
+            file: file.clone(),
+        },
+        Expression::UnaryOp(exprs, UnOp::Dereference) => TokenWithDebugInfo {
+            internal_tok: ReassignmentIdentifier::Dereference(exprs.clone()),
+            line: exprs.clone().expr.line,
+            file: exprs.clone().expr.file,
+        },
+        Expression::ArrayAccess(expr, args) => TokenWithDebugInfo {
+            internal_tok: ReassignmentIdentifier::Array(expr.clone(), args),
+            line: expr.clone().expr.line,
+            file: expr.clone().expr.file,
+        },
+        Expression::BinaryOp(expr1, expr2, BinOp::MemberAccess) => TokenWithDebugInfo {
+            internal_tok: ReassignmentIdentifier::MemberAccess(expr1.clone(), expr2),
+            line: expr1.clone().expr.line,
+            file: expr1.clone().expr.file,
+        },
         _ => panic!("Invalid reassignment identifier. Only modifiable lvalues are allowed."),
     }
 }
@@ -736,8 +930,21 @@ fn find_arr_dims(array: &Atom) -> Option<Vec<i64>> {
         Atom::Array(sub_elements, dim) => {
             let mut dims: Vec<i64> = Vec::new();
 
-            for Typed { expr, .. } in sub_elements {
-                let Typed { expr: elem, .. } = match expr {
+            for Typed {
+                expr:
+                    TokenWithDebugInfo {
+                        internal_tok: expr, ..
+                    },
+                ..
+            } in sub_elements
+            {
+                let Typed {
+                    expr:
+                        TokenWithDebugInfo {
+                            internal_tok: elem, ..
+                        },
+                    ..
+                } = match expr {
                     Expression::Atom(atom) => atom,
                     _ => continue,
                 };
@@ -762,50 +969,95 @@ fn find_arr_dims(array: &Atom) -> Option<Vec<i64>> {
     }
 }
 
-fn rectangularize_array(array: &mut Vec<Typed<Expression>>, depth: usize, max_dims: &Vec<i64>) {
+fn rectangularize_array(
+    array: &mut Vec<Typed<TokenWithDebugInfo<Expression>>>,
+    depth: usize,
+    max_dims: &Vec<i64>,
+) {
     let max_size = max_dims[depth] as usize;
+    let (line, file) = if let Some(first_elem) = array.first() {
+        (first_elem.expr.line.clone(), first_elem.expr.file.clone())
+    } else {
+        (0, String::new())
+    };
     if depth + 1 < max_dims.len() {
         for Typed { expr: elem, .. } in array.iter_mut() {
             if let Expression::Atom(Typed {
-                expr: Atom::Array(ref mut sub_array, _),
+                expr:
+                    TokenWithDebugInfo {
+                        internal_tok: Atom::Array(ref mut sub_array, _),
+                        ..
+                    },
                 ..
-            }) = elem
+            }) = elem.internal_tok
             {
                 rectangularize_array(sub_array, depth + 1, max_dims);
             } else {
                 let mut new_elem = vec![Typed::new(elem.clone())];
+                let (line, file) = (elem.line.clone(), elem.file.clone());
                 rectangularize_array(&mut new_elem, depth + 1, max_dims);
-                *elem = Expression::Atom(Typed::new(Atom::Array(
-                    new_elem.clone(),
-                    new_elem.len() as i64,
-                )));
+                *elem = TokenWithDebugInfo {
+                    internal_tok: Expression::Atom(Typed::new(TokenWithDebugInfo {
+                        internal_tok: Atom::Array(new_elem.clone(), new_elem.len() as i64),
+                        line,
+                        file: file.clone(),
+                    })),
+                    line,
+                    file,
+                };
             }
         }
     }
 
     while array.len() < max_size {
         if depth == max_dims.len() - 1 {
-            array.push(Typed::new(Expression::Atom(Typed::new(Atom::Literal(
-                Typed::new(Literal::Int(0)),
-            )))));
+            array.push(Typed::new(TokenWithDebugInfo {
+                internal_tok: Expression::Atom(Typed::new(TokenWithDebugInfo {
+                    internal_tok: Atom::Literal(Typed::new(TokenWithDebugInfo {
+                        internal_tok: Literal::Int(0),
+                        line: line.clone(),
+                        file: file.clone(),
+                    })),
+                    line,
+                    file: file.clone(),
+                })),
+                line,
+                file: file.clone(),
+            }));
         } else {
             let mut new_elem = vec![];
             rectangularize_array(&mut new_elem, depth + 1, max_dims);
-            array.push(Typed::new(Expression::Atom(Typed::new(Atom::Array(
-                new_elem.clone(),
-                new_elem.len() as i64,
-            )))));
+            let (line, file) = if let Some(first_elem) = new_elem.first() {
+                (first_elem.expr.line.clone(), first_elem.expr.file.clone())
+            } else {
+                (0, String::new())
+            };
+            array.push(Typed::new(TokenWithDebugInfo {
+                internal_tok: Expression::Atom(Typed::new(TokenWithDebugInfo {
+                    internal_tok: Atom::Array(new_elem.clone(), new_elem.len() as i64),
+                    line,
+                    file: file.clone(),
+                })),
+                line,
+                file,
+            }));
         }
     }
 }
 
-fn flatten(array: &Vec<Typed<Expression>>) -> Vec<Typed<Expression>> {
+fn flatten(
+    array: &Vec<Typed<TokenWithDebugInfo<Expression>>>,
+) -> Vec<Typed<TokenWithDebugInfo<Expression>>> {
     let mut flat_arr = Vec::new();
     for Typed { expr: elem, .. } in array.iter() {
         if let Expression::Atom(Typed {
-            expr: Atom::Array(ref sub_array, _),
+            expr:
+                TokenWithDebugInfo {
+                    internal_tok: Atom::Array(ref sub_array, _),
+                    ..
+                },
             ..
-        }) = elem
+        }) = elem.internal_tok
         {
             flatten(sub_array);
             for sub_elem in sub_array.iter() {
@@ -818,8 +1070,10 @@ fn flatten(array: &Vec<Typed<Expression>>) -> Vec<Typed<Expression>> {
     return flat_arr;
 }
 
-fn parse_array(tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
+fn parse_array(tokens: &mut Iter<TokenWithDebugInfo<Token>>) -> TokenWithDebugInfo<Atom> {
     let mut elements = Vec::new();
+    let tmp_clone = tokens.clone().next().unwrap();
+    let (line, file) = (tmp_clone.line.clone(), tmp_clone.file.clone());
     loop {
         let next_tok = tokens.clone().next().unwrap();
         if let TokenWithDebugInfo {
@@ -846,18 +1100,28 @@ fn parse_array(tokens: &mut Iter<TokenWithDebugInfo>) -> Atom {
     rectangularize_array(&mut elements, 0, &max_dims);
     let flat_elements = flatten(&elements);
 
-    return Atom::Array(flat_elements, max_dims[0]);
+    TokenWithDebugInfo {
+        internal_tok: Atom::Array(flat_elements, max_dims[0]),
+        line,
+        file,
+    }
 }
 
 /// Recursively parses an expression, taking into account operator precedence.
 fn parse_expression_with_precedence(
-    mut tokens: &mut Iter<TokenWithDebugInfo>,
+    mut tokens: &mut Iter<TokenWithDebugInfo<Token>>,
     precedence_level: usize,
     precedence_table: &Vec<PrecedenceLevel>,
-) -> Expression {
+) -> TokenWithDebugInfo<Expression> {
     if precedence_level == 0 {
         // Parse the lowest precedence, like literals or atoms
-        return Expression::Atom(parse_atom(&mut tokens));
+        let atom = parse_atom(&mut tokens);
+        let (line, file) = (atom.expr.line.clone(), atom.expr.file.clone());
+        return TokenWithDebugInfo {
+            internal_tok: Expression::Atom(atom),
+            line,
+            file,
+        };
     }
 
     // Check if the current token is a unary operator for this precedence level
@@ -866,13 +1130,18 @@ fn parse_expression_with_precedence(
 
     if precedence_table[precedence_level]
         .unary_ops
-        .contains(&get_un_operator_from_token(&next))
+        .contains(&get_un_operator_from_token(&next).internal_tok)
     {
         let tok = tokens.next().unwrap();
+        let (line, file) = (tok.line.clone(), tok.file.clone());
         let op = get_un_operator_from_token(tok); // Get the unary operator
         let operand =
             parse_expression_with_precedence(&mut tokens, precedence_level, precedence_table); // Parse operand
-        expr = Expression::UnaryOp(Box::new(Typed::new(operand)), op); // Apply unary operator
+        expr = TokenWithDebugInfo {
+            internal_tok: Expression::UnaryOp(Box::new(Typed::new(operand)), op.internal_tok),
+            line,
+            file,
+        }; // Apply unary operator
     } else {
         // No unary operator, so parse the next lower precedence level
         expr =
@@ -883,7 +1152,8 @@ fn parse_expression_with_precedence(
     // Array access
     if let TokenWithDebugInfo {
         internal_tok: Token::LBracket,
-        ..
+        line,
+        file,
     } = next
     {
         tokens.next();
@@ -907,33 +1177,40 @@ fn parse_expression_with_precedence(
                 args.push(Typed::new(parse_expression(&mut tokens)));
             }
         }
-        expr = Expression::ArrayAccess(Box::new(Typed::new(expr)), args);
+        expr = TokenWithDebugInfo {
+            internal_tok: Expression::ArrayAccess(Box::new(Typed::new(expr)), args),
+            line: line.clone(),
+            file: file.clone(),
+        };
     }
 
     // Now handle binary and assignment operators for the current precedence level
     while precedence_table[precedence_level]
         .binary_ops
-        .contains(&get_bin_operator_from_tokens(tokens))
+        .contains(&get_bin_operator_from_tokens(tokens).internal_tok)
         || precedence_table[precedence_level]
             .assignment_ops
-            .contains(&get_assign_operator_from_tokens(tokens))
+            .contains(&get_assign_operator_from_tokens(tokens).internal_tok)
     {
         let op = get_bin_operator_from_tokens(tokens); // Get the binary operator
+        let (line, file) = (op.line.clone(), op.file.clone());
 
-        if op == BinOp::NotABinaryOp {
+        if op.internal_tok == BinOp::NotABinaryOp {
             // If it's not a binary operator, it must be an assignment operator
             let op = get_assign_operator_from_tokens(tokens); // Get the assignment operator
 
-			// Skip forward the appropriate number of tokens
-			match op {
-				AssignmentOp::RightShiftAssign => {
-					// This specific operator is made of three tokens
-					tokens.next();
-					tokens.next();
-					tokens.next();
-				}
-				_ => {tokens.next();}
-			}
+            // Skip forward the appropriate number of tokens
+            match op.internal_tok {
+                AssignmentOp::RightShiftAssign => {
+                    // This specific operator is made of three tokens
+                    tokens.next();
+                    tokens.next();
+                    tokens.next();
+                }
+                _ => {
+                    tokens.next();
+                }
+            }
 
             let next_term = parse_expression_with_precedence(
                 &mut tokens,
@@ -942,33 +1219,43 @@ fn parse_expression_with_precedence(
             ); // Parse next term
 
             // Re-parse the left hand side of the assignment expression
-            let assignment_identifier = parse_reassignment_identifier(expr);
-            expr = Expression::Assignment(
-                Typed::new(assignment_identifier),
-                Box::new(Typed::new(next_term)),
-                op,
-            );
+            let assignment_identifier = parse_reassignment_identifier(expr.internal_tok);
+            expr = TokenWithDebugInfo {
+                internal_tok: Expression::Assignment(
+                    Typed::new(assignment_identifier),
+                    Box::new(Typed::new(next_term)),
+                    op.internal_tok,
+                ),
+                line,
+                file,
+            };
         } else {
-			// Skip forward the appropriate number of tokens
-			match op {
-				BinOp::GreaterOrEqualThan | BinOp::RightShift => {
-					// There specific operators are made of two tokens
-					tokens.next();
-					tokens.next();
-				}
-				_ => {tokens.next();}
-			}
+            // Skip forward the appropriate number of tokens
+            match op.internal_tok {
+                BinOp::GreaterOrEqualThan | BinOp::RightShift => {
+                    // There specific operators are made of two tokens
+                    tokens.next();
+                    tokens.next();
+                }
+                _ => {
+                    tokens.next();
+                }
+            }
 
             let next_term = parse_expression_with_precedence(
                 &mut tokens,
                 precedence_level - 1,
                 precedence_table,
             ); // Parse next term
-            expr = Expression::BinaryOp(
-                Box::new(Typed::new(expr)),
-                Box::new(Typed::new(next_term)),
-                op,
-            );
+            expr = TokenWithDebugInfo {
+                internal_tok: Expression::BinaryOp(
+                    Box::new(Typed::new(expr)),
+                    Box::new(Typed::new(next_term)),
+                    op.internal_tok,
+                ),
+                line,
+                file,
+            };
         }
         next = tokens.clone().next().unwrap();
     }
@@ -976,12 +1263,20 @@ fn parse_expression_with_precedence(
     // Type cast
     if let TokenWithDebugInfo {
         internal_tok: Token::Colon,
-        ..
+        line,
+        file,
     } = next
     {
         tokens.next();
         let type_casted = parse_type(&mut tokens);
-        expr = Expression::TypeCast(Box::new(Typed::new(expr)), type_casted);
+        expr = TokenWithDebugInfo {
+            internal_tok: Expression::TypeCast(
+                Box::new(Typed::new(expr)),
+                type_casted,
+            ),
+            line: line.clone(),
+            file: file.clone(),
+        };
     }
 
     expr
@@ -1115,27 +1410,26 @@ fn build_precedence_table() -> Vec<PrecedenceLevel> {
     ]
 }
 
-fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Type {
+fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo<Token>>) -> TokenWithDebugInfo<Type> {
     let tok = tokens.next().unwrap();
+    let (line, file) = (tok.line.clone(), tok.file.clone());
 
-    match tok {
+    let t = match tok {
         TokenWithDebugInfo {
             internal_tok: Token::PrimitiveType(k),
             ..
-        } => {
-            if k == "int" {
-                return Type::Int;
-            } else if k == "float" {
-                return Type::Float;
-            } else if k == "bool" {
-                return Type::Bool;
-            } else if k == "void" {
-                return Type::Void;
-            } else if k == "char" {
-                return Type::Char;
-            } else if k == "str" {
-                return Type::Array(Box::new(Type::Char));
-            } else if k == "array" {
+        } => match k.as_str() {
+            "int" => Type::Int,
+            "float" => Type::Float,
+            "bool" => Type::Bool,
+            "void" => Type::Void,
+            "char" => Type::Char,
+            "str" => Type::Array(Box::new(TokenWithDebugInfo {
+                internal_tok: Type::Char,
+                line: line.clone(),
+                file: file.clone(),
+            })),
+            "array" => {
                 let next_tok = tokens.next().unwrap();
                 if !matches!(
                     next_tok,
@@ -1159,17 +1453,16 @@ fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Type {
                 ) {
                     error_unexpected_token("closing bracket", next_tok);
                 }
-                return Type::Array(Box::new(inner_type));
-            } else {
-                error_unexpected_token("valid type keyword", &tok);
+                Type::Array(Box::new(inner_type))
             }
-        }
+            _ => error_unexpected_token("valid type keyword", &tok),
+        },
         TokenWithDebugInfo {
             internal_tok: Token::Operator(Operator::Multiply),
             ..
         } => {
             let inner_type = parse_type(&mut tokens);
-            return Type::Pointer(Box::new(inner_type));
+            Type::Pointer(Box::new(inner_type))
         }
         TokenWithDebugInfo {
             internal_tok: Token::Identifier(id),
@@ -1186,38 +1479,44 @@ fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Type {
                 tokens.next();
                 Type::Namespace(id.to_string(), Box::new(parse_type(tokens)))
             } else if let TokenWithDebugInfo {
-				internal_tok: Token::BeginGeneric,
-				..
-			} = next_tok
-			{
-				// Generics bindings type:<T1, T2, ...>
-				tokens.next();
-				let mut generics = Vec::new();
-				loop {
-					generics.push(parse_type(&mut tokens));
-					let next_tok = tokens.next().unwrap();
-					if let TokenWithDebugInfo {
-						internal_tok: Token::Operator(Operator::GreaterThan),
-						..
-					} = next_tok
-					{
-						break;
-					} else if let TokenWithDebugInfo {
-						internal_tok: Token::Comma,
-						..
-					} = next_tok
-					{
-						continue;
-					} else {
-						error_unexpected_token("comma or '>'", &next_tok);
-					}
-				}
-				return Type::GenericBinding(id.to_string(), generics);
-			} else {
+                internal_tok: Token::BeginGeneric,
+                ..
+            } = next_tok
+            {
+                // Generics bindings type:<T1, T2, ...>
+                tokens.next();
+                let mut generics = Vec::new();
+                loop {
+                    generics.push(parse_type(&mut tokens));
+                    let next_tok = tokens.next().unwrap();
+                    if let TokenWithDebugInfo {
+                        internal_tok: Token::Operator(Operator::GreaterThan),
+                        ..
+                    } = next_tok
+                    {
+                        break;
+                    } else if let TokenWithDebugInfo {
+                        internal_tok: Token::Comma,
+                        ..
+                    } = next_tok
+                    {
+                        continue;
+                    } else {
+                        error_unexpected_token("comma or '>'", &next_tok);
+                    }
+                }
+                Type::GenericBinding(id.to_string(), generics)
+            } else {
                 Type::Struct(id.to_string())
             }
         }
         _ => error_unexpected_token("valid type token", &tok),
+    };
+
+    TokenWithDebugInfo {
+        internal_tok: t,
+        line,
+        file,
     }
 }
 
@@ -1227,7 +1526,9 @@ fn parse_type(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Type {
 /// It is used to parse the top-level expression.
 ///
 /// An expression is a combination of atoms and operators that evaluates to a value.
-fn parse_expression(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Expression {
+fn parse_expression(
+    mut tokens: &mut Iter<TokenWithDebugInfo<Token>>,
+) -> TokenWithDebugInfo<Expression> {
     let precedence_table = build_precedence_table();
     let max_precedence = precedence_table.len() - 1;
 
@@ -1238,8 +1539,9 @@ fn parse_expression(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Expression {
 ///
 /// A statement is a single instruction in the program.
 /// Statements can be assignments, let bindings, if statements, while loops, loops, do-while loops, for loops, return statements, expressions, compound statements, break statements, or continue statements.
-fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
+fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo<Token>>) -> TokenWithDebugInfo<Statement> {
     let tok = tokens.clone().next().unwrap();
+    let (line, file) = (tok.line.clone(), tok.file.clone());
     let statement;
 
     match tok {
@@ -1286,9 +1588,20 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
                 // if (exp) statement [else statement]
                 let exp = parse_expression(tokens);
                 let mut if_stmt = parse_statement(tokens);
+                let (line, file) = (if_stmt.line.clone(), if_stmt.file.clone());
 
-                if !matches!(if_stmt, Statement::Compound(_)) {
-                    if_stmt = Statement::Compound(vec![Typed::new(if_stmt)]);
+                if !matches!(
+                    if_stmt,
+                    TokenWithDebugInfo {
+                        internal_tok: Statement::Compound(_),
+                        ..
+                    }
+                ) {
+                    if_stmt = TokenWithDebugInfo {
+                        internal_tok: Statement::Compound(vec![Typed::new(if_stmt)]),
+                        line: line.clone(),
+                        file: file.clone(),
+                    };
                 }
 
                 let next_tok = tokens.clone().next().unwrap();
@@ -1300,9 +1613,20 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
                     if k == "else" {
                         tokens.next();
                         let mut else_stmt = parse_statement(tokens);
+                        let (line, file) = (else_stmt.line.clone(), else_stmt.file.clone());
 
-                        if !matches!(else_stmt, Statement::Compound(_)) {
-                            else_stmt = Statement::Compound(vec![Typed::new(else_stmt)]);
+                        if !matches!(
+                            else_stmt,
+                            TokenWithDebugInfo {
+                                internal_tok: Statement::Compound(_),
+                                ..
+                            }
+                        ) {
+                            else_stmt = TokenWithDebugInfo {
+                                internal_tok: Statement::Compound(vec![Typed::new(else_stmt)]),
+                                line: line.clone(),
+                                file: file.clone(),
+                            };
                         }
 
                         statement = Statement::If(
@@ -1321,19 +1645,39 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
                 // while (exp) statement
                 let exp = parse_expression(tokens);
                 let mut while_stmt = parse_statement(tokens);
+                let (line, file) = (while_stmt.line.clone(), while_stmt.file.clone());
 
-                if !matches!(while_stmt, Statement::Compound(_)) {
-                    while_stmt = Statement::Compound(vec![Typed::new(while_stmt)]);
+                if !matches!(
+                    while_stmt,
+                    TokenWithDebugInfo {
+                        internal_tok: Statement::Compound(_),
+                        ..
+                    }
+                ) {
+                    while_stmt = TokenWithDebugInfo {
+                        internal_tok: Statement::Compound(vec![Typed::new(while_stmt)]),
+                        line: line.clone(),
+                        file: file.clone(),
+                    };
                 }
 
                 statement = Statement::While(Typed::new(exp), Box::new(Typed::new(while_stmt)));
             } else if k == "loop" {
                 // loop statement
                 let mut loop_stmt = parse_statement(tokens);
+                let (line, file) = (loop_stmt.line.clone(), loop_stmt.file.clone());
 
-                if let Statement::Compound(_) = loop_stmt {
+                if let TokenWithDebugInfo {
+                    internal_tok: Statement::Compound(_),
+                    ..
+                } = loop_stmt
+                {
                 } else {
-                    loop_stmt = Statement::Compound(vec![Typed::new(loop_stmt)]);
+                    loop_stmt = TokenWithDebugInfo {
+                        internal_tok: Statement::Compound(vec![Typed::new(loop_stmt)]),
+                        line: line.clone(),
+                        file: file.clone(),
+                    };
                 }
 
                 statement = Statement::Loop(Box::new(Typed::new(loop_stmt)));
@@ -1383,9 +1727,20 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
                     error_unexpected_token("closing parenthesis", next_tok);
                 }
                 let mut for_stmt = parse_statement(tokens);
+                let (line, file) = (for_stmt.line.clone(), for_stmt.file.clone());
 
-                if !matches!(for_stmt, Statement::Compound(_)) {
-                    for_stmt = Statement::Compound(vec![Typed::new(for_stmt)]);
+                if !matches!(
+                    for_stmt,
+                    TokenWithDebugInfo {
+                        internal_tok: Statement::Compound(_),
+                        ..
+                    }
+                ) {
+                    for_stmt = TokenWithDebugInfo {
+                        internal_tok: Statement::Compound(vec![Typed::new(for_stmt)]),
+                        line: line.clone(),
+                        file: file.clone(),
+                    };
                 }
 
                 statement = Statement::For(
@@ -1397,9 +1752,20 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
             } else if k == "do" {
                 // do statement while (exp);
                 let mut do_stmt = parse_statement(tokens);
+                let (line, file) = (do_stmt.line.clone(), do_stmt.file.clone());
 
-                if !matches!(do_stmt, Statement::Compound(_)) {
-                    do_stmt = Statement::Compound(vec![Typed::new(do_stmt)]);
+                if !matches!(
+                    do_stmt,
+                    TokenWithDebugInfo {
+                        internal_tok: Statement::Compound(_),
+                        ..
+                    }
+                ) {
+                    do_stmt = TokenWithDebugInfo {
+                        internal_tok: Statement::Compound(vec![Typed::new(do_stmt)]),
+                        line: line.clone(),
+                        file: file.clone(),
+                    };
                 }
 
                 let next_tok = tokens.next().unwrap();
@@ -1425,6 +1791,7 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
             } else if k == "asm" {
                 let mut asm = String::new();
                 let next_tok = tokens.next().unwrap();
+                let (line, file) = (next_tok.line.clone(), next_tok.file.clone());
                 if let TokenWithDebugInfo {
                     internal_tok: Token::StringLiteral(s),
                     ..
@@ -1444,9 +1811,27 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
                 {
                     tokens.next();
                     let return_type = parse_type(tokens);
-                    statement = Statement::Asm(asm, return_type);
+                    statement = Statement::Asm(
+                        TokenWithDebugInfo {
+                            internal_tok: asm,
+                            line,
+                            file,
+                        },
+                        return_type,
+                    );
                 } else {
-                    statement = Statement::Asm(asm, Type::Void);
+                    statement = Statement::Asm(
+                        TokenWithDebugInfo {
+                            internal_tok: asm,
+                            line,
+                            file: file.clone(),
+                        },
+                        TokenWithDebugInfo {
+                            internal_tok: Type::Void,
+                            line,
+                            file,
+                        },
+                    );
                 }
             } else {
                 error_unexpected_token("valid keyword token", &tok);
@@ -1483,16 +1868,19 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
     }
 
     // Compound, If statements and loops don't need a semicolon
-    if let Statement::Compound(_) = statement {
-        return statement;
-    } else if let Statement::If(_, _, _) = statement {
-        return statement;
-    } else if let Statement::While(_, _) = statement {
-        return statement;
-    } else if let Statement::Loop(_) = statement {
-        return statement;
-    } else if let Statement::For(_, _, _, _) = statement {
-        return statement;
+    match statement {
+        Statement::Compound(_)
+        | Statement::If(_, _, _)
+        | Statement::While(_, _)
+        | Statement::Loop(_)
+        | Statement::For(_, _, _, _) => {
+            return TokenWithDebugInfo {
+                internal_tok: statement,
+                line,
+                file,
+            };
+        }
+        _ => {}
     }
 
     let tok = tokens.next().unwrap();
@@ -1507,24 +1895,30 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo>) -> Statement {
         error_unexpected_token("semicolon", tok);
     }
 
-    return statement;
+    return TokenWithDebugInfo {
+        internal_tok: statement,
+        line,
+        file,
+    };
 }
 
-fn parse_const(tokens: &mut Iter<TokenWithDebugInfo>) -> Constant {
+fn parse_const(tokens: &mut Iter<TokenWithDebugInfo<Token>>) -> TokenWithDebugInfo<Constant> {
     // const id: type = exp;
 
     let next_tok = tokens.next().unwrap();
+    let (line, file) = (next_tok.line.clone(), next_tok.file.clone());
 
     if &Token::Keyword("const".to_string()) != next_tok {
         error_unexpected_token("const keyword", next_tok);
     }
 
     let next_tok = tokens.next().unwrap();
-    let id = match next_tok {
+    let (id, id_line, id_file) = match next_tok {
         TokenWithDebugInfo {
             internal_tok: Token::Identifier(id),
-            ..
-        } => id.clone(),
+            line: id_line,
+            file: id_file,
+        } => (id.clone(), id_line, id_file),
         _ => error_unexpected_token("identifier", &next_tok),
     };
 
@@ -1556,13 +1950,28 @@ fn parse_const(tokens: &mut Iter<TokenWithDebugInfo>) -> Constant {
         error_unexpected_token("semicolon", next_tok);
     }
 
-    return Constant::Constant(id.to_string(), lit, var_type);
+    return TokenWithDebugInfo {
+        internal_tok: Constant::Constant(
+            TokenWithDebugInfo {
+                internal_tok: id,
+                line: id_line.clone(),
+                file: id_file.clone(),
+            },
+            lit,
+            var_type,
+        ),
+        line,
+        file,
+    };
 }
 
 /// Parses a function from a list of tokens.
 /// fn id(params): type statement
-fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
+fn parse_function(
+    mut tokens: &mut Iter<TokenWithDebugInfo<Token>>,
+) -> TokenWithDebugInfo<Function> {
     let tok = tokens.next().unwrap();
+    let (line, file) = (tok.line.clone(), tok.file.clone());
 
     match tok {
         TokenWithDebugInfo {
@@ -1580,8 +1989,13 @@ fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
     let id = match tok {
         TokenWithDebugInfo {
             internal_tok: Token::Identifier(id),
-            ..
-        } => id.clone(),
+            line,
+            file,
+        } => TokenWithDebugInfo {
+            internal_tok: id.clone(),
+            line: line.clone(),
+            file: file.clone(),
+        },
         TokenWithDebugInfo { .. } => error_unexpected_token("identifier", &tok),
     };
 
@@ -1598,10 +2012,15 @@ fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
             let abstract_type_tok = tokens.next().unwrap();
             if let TokenWithDebugInfo {
                 internal_tok: Token::Identifier(id),
-                ..
+                line,
+                file,
             } = abstract_type_tok
             {
-                abstract_types.push(id.clone());
+                abstract_types.push(TokenWithDebugInfo {
+                    internal_tok: id.clone(),
+                    line: line.clone(),
+                    file: file.clone(),
+                });
 
                 let tok = tokens.next().unwrap();
                 if let TokenWithDebugInfo {
@@ -1653,7 +2072,8 @@ fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
             continue;
         } else if let TokenWithDebugInfo {
             internal_tok: Token::Identifier(id),
-            ..
+            line,
+            file,
         } = tok
         {
             let tok = tokens.next().unwrap();
@@ -1666,7 +2086,14 @@ fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
             ) {
                 error_unexpected_token("colon", tok);
             }
-            params.push((id.clone(), parse_type(&mut tokens)));
+            params.push((
+                TokenWithDebugInfo {
+                    internal_tok: id.clone(),
+                    line: line.clone(),
+                    file: file.clone(),
+                },
+                parse_type(&mut tokens),
+            ));
         } else {
             error_unexpected_token("identifier or closing parenthesis", &tok);
         }
@@ -1686,32 +2113,42 @@ fn parse_function(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Function {
     let return_type = parse_type(&mut tokens);
 
     let mut statement = parse_statement(&mut tokens);
+    let (stm_line, stm_file) = (statement.line.clone(), statement.file.clone());
 
     // If the statement is not a compound statement, wrap it in one
     // This is to allow okay-ish scope handling
-    if let Statement::Compound(_) = statement {
+    if let Statement::Compound(_) = statement.internal_tok {
     } else {
-        statement = Statement::Compound(vec![Typed::new(statement)]);
+        statement = TokenWithDebugInfo {
+            internal_tok: Statement::Compound(vec![Typed::new(statement)]),
+            line: stm_line,
+            file: stm_file,
+        };
     }
 
-    return Function {
-        id: id,
-        args: params,
-        body: Typed::new(statement),
-        return_type: return_type,
-        generics: abstract_types,
+    return TokenWithDebugInfo {
+        internal_tok: Function {
+            id: id,
+            args: params,
+            body: Typed::new(statement),
+            return_type: return_type,
+            generics: abstract_types,
+        },
+        line,
+        file,
     };
 }
 
 #[derive(Debug, Clone)]
 pub struct Struct {
-    pub id: String,
-    pub members: Vec<(String, Type)>,
-	pub generics: Vec<String>,
+    pub id: TokenWithDebugInfo<String>,
+    pub members: Vec<(TokenWithDebugInfo<String>, TokenWithDebugInfo<Type>)>,
+    pub generics: Vec<TokenWithDebugInfo<String>>,
 }
 
-fn parse_struct(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Struct {
+fn parse_struct(mut tokens: &mut Iter<TokenWithDebugInfo<Token>>) -> TokenWithDebugInfo<Struct> {
     let tok = tokens.next().unwrap();
+    let (line, file) = (tok.line.clone(), tok.file.clone());
 
     if let TokenWithDebugInfo {
         internal_tok: Token::Keyword(ref k),
@@ -1729,49 +2166,59 @@ fn parse_struct(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Struct {
     let id = match tok {
         TokenWithDebugInfo {
             internal_tok: Token::Identifier(id),
-            ..
-        } => id.clone(),
+            line,
+            file,
+        } => TokenWithDebugInfo {
+            internal_tok: id.clone(),
+            line: line.clone(),
+            file: file.clone(),
+        },
         TokenWithDebugInfo { .. } => error_unexpected_token("identifier", &tok),
     };
 
     let mut tok = tokens.next().unwrap();
 
-	// Check if any abstract types are defined
-	// struct id:<type1, type2, ..> { members }
-	let mut abstract_types = Vec::new();
-	if let TokenWithDebugInfo {
-		internal_tok: Token::BeginGeneric,
-		..
-	} = tok
-	{
-		loop {
-			let abstract_type_tok = tokens.next().unwrap();
-			if let TokenWithDebugInfo {
-				internal_tok: Token::Identifier(id),
-				..
-			} = abstract_type_tok
-			{
-				abstract_types.push(id.clone());
-				let tok = tokens.next().unwrap();
-				if let TokenWithDebugInfo {
-					internal_tok: Token::Comma,
-					..
-				} = tok
-				{
-					continue;
-				} else if let TokenWithDebugInfo {
-					internal_tok: Token::Operator(Operator::GreaterThan),
-					..
-				} = tok
-				{
-					break;
-				} else {
-					error_unexpected_token("comma or closing angle bracket", &tok);
-				}
-			}
-		}
-		tok = tokens.next().unwrap();
-	}
+    // Check if any abstract types are defined
+    // struct id:<type1, type2, ..> { members }
+    let mut abstract_types = Vec::new();
+    if let TokenWithDebugInfo {
+        internal_tok: Token::BeginGeneric,
+        ..
+    } = tok
+    {
+        loop {
+            let abstract_type_tok = tokens.next().unwrap();
+            if let TokenWithDebugInfo {
+                internal_tok: Token::Identifier(id),
+                line,
+                file,
+            } = abstract_type_tok
+            {
+                abstract_types.push(TokenWithDebugInfo {
+                    internal_tok: id.clone(),
+                    line: line.clone(),
+                    file: file.clone(),
+                });
+                let tok = tokens.next().unwrap();
+                if let TokenWithDebugInfo {
+                    internal_tok: Token::Comma,
+                    ..
+                } = tok
+                {
+                    continue;
+                } else if let TokenWithDebugInfo {
+                    internal_tok: Token::Operator(Operator::GreaterThan),
+                    ..
+                } = tok
+                {
+                    break;
+                } else {
+                    error_unexpected_token("comma or closing angle bracket", &tok);
+                }
+            }
+        }
+        tok = tokens.next().unwrap();
+    }
 
     if !matches!(
         tok,
@@ -1802,7 +2249,8 @@ fn parse_struct(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Struct {
             continue;
         } else if let TokenWithDebugInfo {
             internal_tok: Token::Identifier(id),
-            ..
+            line,
+            file,
         } = tok
         {
             let tok = tokens.next().unwrap();
@@ -1815,23 +2263,39 @@ fn parse_struct(mut tokens: &mut Iter<TokenWithDebugInfo>) -> Struct {
             ) {
                 error_unexpected_token("colon", tok);
             }
-            members.push((id.clone(), parse_type(&mut tokens)));
+            members.push((
+                TokenWithDebugInfo {
+                    internal_tok: id.clone(),
+                    line: line.clone(),
+                    file: file.clone(),
+                },
+                parse_type(&mut tokens),
+            ));
         } else {
             error_unexpected_token("identifier or closing brace", &tok);
         }
     }
 
-    return Struct { id, members, generics: abstract_types };
+    return TokenWithDebugInfo {
+        internal_tok: Struct {
+            id,
+            members,
+            generics: abstract_types,
+        },
+        line,
+        file,
+    };
 }
 
 #[derive(Debug, Clone)]
 pub struct Enum {
-    pub id: String,
-    pub variants: Vec<String>,
+    pub id: TokenWithDebugInfo<String>,
+    pub variants: Vec<TokenWithDebugInfo<String>>,
 }
 
-fn parse_enum(tokens: &mut Iter<TokenWithDebugInfo>) -> Enum {
+fn parse_enum(tokens: &mut Iter<TokenWithDebugInfo<Token>>) -> TokenWithDebugInfo<Enum> {
     let tok = tokens.next().unwrap();
+    let (line, file) = (tok.line.clone(), tok.file.clone());
 
     if let TokenWithDebugInfo {
         internal_tok: Token::Keyword(ref k),
@@ -1849,8 +2313,13 @@ fn parse_enum(tokens: &mut Iter<TokenWithDebugInfo>) -> Enum {
     let id = match tok {
         TokenWithDebugInfo {
             internal_tok: Token::Identifier(id),
-            ..
-        } => id.clone(),
+            line,
+            file,
+        } => TokenWithDebugInfo {
+            internal_tok: id.clone(),
+            line: line.clone(),
+            file: file.clone(),
+        },
         TokenWithDebugInfo { .. } => error_unexpected_token("identifier", &tok),
     };
 
@@ -1872,10 +2341,15 @@ fn parse_enum(tokens: &mut Iter<TokenWithDebugInfo>) -> Enum {
 
         if let TokenWithDebugInfo {
             internal_tok: Token::Identifier(id),
-            ..
+            line,
+            file,
         } = tok
         {
-            variants.push(id.clone());
+            variants.push(TokenWithDebugInfo {
+                internal_tok: id.clone(),
+                line: line.clone(),
+                file: file.clone(),
+            });
             let next_tok = tokens.next().unwrap();
 
             if let TokenWithDebugInfo {
@@ -1898,12 +2372,23 @@ fn parse_enum(tokens: &mut Iter<TokenWithDebugInfo>) -> Enum {
         }
     }
 
-    return Enum { id, variants };
+    TokenWithDebugInfo {
+        internal_tok: Enum { id, variants },
+        line,
+        file,
+    }
 }
 
 /// Parses an abstract syntax tree (AST) from a list of tokens.
-pub fn parse_namespace(tokens: &mut Iter<TokenWithDebugInfo>, is_toplevel: bool) -> Namespace {
+pub fn parse_namespace(
+    tokens: &mut Iter<TokenWithDebugInfo<Token>>,
+    is_toplevel: bool,
+) -> TokenWithDebugInfo<Namespace> {
     let id;
+
+    let tmp_clone = tokens.clone().next().unwrap();
+    let (line, file) = (tmp_clone.line.clone(), tmp_clone.file.clone());
+
     if !is_toplevel {
         let tok = tokens.next().unwrap();
         if let TokenWithDebugInfo {
@@ -2010,17 +2495,21 @@ pub fn parse_namespace(tokens: &mut Iter<TokenWithDebugInfo>, is_toplevel: bool)
         }
     }
 
-    Namespace {
-        id,
-        functions,
-        constants,
-        structs,
-        enums,
-        sub_namespaces,
+    TokenWithDebugInfo {
+        internal_tok: Namespace {
+            id,
+            functions,
+            constants,
+            structs,
+            enums,
+            sub_namespaces,
+        },
+        line,
+        file,
     }
 }
 
-pub fn parse(tokens: &Vec<TokenWithDebugInfo>) -> Ast {
+pub fn parse(tokens: &Vec<TokenWithDebugInfo<Token>>) -> Ast {
     let mut tokens = tokens.iter();
     let program = parse_namespace(&mut tokens, true);
 

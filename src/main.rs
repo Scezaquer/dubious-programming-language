@@ -10,6 +10,8 @@ mod ast_pretty_print;
 mod logic_checker;
 /// Code generator: Turns the AST into x86_64 assembly code.
 mod code_generator;
+// Shared: Contains shared types and functions used across the compiler.
+mod shared;
 
 use preprocessor::preprocessor;
 use ast_build::parse;

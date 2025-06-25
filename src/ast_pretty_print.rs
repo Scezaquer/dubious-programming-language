@@ -1,6 +1,7 @@
 use crate::ast_build::{
-	AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Namespace, ReassignmentIdentifier, Statement, Type, UnOp, Typed
+	AssignmentIdentifier, AssignmentOp, Ast, Atom, BinOp, Constant, Expression, Function, Namespace, ReassignmentIdentifier, Statement, UnOp
 };
+use crate::shared::{TokenWithDebugInfo, Type, Typed};
 
 impl std::fmt::Display for Ast {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -11,6 +12,12 @@ impl std::fmt::Display for Ast {
 impl<T: std::fmt::Display> std::fmt::Display for Typed<T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{}", self.expr)
+	}
+}
+
+impl<T: std::fmt::Display> std::fmt::Display for TokenWithDebugInfo<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.internal_tok)
 	}
 }
 

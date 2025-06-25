@@ -1,5 +1,6 @@
 use regex::Regex;
 use std::i64;
+use crate::shared::TokenWithDebugInfo;
 
 /// All the operators that the lexer can recognize.
 ///
@@ -91,17 +92,8 @@ pub enum Token {
     EOF
 }
 
-/// A token with extra debug information to print more useful error messages.
-#[derive(Debug)]
-#[derive(PartialEq, Clone)]
-pub struct TokenWithDebugInfo {
-	pub internal_tok: Token,
-	pub line: usize,
-	pub file: String
-}
-
-impl TokenWithDebugInfo {
-	pub fn new(internal_tok: Token, line: usize, file: String) -> TokenWithDebugInfo {
+impl TokenWithDebugInfo<Token> {
+	pub fn new(internal_tok: Token, line: usize, file: String) -> TokenWithDebugInfo<Token> {
 		TokenWithDebugInfo {
 			internal_tok,
 			line,
@@ -110,8 +102,8 @@ impl TokenWithDebugInfo {
 	}
 }
 
-impl PartialEq<TokenWithDebugInfo> for Token {
-	fn eq(&self, other: &TokenWithDebugInfo) -> bool {
+impl PartialEq<TokenWithDebugInfo<Token>> for Token {
+	fn eq(&self, other: &TokenWithDebugInfo<Token>) -> bool {
 		self == &other.internal_tok
 	}
 }
@@ -171,8 +163,8 @@ fn process_escape_sequence(s: &str) -> String {
 /// 
 /// The lex function has a time complexity of O(n), where n is the length of the input file.
 /// The lex function has a space complexity of O(n), where n is the length of the input file.
-pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
-    let mut tokens : Vec<TokenWithDebugInfo> = Vec::new();
+pub fn lex(file: &str) -> Vec<TokenWithDebugInfo<Token>> {
+    let mut tokens : Vec<TokenWithDebugInfo<Token>> = Vec::new();
 
     // Identifiers can start with a letter or an underscore, followed by any
     // number of letters, numbers, or underscores
@@ -367,10 +359,10 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo> {
             panic!("Unexpected character: {}", rest.chars().next().unwrap());
         }
 
-		tokens.push(TokenWithDebugInfo::new(tok, line_hashmap[&current_file], current_file.clone()));
+		tokens.push(TokenWithDebugInfo::<Token>::new(tok, line_hashmap[&current_file], current_file.clone()));
     }
 
-    tokens.push(TokenWithDebugInfo::new(Token::EOF, line_hashmap[&current_file], current_file.clone()));
+    tokens.push(TokenWithDebugInfo::<Token>::new(Token::EOF, line_hashmap[&current_file], current_file.clone()));
 
     return tokens;
 }
