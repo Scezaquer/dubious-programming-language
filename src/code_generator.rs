@@ -993,7 +993,13 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<TokenWithD
                     writeln!(file, "    jne {}", start_label).unwrap();
                     writeln!(file, "{}:", end_label).unwrap();
                 }
-                Typed{expr: TokenWithDebugInfo{internal_tok: Statement::For(init, condition, update, statement), ..}, ..} => {
+                Typed{expr: TokenWithDebugInfo{internal_tok: Statement::For(_, condition, update, statement), ..}, ..} => {
+					// We ignore the loop initialization on purpose as statements such as
+					// `for (let i: int = 0; i < 10; i = i+1)`
+					// are replaced by
+					// `let i: int = 0; for (; i < 10; i = i+1)`
+					// In the ast building stage.
+
                     let loop_label = LOOP_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     let start_label = format!(".for_start_{}", loop_label);
                     let end_label = format!(".for_end_{}", loop_label);
@@ -1002,7 +1008,6 @@ fn generate_compound_statement(file: &mut File, cmp_statement: &Typed<TokenWithD
                     context.break_label = Some(end_label.clone());
 
                     writeln!(file, "    ;for statement").unwrap();
-                    generate_expression(file, init, &mut context);
                     writeln!(file, "{}:", start_label).unwrap();
                     generate_expression(file, condition, &mut context);
                     writeln!(file, "    cmp rax, 0").unwrap();

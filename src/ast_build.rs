@@ -393,7 +393,7 @@ pub enum Statement {
         Box<Typed<TokenWithDebugInfo<Statement>>>,
     ),
     For(
-        Typed<TokenWithDebugInfo<Expression>>,
+        Box<Typed<TokenWithDebugInfo<Statement>>>,
         Typed<TokenWithDebugInfo<Expression>>,
         Typed<TokenWithDebugInfo<Expression>>,
         Box<Typed<TokenWithDebugInfo<Statement>>>,
@@ -1682,7 +1682,7 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo<Token>>) -> TokenWithDeb
 
                 statement = Statement::Loop(Box::new(Typed::new(loop_stmt)));
             } else if k == "for" {
-                // for (exp; exp; exp) statement
+                // for (statement; exp; exp) statement
                 let next_tok = tokens.next().unwrap(); // Skip opening parenthesis
                 if !matches!(
                     next_tok,
@@ -1693,17 +1693,7 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo<Token>>) -> TokenWithDeb
                 ) {
                     error_unexpected_token("opening parenthesis", next_tok);
                 }
-                let init = parse_expression(tokens);
-                let next_tok = tokens.next().unwrap(); // Skip semicolon
-                if !matches!(
-                    next_tok,
-                    TokenWithDebugInfo {
-                        internal_tok: Token::Semicolon,
-                        ..
-                    }
-                ) {
-                    error_unexpected_token("semicolon", next_tok);
-                }
+                let init = parse_statement(tokens);
                 let cond = parse_expression(tokens);
                 let next_tok = tokens.next().unwrap(); // Skip semicolon
                 if !matches!(
@@ -1744,7 +1734,7 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo<Token>>) -> TokenWithDeb
                 }
 
                 statement = Statement::For(
-                    Typed::new(init),
+                    Box::new(Typed::new(init)),
                     Typed::new(cond),
                     Typed::new(step),
                     Box::new(Typed::new(for_stmt)),
@@ -1855,7 +1845,11 @@ fn parse_statement(tokens: &mut Iter<TokenWithDebugInfo<Token>>) -> TokenWithDeb
                     tokens.next();
                     break;
                 } else {
-                    statements.push(Typed::new(parse_statement(tokens)));
+					let new_statement = parse_statement(tokens);
+					if let TokenWithDebugInfo{ internal_tok: Statement::For(init, ..), ..} = &new_statement {
+						statements.push(*init.clone());
+					}
+                    statements.push(Typed::new(new_statement));
                 }
             }
 

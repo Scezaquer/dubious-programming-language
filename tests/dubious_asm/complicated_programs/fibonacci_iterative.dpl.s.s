@@ -62,9 +62,9 @@ main:
     sub [rbp-8], rax
     push 0
     push 0
-    ;for statement
     mov rax, 0
     mov [rbp-40], rax
+    ;for statement
 .for_start_0:
     mov rax, [rbp-8]
     push rax

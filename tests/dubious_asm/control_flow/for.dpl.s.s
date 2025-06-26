@@ -16,9 +16,9 @@ main:
     push 0
     mov rax, 0
     push rax
-    ;for statement
     mov rax, 0
     mov [rbp-8], rax
+    ;for statement
 .for_start_0:
     mov rax, 10
     push rax

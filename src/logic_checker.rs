@@ -1485,10 +1485,7 @@ fn check_if_struct_or_enum(
                     file,
                 }
             } else {
-				error(
-					format!("Generic struct '{}' not in scope", id).as_str(),
-					&t,
-				);
+                error(format!("Generic struct '{}' not in scope", id).as_str(), &t);
             }
         }
     }
@@ -1567,7 +1564,14 @@ fn type_statement(
                 type_: condition_type,
             } = type_expression(fn_array, condition.expr.clone(), context);
             if condition_type != Type::Bool {
-				error(format!("Condition in if statement is not a boolean: '{}'", condition_type).as_str(), &condition.expr);
+                error(
+                    format!(
+                        "Condition in if statement is not a boolean: '{}'",
+                        condition_type
+                    )
+                    .as_str(),
+                    &condition.expr,
+                );
             }
             let Typed {
                 expr: new_if_body,
@@ -1579,7 +1583,14 @@ fn type_statement(
                     type_: else_body_type,
                 } = type_statement(fn_array, &else_body.expr, context);
                 if if_body_type != else_body_type {
-					error(format!("If and else branches have different types: '{}' and '{}'", if_body_type, else_body_type).as_str(), &if_body.expr);
+                    error(
+                        format!(
+                            "If and else branches have different types: '{}' and '{}'",
+                            if_body_type, else_body_type
+                        )
+                        .as_str(),
+                        &if_body.expr,
+                    );
                 }
                 return Typed {
                     expr: TokenWithDebugInfo {
@@ -1628,10 +1639,14 @@ fn type_statement(
                 type_: condition_type,
             } = type_expression(fn_array, condition.expr.clone(), context);
             if condition_type != Type::Bool {
-				error(
-					format!("Condition in while statement is not a boolean: '{}'", condition_type).as_str(),
-					&condition.expr,
-				);
+                error(
+                    format!(
+                        "Condition in while statement is not a boolean: '{}'",
+                        condition_type
+                    )
+                    .as_str(),
+                    &condition.expr,
+                );
             }
             let Typed {
                 expr: new_body,
@@ -1655,18 +1670,26 @@ fn type_statement(
                 type_: body_type,
             };
         }
-        Statement::For(init, condition, increment, body) => {
-            let Typed {
-                expr: new_init,
-                type_: init_type,
-            } = type_expression(fn_array, init.expr, context);
+        Statement::For(_, condition, increment, body) => {
+            // We ignore the loop initialization on purpose as statements such as
+            // `for (let i: int = 0; i < 10; i = i+1)`
+            // are replaced by
+            // `let i: int = 0; for (; i < 10; i = i+1)`
+            // In the ast building stage.
 
             let Typed {
                 expr: new_condition,
                 type_: condition_type,
             } = type_expression(fn_array, condition.expr.clone(), context);
             if condition_type != Type::Bool {
-				error(format!("Condition in for statement is not a boolean: '{}'", condition_type).as_str(), &condition.expr);
+                error(
+                    format!(
+                        "Condition in for statement is not a boolean: '{}'",
+                        condition_type
+                    )
+                    .as_str(),
+                    &condition.expr,
+                );
             }
             let Typed {
                 expr: new_increment,
@@ -1679,10 +1702,14 @@ fn type_statement(
             return Typed {
                 expr: TokenWithDebugInfo {
                     internal_tok: Statement::For(
-                        Typed {
-                            expr: new_init,
-                            type_: init_type,
-                        },
+                        Box::new(Typed {
+                            expr: TokenWithDebugInfo {
+                                internal_tok: Statement::Break, // Placeholder
+                                line: 0,
+                                file: "".to_string(),
+                            },
+                            type_: Type::Void,
+                        }),
                         Typed {
                             expr: new_condition,
                             type_: condition_type,
@@ -1784,7 +1811,14 @@ fn type_statement(
                             var_type = *t;
                             id = inner.expr;
                         } else {
-							error(format!("Dereferencing a non-pointer type: '{}'", var_type.internal_tok).as_str(), &id);
+                            error(
+                                format!(
+                                    "Dereferencing a non-pointer type: '{}'",
+                                    var_type.internal_tok
+                                )
+                                .as_str(),
+                                &id,
+                            );
                         }
                     } else {
                         flag = false;
@@ -1794,10 +1828,14 @@ fn type_statement(
                 let var_type = &check_if_struct_or_enum(context, var_type);
 
                 if var_type.internal_tok != expr_type {
-					error(format!(
-						"Variable type ('{}') does not match expression type ('{}')",
-						var_type.internal_tok, expr_type
-					).as_str(), &expr.expr);
+                    error(
+                        format!(
+                            "Variable type ('{}') does not match expression type ('{}')",
+                            var_type.internal_tok, expr_type
+                        )
+                        .as_str(),
+                        &expr.expr,
+                    );
                 }
                 return Typed {
                     expr: TokenWithDebugInfo {
@@ -1859,7 +1897,14 @@ fn type_statement(
                 type_: expr_type,
             } = type_expression(fn_array, condition.expr.clone(), context);
             if expr_type != Type::Bool {
-				error(format!("Condition in do while statement is not a boolean: '{}'", expr_type).as_str(), &condition.expr);
+                error(
+                    format!(
+                        "Condition in do while statement is not a boolean: '{}'",
+                        expr_type
+                    )
+                    .as_str(),
+                    &condition.expr,
+                );
             }
             let Typed {
                 expr: new_body,
@@ -2406,8 +2451,8 @@ pub fn check_program(ast: &Ast) -> Ast {
     }
 
     if !main_found {
-		error("Main function not found. Please define a function named 'main' that returns an integer.", &ast.program);
-	}
+        error("Main function not found. Please define a function named 'main' that returns an integer.", &ast.program);
+    }
 
     // We do a pre-parsing pass to get all functions, structs, enums and constants
     // This lets us use functions, structs and enums before they are declared

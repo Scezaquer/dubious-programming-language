@@ -7,6 +7,8 @@ A simple compiler for the Dubious programming language (DPL).
 ### Priority features
 
 - TODO: fix problem where structs in function prototypes don't get the path added during typechecking
+- TODO: Allow vars to be declared inside for loop thing (for (let i: int = 0; i < 10; i = i + 1))
+- TODO: Let arr.len give the length of an array as int (instead of having to do arr[-1]: int)
 - TODO: heap memory stuff
 - TODO: std library
 - TODO: Wiki
@@ -85,19 +87,21 @@ Uninitialized variables default to 0.
 
 ++ and -- are NOT assignment operators (i.e. `++a` will evaluate to `a+1` but the value of `a` will be unchanged).
 
-For loop iterator variables can't be declared inside the loop itself they have to be declared before. i.e.
+For loop iterator variables can be declared inside the loop itself they have to be declared before. i.e.
 ```
 for (let i: int = 0; i < 10; i += 1){
 	...
 }
 ```
-isn't legal syntax and should be replaced by
+is legal syntax. Strictly speaking it is equivalent to
 ```
-let i: int;
-for (i = 0; i < 10; i += 1){
+let i: int = 0;
+for (0; i < 10; i += 1){
 	...
 }
 ```
+Therefore `i` remains accessible after the loop.
+
 Furthermore all 3 fields have to contain an expression, although the expression may have no side effects, i.e
 ```
 for (;;){

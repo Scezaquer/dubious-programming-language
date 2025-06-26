@@ -47,9 +47,9 @@ main:
     mov rax, 0
     push rax
     push 0
-    ;for statement
     mov rax, 0
     mov [rbp-16], rax
+    ;for statement
 .for_start_0:
     mov rax, [rbp+24]
     push rax

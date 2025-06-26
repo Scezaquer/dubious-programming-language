@@ -399,6 +399,13 @@
 		"output": 30
 	},
 	{
+		"name": "for_iterator_declared_in_loop",
+		"description": "For loop with iterator declared in the loop",
+		"filename": "control_flow/for_iterator_declared_in_loop.dpl",
+		"input": [],
+		"output": 30
+	},
+	{
 		"name": "dowhile",
 		"description": "Do while loop",
 		"filename": "control_flow/dowhile.dpl",

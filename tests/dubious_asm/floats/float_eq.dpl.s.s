@@ -71,7 +71,7 @@ main:
 
 section .data
 	.float.0: dq 0.0
-	.float.2: dq 0.0
 	.float.1: dq 0.1
+	.float.2: dq 0.0
 	.float.3: dq 0.0
 	mxcsr_val dd 0
