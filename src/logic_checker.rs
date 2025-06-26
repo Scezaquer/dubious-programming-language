@@ -650,6 +650,66 @@ fn type_member_access(
         } else {
             error("Member access must be on a variable", &rhs);
         }
+    } else if let Type::Array(_) = lhs_type.clone() {
+        if let Expression::Atom(Typed {
+            expr:
+                TokenWithDebugInfo {
+                    internal_tok: Atom::Variable(attribute),
+                    line,
+                    file,
+                },
+            ..
+        }) = rhs.internal_tok.clone()
+        {
+            if attribute.internal_tok.eq("len") {
+                return Typed {
+                    expr: TokenWithDebugInfo {
+                        internal_tok: Expression::ArrayAccess(
+                            Box::new(Typed {
+                                expr: lhs_expr,
+                                type_: lhs_type,
+                            }),
+                            vec![Typed {
+                                expr: TokenWithDebugInfo {
+                                    internal_tok: Expression::Atom(Typed {
+                                        expr: TokenWithDebugInfo {
+                                            internal_tok: Atom::Literal(Typed {
+                                                expr: TokenWithDebugInfo {
+                                                    internal_tok: Literal::Int(-1),
+                                                    line,
+                                                    file: file.clone(),
+                                                },
+                                                type_: Type::Int,
+                                            }),
+                                            line,
+                                            file: file.clone(),
+                                        },
+                                        type_: Type::Int,
+                                    }),
+                                    line,
+                                    file: file.clone(),
+                                },
+                                type_: Type::Int,
+                            }],
+                        ),
+                        line,
+                        file: file.clone(),
+                    },
+                    type_: Type::Int,
+                };
+            } else {
+                error(
+                    format!(
+                        "Array '{}' does not have member '{}'. Did you mean '.len'?",
+                        lhs, rhs
+                    )
+                    .as_str(),
+                    &rhs,
+                );
+            }
+        } else {
+            error("Member access must be on a variable", &rhs);
+        }
     } else {
         error(
             format!(

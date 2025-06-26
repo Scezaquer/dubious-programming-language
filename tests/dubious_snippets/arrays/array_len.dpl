@@ -1,4 +1,4 @@
-fn main(): int {
-	let arr[3]: array[int] = [4, 5, 6];
-	return arr[-1];
+fn main(): int{
+	let arr: array[float] = [1.0, 2.0, 3.0, 4.0, 5.0];
+	return arr.len;
 }

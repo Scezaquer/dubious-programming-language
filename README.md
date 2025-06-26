@@ -7,8 +7,6 @@ A simple compiler for the Dubious programming language (DPL).
 ### Priority features
 
 - TODO: fix problem where structs in function prototypes don't get the path added during typechecking
-- TODO: Allow vars to be declared inside for loop thing (for (let i: int = 0; i < 10; i = i + 1))
-- TODO: Let arr.len give the length of an array as int (instead of having to do arr[-1]: int)
 - TODO: heap memory stuff
 - TODO: std library
 - TODO: Wiki

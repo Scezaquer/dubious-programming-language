@@ -571,6 +571,13 @@
 		"description": "Length of an array",
 		"filename": "arrays/array_len.dpl",
 		"input": [],
+		"output": 5
+	},
+	{
+		"name": "array_len_old",
+		"description": "Old way of getting the length of an array",
+		"filename": "arrays/array_len_old.dpl",
+		"input": [],
 		"output": 3
 	},
 	{
