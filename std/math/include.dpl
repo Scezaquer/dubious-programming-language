@@ -6,3 +6,4 @@
 #include <combinatorics.dpl>
 #include <exp.dpl>
 #include <trig.dpl>
+#include <arrays.dpl>

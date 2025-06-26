@@ -6,9 +6,6 @@ fn exception(e: str, error_code: int): int {
 	io::print("Exception: ");
 	io::println(e);
 
-	// TODO: This exits with the wrong code, it actually outputs the length of e
-	// because error_code points to the wrong place in memory
-
 	error_code;
 	asm "	mov rdi, rax
 	mov rax, 60

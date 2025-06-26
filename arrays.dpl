@@ -1,0 +1,16 @@
+#include <std>
+
+fn main(): int{
+
+	let arri: array[int] = [1, 2, 3, 4, 5];
+	let arrf: array[float] = [1.0, 2.0, 3.0, 4.0, 5.0];
+
+	std::io::printiln(std::math::maxi(arri));
+	std::io::printiln(std::math::mini(arri));
+	std::io::printiln(std::math::sumi(arri));
+	std::io::printfln(std::math::maxf(arrf));
+	std::io::printfln(std::math::minf(arrf));
+	std::io::printfln(std::math::sumf(arrf));
+
+	return 0;
+}

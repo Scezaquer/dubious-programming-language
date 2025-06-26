@@ -2,6 +2,7 @@
 
 #include <io>
 #include <math>
+#include <random>
 // #include <mem>
 #include <string.dpl>
 #include <exception.dpl>

@@ -78,6 +78,8 @@ pub fn preprocessor(file: &str, filename: &str, include_path: HashSet<String>, m
 	let mut line = 1;
 	let mut namespace_counter = 0;
 
+	let chars = file.chars().collect::<Vec<_>>();
+
 	processed_file.push_str(format!("// <{}>\n", filename).as_str());
 	while pos < file.len(){
 		let rest = &file[pos..];
@@ -430,7 +432,7 @@ pub fn preprocessor(file: &str, filename: &str, include_path: HashSet<String>, m
 			}
 			pos += caps.get(0).unwrap().end();
 		} else {
-			processed_file.push(file.chars().nth(pos).unwrap());
+			processed_file.push(chars[pos]);
 			pos += 1;
 		}
 	}

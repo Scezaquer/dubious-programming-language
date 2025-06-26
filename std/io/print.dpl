@@ -127,3 +127,24 @@ fn printarrayln:<T>(a: array[T]): int {
 	printarray:<T>(a);
 	print("\n");
 }
+
+fn printarrayf:<T>(a: array[T]): int {
+	// Print the content of array a to stdout, with each element on a new line
+
+	print("[");
+	let i: int;
+	for (i = 0; i < a[-1] : int; i = i + 1) {
+		if (i > 0) {
+			print(", ");
+		}
+		printf(a[i]: float);
+	}
+	print("]");
+}
+
+fn printarrayfln:<T>(a: array[T]): int {
+	// Print the content of array a to stdout, with each element on a new line, followed by a newline
+
+	printarrayf:<T>(a);
+	print("\n");
+}

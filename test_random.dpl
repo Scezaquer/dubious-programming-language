@@ -1,0 +1,13 @@
+#include <std>
+
+fn main(): int{
+	let r: int = std::random::random(42);
+	let i: int;
+	for (i = 0; i < 10; i = i + 1) {
+		r = std::random::random(r);
+		std::io::printiln(r);
+		std::io::printiln(std::random::random_range(r, 0, 100));
+		std::io::printfln(std::random::random_float(r));
+	}
+	return 0;
+}
