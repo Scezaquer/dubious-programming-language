@@ -1,0 +1,6 @@
+#include <std>
+
+fn main(): int {
+	std::exception("Test exception", 1);
+	return 0;
+}

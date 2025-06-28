@@ -77,21 +77,3 @@ fn sumf(arr: array[float]): float {
 	}
 	return sum;
 }
-
-fn zeroi(arr: array[int]): array[int] {
-	// Set all elements in the array to zero
-	let i: int;
-	for (i = 0; i < arr.len; i = i + 1) {
-		arr[i] = 0;
-	}
-	return arr;
-}
-
-fn zerof(arr: array[float]): array[float] {
-	// Set all elements in the array to zero
-	let i: int;
-	for (i = 0; i < arr.len; i = i + 1) {
-		arr[i] = 0.0;
-	}
-	return arr;
-}

@@ -432,3 +432,9 @@ All elements in code are considered as part of the `toplevel` namespace. This
 means that you can use an "absolute" path to access anything by doing
 `toplevel::some_namespace::some_function`. This also implies that `toplevel` is
 a reserved namespace that can't be used elsewhere, to avoid ambiguities.
+
+## Constructing arrays at runtime
+
+```
+let x: array[float] = [0.0] * (expr : int);
+```

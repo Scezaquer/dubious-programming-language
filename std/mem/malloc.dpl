@@ -1,5 +1,95 @@
-fn malloc(size: int): *void {
+#include <../exception.dpl>
+
+struct block_meta {
+	// Metadata for a block of memory allocated by malloc
+	// This is used to keep track of the size of the block and to allow free to work correctly
+	size: int;			// Size of the block in bytes
+	next: block_meta;	// Pointer to the next block in the linked list
+	free: bool;			// Whether the block is free or not
 }
 
-fn free(ptr: *void): void {
+fn sbrk(size: int): array[int] {
+	// sbrk, or sys_brk, is a syscall used to allocate memory in the heap
+	// sys_brk(0) returns the current top of the heap, and sys_brk(size) allocates
+	// size bytes and returns the new top of the heap.
+
+	if (size <= 0) {
+		exception("sbrk: size must be at least 1", 1);
+	}
+
+	size;   // Move size into rax
+    asm "	; Get current break point first
+    mov rax, 12	; syscall: sys_brk  
+    mov rdi, 0	; get current break
+    syscall
+    mov rbx, rax	; save old break in rbx
+    
+    ; Now allocate new memory
+    mov rdi, rax	; current break
+    add rdi, rcx	; add size (assuming size is in rcx)
+    add rdi, 8	; add 8 bytes for metadata
+    mov rax, 12	; syscall: sys_brk
+    syscall
+    
+    ; rbx now contains the start of our allocated block";
+    size;   // Move size into rax
+    asm "	mov [rbx], rax	; store array length at start of block
+    mov rax, rbx	; return the pointer
+    add rax, 8	; move past the metadata": array[int];
+}
+
+fn malloc(size: int): array[int] {
+	let ptr: array[int] = sbrk(size);
+
+	return ptr;
+}
+
+fn free(ptr: array[int]): void {
+}
+
+fn calloc(size: int): array[int] {
+    // calloc allocates memory and initializes it to zero
+    let ptr: array[int] = malloc(size);
+    arrset:<int>(ptr, 0); // Set all elements to zero
+    return ptr;
+}
+
+fn falloc(size: int): array[float] {
+    // falloc allocates memory for floats and initializes it to zero
+    let ptr: array[float] = malloc(size): array[float];
+    arrset:<float>(ptr, 0.0); // Set all elements to zero
+    return ptr;
+}
+
+fn realloc(ptr: array[int], new_size: int): array[int] {
+    if (new_size <= 0) {
+        exception("realloc: new size must be at least 1", 1);
+    }
+
+    let old_size: int = ptr.len;
+    let new_ptr: array[int] = malloc(new_size);
+
+    // Copy old data to new pointer
+    for (let i: int = 0; i < old_size && i < new_size; i += 1) {
+        new_ptr[i] = ptr[i];
+    }
+
+    free(ptr); // Free the old pointer
+    return new_ptr;
+}
+
+fn arrset:<T>(arr: array[T], value: T): T {
+    for (let i: int = 0; i < arr.len; i += 1) {
+        arr[i] = value;
+    }
+}
+
+fn memset(ptr: array[int], value: int, size: int): int {
+    if (size < 0) {
+        exception("memset: size must be a positive number", 1);
+    }
+
+    for (let i: int = 0; i < size; i += 1) {
+        ptr[i] = value;
+    }
 }

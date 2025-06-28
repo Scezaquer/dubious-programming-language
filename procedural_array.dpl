@@ -1,0 +1,22 @@
+fn main(): int{
+	let x: array[float] = [0.0] * 5;
+	return 0;
+}
+
+// [array_content] * expr
+
+// ASSUMING EVALUATING array_content DOES NOT PUSH TO STACK
+
+// 1. Evaluate expr, put into register r15, r14
+// 2. Check r15 > 0, if not, jump to end
+// 3. Start loop that runs counting down r14 until r14 == 0
+// 4. In loop, do:
+//     - Evaluate array_content, put into rax
+//     - push rax onto stack
+//     - decrement r14
+//     - if r14 < 0, jump to step 3
+// 5. push r15 onto stack (size of array)
+// 6. move rsp + 8 to rax
+
+// ASSUMING array_content PUSHES TO STACK
+

@@ -37,10 +37,10 @@ main:
     jmp .end_0
 .else_0:
     ;if statement
-    movsd xmm0, [.float.2]	; Load float into xmm0
+    movsd xmm0, [.float.0]	; Load float into xmm0
     movq rax, xmm0
     push rax
-    movsd xmm0, [.float.3]	; Load float into xmm0
+    movsd xmm0, [.float.0]	; Load float into xmm0
 	pop rcx
 	movq xmm1, rcx
 	ucomisd xmm0, xmm1
@@ -72,6 +72,4 @@ main:
 section .data
 	.float.1: dq 0.1
 	.float.0: dq 0.0
-	.float.2: dq 0.0
-	.float.3: dq 0.0
 	mxcsr_val dd 0

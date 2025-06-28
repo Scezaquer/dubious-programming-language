@@ -16,7 +16,7 @@ main:
     movsd xmm0, [.float.0]	; Load float into xmm0
     movq rax, xmm0
     push rax
-    movsd xmm0, [.float.1]	; Load float into xmm0
+    movsd xmm0, [.float.0]	; Load float into xmm0
 	pop rcx
 	movq xmm1, rcx
 	mulsd xmm0, xmm1
@@ -60,6 +60,5 @@ main:
     ret				;return by default if no return statement was reached
 
 section .data
-	.float.1: dq 1.414213562374
 	.float.0: dq 1.414213562374
 	mxcsr_val dd 0

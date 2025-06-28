@@ -3,5 +3,5 @@
     "workbench.preferredDarkColorTheme": "Default Dark Modern",
 	"workbench.preferredHighContrastColorTheme": "Default High Contrast",
 	"editor.insertSpaces": false,
-	"editor.detectIndentation": false
+	"editor.detectIndentation": true
 }
