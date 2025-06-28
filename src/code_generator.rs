@@ -1180,5 +1180,5 @@ pub fn generate(ast: &Ast, out_path: &str) {
 	generate_constants(&mut file, const_vector);
 	generate_float_literals(&mut file);
 	writeln!(file, "	mxcsr_val dd 0").unwrap();
-	writeln!(file, "	malloc_used dd 0").unwrap();
+	writeln!(file, "	malloc_counter dd 0").unwrap();
 }

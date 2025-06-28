@@ -62,3 +62,4 @@ main:
 section .data
 	.float.0: dq 1.414213562374
 	mxcsr_val dd 0
+	malloc_counter dd 0

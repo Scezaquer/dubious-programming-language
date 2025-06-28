@@ -27,9 +27,6 @@ main:
     mov rax, [rbp-32]
     push rax
     movsd xmm0, [.float.2]	; Load float into xmm0
-    pcmpeqd xmm1, xmm1	; xmm1 = all ones (0xFFFFFFFFFFFFFFFF)
-    psllq xmm1, 63		; xmm1 = 0x8000000000000000 (sign bit mask)
-    xorpd xmm0, xmm1	; Flip the sign bit of xmm0
     movq rax, xmm0
     push rax
     mov rax, 2		; length of the array
@@ -90,7 +87,8 @@ main:
     ret				;return by default if no return statement was reached
 
 section .data
-	.float.1: dq 0.8
-	.float.2: dq 0.7
+	.float.2: dq -0.7
 	.float.0: dq 1.7
+	.float.1: dq 0.8
 	mxcsr_val dd 0
+	malloc_counter dd 0

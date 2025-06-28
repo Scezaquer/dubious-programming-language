@@ -19,6 +19,7 @@ A simple compiler for the Dubious programming language (DPL).
 ### Optional
 
 - TODO: optimize multiple files importing the same methods (only generate code for one of them instead of having redundant asm)
+- TODO: Should code be generated for unused functions ?
 - TODO: optimized register allocation ?
 - TODO: default function parameters ?
 - TODO: kwargs ?

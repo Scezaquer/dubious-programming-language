@@ -48,3 +48,4 @@ section .data
 	.float.0: dq 0.0
 	.float.1: dq 0.1
 	mxcsr_val dd 0
+	malloc_counter dd 0

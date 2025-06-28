@@ -39,7 +39,6 @@ pub enum Operator {
     MultiplyAssign,     // *=
     DivideAssign,       // /=
     ModulusAssign,      // %=
-    LeftShiftAssign,    // <<=
     BitwiseAndAssign,   // &=
     BitwiseXorAssign,   // ^=
     BitwiseOrAssign,    // |=
@@ -175,7 +174,7 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo<Token>> {
 
     // Floats are a sequence of digits, followed by a decimal point
     // and more digits
-    let float_re = Regex::new(r"^\d+\.\d+").unwrap();
+    let float_re = Regex::new(r"^-?\d+\.\d+").unwrap();
 
     // Integers are a sequence of digits
     let int_re = Regex::new(r"^\d+").unwrap();
@@ -198,8 +197,6 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo<Token>> {
     let keyword_re = Regex::new(r"^(if|else|do|while|for|loop|return|fn|let|break|continue|const|struct|enum|asm|namespace|spacename)$").unwrap();
 
 	let whitespace_re = Regex::new(r"^[^\S\n]+").unwrap();
-
-	let preprocessor_re = Regex::new(r"^\#(include|define|undef|ifdef|ifndef|if|elif|else|endif|error|print).*?(\n|$)").unwrap();
 	
 	let char_re = Regex::new(r"^'(?:\\.|[^\\']){0,8}'").unwrap();
 
@@ -218,11 +215,7 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo<Token>> {
     while pos < file.len() {
         let rest = &file[pos..];
 		let tok;
-		if let Some(caps) = preprocessor_re.captures(rest){
-			// Skip the preprocessor directive
-			pos += caps.get(0).unwrap().end();
-			continue;
-		} else if let Some(caps) = imported_code_re.captures(rest){
+        if rest.starts_with("//") && let Some(caps) = imported_code_re.captures(rest){
 			current_file = caps.get(0).unwrap().as_str()
 				.trim_start_matches("// <")
 				.trim_end_matches(">\n")
@@ -262,44 +255,49 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo<Token>> {
         } else if rest.starts_with("]") {
             tok = Token::RBracket;
             pos += 1;
-		} else if let Some(caps) = bin_re.captures(rest) {
+		} else if rest.starts_with("0") && let Some(caps) = bin_re.captures(rest) {
 			tok = Token::BinLiteral(i64::from_str_radix(caps.get(0).unwrap().as_str().strip_prefix("0b").unwrap(), 2).unwrap());
 			pos += caps.get(0).unwrap().end();
-		} else if let Some(caps) = hex_re.captures(rest) {
+		} else if rest.starts_with("0") && let Some(caps) = hex_re.captures(rest) {
 			tok = Token::HexLiteral(i64::from_str_radix(caps.get(0).unwrap().as_str().strip_prefix("0x").unwrap(), 16).unwrap());
 			pos += caps.get(0).unwrap().end();
 		} else if let Some(caps) = float_re.captures(rest) {
-            tok = Token::FloatLiteral(caps.get(0).unwrap().as_str().parse().unwrap());
+            let f = caps.get(0).unwrap().as_str().parse().unwrap();
+            tok = Token::FloatLiteral(f);
+            if f < 0.0 {
+                tokens.push(TokenWithDebugInfo::<Token>::new(Token::Operator(Operator::Add), line_hashmap[&current_file], current_file.clone()));
+            }
             pos += caps.get(0).unwrap().end();
         } else if let Some(caps) = int_re.captures(rest) {
             tok = Token::IntLiteral(caps.get(0).unwrap().as_str().parse().unwrap());
             pos += caps.get(0).unwrap().end();
-        } else if let Some(caps) = char_re.captures(rest) {
+        } else if rest.starts_with("'") && let Some(caps) = char_re.captures(rest) {
 			pos += caps.get(0).unwrap().end();
 			if let Some(file) = line_hashmap.get_mut(&current_file){
 				*file += caps.get(0).unwrap().as_str().matches('\n').count();
 			}
 			tok = Token::CharLiteral(process_escape_sequence(caps.get(0).unwrap().as_str().strip_prefix("'").unwrap().strip_suffix("'").unwrap()));
-		} else if let Some(caps) = string_re.captures(rest) {
+		} else if rest.starts_with('"') && let Some(caps) = string_re.captures(rest) {
 			pos += caps.get(0).unwrap().end();
 			if let Some(file) = line_hashmap.get_mut(&current_file){
 				*file += caps.get(0).unwrap().as_str().matches('\n').count();
 			}
 			tok = Token::StringLiteral(process_escape_sequence(caps.get(0).unwrap().as_str().strip_prefix("\"").unwrap().strip_suffix("\"").unwrap()));
-		} else if let Some(caps) = large_operator_re.captures(rest) {
-            let op = match caps.get(0).unwrap().as_str() {
+		} else if large_operator_re.is_match(rest) {
+            let op = match &rest[..2] {
+                // Commented out operators are handled in the AST build phase
+                // ">=" => Operator::GreaterOrEqualThan,
+                // ">>" => Operator::RightShift,
+                // ">>=" => Operator::RightShiftAssign,
+                // "<<" => Operator::LeftShiftAssign,
                 "==" => Operator::Equal,
                 "!=" => Operator::NotEqual,
                 "<=" => Operator::LessOrEqualThan,
-                // ">=" => Operator::GreaterOrEqualThan,
                 "&&" => Operator::LogicalAnd,
                 "||" => Operator::LogicalOr,
                 "++" => Operator::Increment,
                 "--" => Operator::Decrement,
-                "<<=" => Operator::LeftShiftAssign,
-                // ">>=" => Operator::RightShiftAssign,
                 "<<" => Operator::LeftShift,
-                // ">>" => Operator::RightShift,
                 "+=" => Operator::AddAssign,
                 "-=" => Operator::SubtractAssign,
                 "*=" => Operator::MultiplyAssign,
@@ -313,9 +311,9 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo<Token>> {
                 _ => unreachable!(),
             };
             tok = Token::Operator(op);
-            pos += caps.get(0).unwrap().end();
-        } else if let Some(caps) = operator_re.captures(rest) {
-            let op = match caps.get(0).unwrap().as_str() {
+            pos += 2;
+        } else if operator_re.is_match(rest) {
+            let op = match &rest[..1] {
                 "+" => Operator::Add,
                 "-" => Operator::Subtract,
                 "*" => Operator::Multiply,
@@ -334,14 +332,14 @@ pub fn lex(file: &str) -> Vec<TokenWithDebugInfo<Token>> {
                 _ => unreachable!(),
             };
             tok = Token::Operator(op);
-            pos += caps.get(0).unwrap().end();
+            pos += 1;
         } else if rest.starts_with(":<") {
 			tok = Token::BeginGeneric;
 			pos += 2;
 		} else if rest.starts_with(":") {
             tok = Token::Colon;
             pos += 1;
-        } else if let Some(caps) = identifier_re.captures(rest) {
+        } else if identifier_re.is_match(rest) && let Some(caps) = identifier_re.captures(rest) {
 			if primitive_type_re.is_match(caps.get(0).unwrap().as_str()) {
 				tok = Token::PrimitiveType(caps.get(0).unwrap().as_str().to_string());
 			} else if keyword_re.is_match(caps.get(0).unwrap().as_str()) {

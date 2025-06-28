@@ -76,3 +76,4 @@ main:
 section .data
     .constant.toplevel.test.c: dq 5
 	mxcsr_val dd 0
+	malloc_counter dd 0

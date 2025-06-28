@@ -61,3 +61,4 @@ main:
 
 section .data
 	mxcsr_val dd 0
+	malloc_counter dd 0

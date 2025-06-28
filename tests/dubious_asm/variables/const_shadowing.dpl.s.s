@@ -54,3 +54,4 @@ main:
 section .data
     .constant.toplevel.a: dq 10
 	mxcsr_val dd 0
+	malloc_counter dd 0

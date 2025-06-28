@@ -17,9 +17,6 @@ main:
     movq rax, xmm0
     push rax
     movsd xmm0, [.float.1]	; Load float into xmm0
-    pcmpeqd xmm1, xmm1	; xmm1 = all ones (0xFFFFFFFFFFFFFFFF)
-    psllq xmm1, 63		; xmm1 = 0x8000000000000000 (sign bit mask)
-    xorpd xmm0, xmm1	; Flip the sign bit of xmm0
 	pop rcx
 	movq xmm1, rcx
 	addsd xmm0, xmm1
@@ -63,6 +60,7 @@ main:
     ret				;return by default if no return statement was reached
 
 section .data
+	.float.1: dq -1.25
 	.float.0: dq 3.25
-	.float.1: dq 1.25
 	mxcsr_val dd 0
+	malloc_counter dd 0

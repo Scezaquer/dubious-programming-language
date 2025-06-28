@@ -36,3 +36,4 @@ section .data
     .constant.toplevel.b: dq 15
     .constant.toplevel.c: dq 3
 	mxcsr_val dd 0
+	malloc_counter dd 0

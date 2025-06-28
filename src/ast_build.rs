@@ -214,7 +214,19 @@ fn get_bin_operator_from_tokens(
             Operator::Modulus => BinOp::Modulus,
             Operator::Add => BinOp::Add,
             Operator::Subtract => BinOp::Subtract,
-            Operator::LeftShift => BinOp::LeftShift,
+                // Similar to  Operator::GreaterThan
+                Operator::LeftShift => {
+                let next = cloned_tokens.next().unwrap();
+                if let TokenWithDebugInfo {
+                    internal_tok: Token::Operator(Operator::Assign),
+                    ..
+                } = next
+                {
+                    BinOp::NotABinaryOp // <<=
+                } else {
+                    BinOp::LeftShift // <<
+                }
+            }
             Operator::LessThan => BinOp::LessThan,
             Operator::LessOrEqualThan => BinOp::LessOrEqualThan,
             Operator::Equal => BinOp::Equal,
@@ -297,7 +309,18 @@ fn get_assign_operator_from_tokens(
             Operator::MultiplyAssign => AssignmentOp::MultiplyAssign,
             Operator::DivideAssign => AssignmentOp::DivideAssign,
             Operator::ModulusAssign => AssignmentOp::ModulusAssign,
-            Operator::LeftShiftAssign => AssignmentOp::LeftShiftAssign,
+            Operator::LeftShift => {
+                let next = cloned_tokens.next().unwrap();
+                if let TokenWithDebugInfo {
+                    internal_tok: Token::Operator(Operator::Assign),
+                    ..
+                } = next
+                {
+                    AssignmentOp::LeftShiftAssign // <<=
+                } else {
+                    AssignmentOp::NotAnAssignmentOp // <<
+                }
+            }
             Operator::GreaterThan => {
                 // For the same reason as in get_bin_operator_from_tokens, we
                 // need to make sure the '>>=' in 'let a: S<T<U>>= ..;' is not
@@ -1207,6 +1230,11 @@ fn parse_expression_with_precedence(
                     tokens.next();
                     tokens.next();
                 }
+                AssignmentOp::LeftShiftAssign => {
+                    // This specific operator is made of two tokens
+                    tokens.next();
+                    tokens.next();
+                }
                 _ => {
                     tokens.next();
                 }
@@ -1969,7 +1997,7 @@ fn parse_function(
 
     match tok {
         TokenWithDebugInfo {
-            internal_tok: Token::Keyword(ref k),
+            internal_tok: Token::Keyword(k),
             ..
         } => {
             if k != "fn" {
@@ -2145,7 +2173,7 @@ fn parse_struct(mut tokens: &mut Iter<TokenWithDebugInfo<Token>>) -> TokenWithDe
     let (line, file) = (tok.line.clone(), tok.file.clone());
 
     if let TokenWithDebugInfo {
-        internal_tok: Token::Keyword(ref k),
+        internal_tok: Token::Keyword(k),
         ..
     } = tok
     {
@@ -2292,7 +2320,7 @@ fn parse_enum(tokens: &mut Iter<TokenWithDebugInfo<Token>>) -> TokenWithDebugInf
     let (line, file) = (tok.line.clone(), tok.file.clone());
 
     if let TokenWithDebugInfo {
-        internal_tok: Token::Keyword(ref k),
+        internal_tok: Token::Keyword(k),
         ..
     } = tok
     {
@@ -2386,7 +2414,7 @@ pub fn parse_namespace(
     if !is_toplevel {
         let tok = tokens.next().unwrap();
         if let TokenWithDebugInfo {
-            internal_tok: Token::Keyword(ref k),
+            internal_tok: Token::Keyword(k),
             ..
         } = tok
         {
@@ -2443,7 +2471,7 @@ pub fn parse_namespace(
                 break;
             }
             TokenWithDebugInfo {
-                internal_tok: Token::Keyword(ref k),
+                internal_tok: Token::Keyword(k),
                 ..
             } => {
                 if k == "fn" {
