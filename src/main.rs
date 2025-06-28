@@ -22,6 +22,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 use logic_checker::check_program;
+use std::time::Instant;
 
 use clap::Parser;
 
@@ -41,7 +42,7 @@ struct Args {
     ast: bool,
 
     /// Print the tokens
-    #[arg(short, long, default_value_t = false)]
+    #[arg(short = 'T', long, default_value_t = false)]
     tokens: bool,
 
     /// Output an assembly file instead of a binary
@@ -51,6 +52,10 @@ struct Args {
 	/// Output both a binary and an assembly file
 	#[arg(short, long, default_value_t = false)]
 	both: bool,
+
+	/// Print the time taken for each step
+	#[arg(short, long, default_value_t = false)]
+	time: bool,
 }
 
 /// A simple compiler for the Dubious programming language (DPL).
@@ -77,6 +82,7 @@ struct Args {
 /// // This will compile the file example.dpl and print the tokens and AST to the console for debugging
 /// ./dubious example.dpl --tokens --ast
 fn main() {
+	let start = Instant::now();
     let args = Args::parse();
 
     if !Path::new(&args.input_file).exists() {
@@ -84,20 +90,34 @@ fn main() {
         std::process::exit(1);
     }
 
+	let now = Instant::now();
     let file = fs::read_to_string(&args.input_file).expect("Failed to read file");
-    //let file = fs::read_to_string("return_2.dpl").expect("Failed to read file");
+	let elapsed = now.elapsed();
+    if args.time { println!("read file elapsed: {:.2?}", elapsed); }
 
+	let now = Instant::now();
 	let preprocessed_file = preprocessor(&file, &args.input_file, HashSet::new(), vec!["toplevel".to_string()]);
+	let elapsed = now.elapsed();
+    if args.time { println!("preprocessor elapsed: {:.2?}", elapsed); }
 
+	let now = Instant::now();
     let tokens = lex(preprocessed_file.as_str());
+	let elapsed = now.elapsed();
+    if args.time { println!("lexer elapsed: {:.2?}", elapsed); }
 
     if args.tokens {
         dbg!(&tokens);
     }
 
+	let now = Instant::now();
     let mut ast = parse(&tokens);
+	let elapsed = now.elapsed();
+    if args.time {  println!("parser elapsed: {:.2?}", elapsed); }
 
+	let now = Instant::now();
 	ast = check_program(&ast);
+	let elapsed = now.elapsed();
+    if args.time { println!("checker elapsed: {:.2?}", elapsed); }
 
     if args.ast {
         println!("{}", ast);
@@ -121,8 +141,12 @@ fn main() {
 		asm_output_file = output_file.clone();
 	}
 
+	let now = Instant::now();
     generate(&ast, &asm_output_file);
+	let elapsed = now.elapsed();
+    if args.time { println!("code generation elapsed: {:.2?}", elapsed); }
     if !args.output_asm {
+		let now = Instant::now();
         // nasm -f elf64 out.s -o out.o
 		let nasm_output = Command::new("nasm")
 			.args([
@@ -143,6 +167,10 @@ fn main() {
 			std::process::exit(1);
 		}
 
+		let elapsed = now.elapsed();
+    	if args.time { println!("nasm elapsed: {:.2?}", elapsed); }
+
+		let now = Instant::now();
 		// ld out.o -o out
 		let ld_output = Command::new("ld")
 			.args([
@@ -160,6 +188,9 @@ fn main() {
 			);
 			std::process::exit(1);
 		}
+
+		let elapsed = now.elapsed();
+    	if args.time { println!("ld elapsed: {:.2?}", elapsed); }
 
 		// TODO: should probably check i'm not overwriting a file
 		// rm out.o
@@ -183,4 +214,7 @@ fn main() {
         // And this disassembles it
         // ndisasm -b 64 out
     }
+
+	let elapsed = start.elapsed();
+	if args.time { println!("total elapsed: {:.2?}", elapsed); }
 }

@@ -24,6 +24,12 @@ lazy_static! {
         let m = HashMap::new();
         Mutex::new(m)
     };
+
+	// I only want one label for each float, and if two floats are equal, they should have the same label.
+	static ref LABEL_LABEL_MAP: Mutex<HashMap<u64, String>> = {
+        let m = HashMap::new();
+        Mutex::new(m)
+    };
 }
 
 /// Generates the assembly code for an atom
@@ -31,10 +37,17 @@ fn generate_atom(file: &mut File, atom: &Typed<TokenWithDebugInfo<Atom>>, contex
     match atom {
         Typed{expr: TokenWithDebugInfo{internal_tok: Atom::Literal(constant), ..}, ..} => {
 			if let Literal::Float(f) = constant.expr.internal_tok {
-                let label = format!(".float.{}", FLOAT_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst));
 
                 let mut float_label_map = FLOAT_LABEL_MAP.lock().unwrap();
-                float_label_map.insert(label.clone(), f);
+				let mut label_label_map = LABEL_LABEL_MAP.lock().unwrap();
+				let label;
+				if let Some(existing_label) = label_label_map.get(&f.to_bits()) {
+					label = existing_label.clone();
+				} else {
+					label = format!(".float.{}", FLOAT_LABEL.fetch_add(1, std::sync::atomic::Ordering::SeqCst));
+					float_label_map.insert(label.clone(), f);
+					label_label_map.insert(f.to_bits(), label.clone());
+				}
 
 				writeln!(file, "    movsd xmm0, [{}]	; Load float into xmm0", label.replace("::", "..")).unwrap();
 			} else if let Literal::Char(c) = &constant.expr.internal_tok {
