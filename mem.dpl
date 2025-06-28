@@ -2,11 +2,13 @@
 
 fn main(): int {
 	let arr: array[int] = std::mem::malloc(10);
-	arr[0] = 1;
-	arr[3] = 4;
-	arr[5] = 6;
-	arr[9] = 10;
+	// arr[0] = 1;
+	// arr[3] = 4;
+	// arr[5] = 6;
+	// arr[9] = 10;
 	std::io::printarrayln:<int>(arr);
 	std::io::printiln(arr.len);
+	std::io::printiln(arr[10]);
+	std::io::printiln(arr[11]);
 	return 0;
 }

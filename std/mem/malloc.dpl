@@ -8,43 +8,106 @@ struct block_meta {
 	free: bool;			// Whether the block is free or not
 }
 
-fn sbrk(size: int): array[int] {
-	// sbrk, or sys_brk, is a syscall used to allocate memory in the heap
-	// sys_brk(0) returns the current top of the heap, and sys_brk(size) allocates
-	// size bytes and returns the new top of the heap.
+fn get_current_break(): int {
+    // Get the current break point of the heap as an integer
+    // This is the address of the end of the heap, where new memory can be allocated
 
-	if (size <= 0) {
+    asm "mov rax, 12	; syscall: sys_brk
+    mov rdi, 0	; get current break
+    syscall": int;
+}
+
+fn sbrk(bytes: int): array[int] {
+	// sbrk, or sys_brk, is a syscall used to allocate memory in the heap
+	// sys_brk(0) returns the current top of the heap, and sys_brk(size)
+    // allocates bytes and returns the new top of the heap.
+
+    // When allocating blocks, they are surrounded by metadata which goes
+    // [free flag (8 bytes)]    <- Highest address
+    // [previous break point (8 bytes)] <- is 0 if this is the first block
+    // [block (len of block bytes)]
+    // [length of the block (8bytes)]
+
+	if (bytes <= 0) {
 		exception("sbrk: size must be at least 1", 1);
 	}
 
-	size;   // Move size into rax
+	bytes;   // Move size into rax
     asm "	; Get current break point first
     mov rax, 12	; syscall: sys_brk  
     mov rdi, 0	; get current break
     syscall
-    mov rbx, rax	; save old break in rbx
-    
-    ; Now allocate new memory
-    mov rdi, rax	; current break
-    add rdi, rcx	; add size (assuming size is in rcx)
-    add rdi, 8	; add 8 bytes for metadata
+    mov rbx, rax	; save old break in rbx";
+
+    bytes;
+    asm"    ; Now allocate new memory
+    mov rdi, rbx    ; rbx contains the old break point
+    add rdi, rax	; add size to the old break point
+    add rdi, 24	; add 24 bytes for metadata
     mov rax, 12	; syscall: sys_brk
     syscall
-    
-    ; rbx now contains the start of our allocated block";
-    size;   // Move size into rax
+
+    ; rbx now contains the start of our allocated block, and rax contains the new break point
+    mov [rax - 16], rbx	; previous break point is stored at rax - 16
+    mov dword [rax - 8], 1	; mark the block as not free (1 = not free, 0 = free)";
+
+    bytes / 8;   // Move size into rax
     asm "	mov [rbx], rax	; store array length at start of block
     mov rax, rbx	; return the pointer
     add rax, 8	; move past the metadata": array[int];
 }
 
+fn was_malloc_used(): bool {
+    // Check if malloc has been used by checking the malloc_used variable
+    asm "mov rax, [malloc_used]": bool; // Load the value of malloc_used
+}
+
 fn malloc(size: int): array[int] {
-	let ptr: array[int] = sbrk(size);
+    // let breakpoint: int = get_current_break();
+    let malloc_used: bool = was_malloc_used();
+    asm "   mov dword [malloc_used], 0xFFFFFFFFFFFFFFFF"; // Mark that malloc has been used
+    let ptr: array[int];
+
+    // If this is the first malloc call, we need to set the next pointer to null
+    if (!malloc_used) {
+        ptr = sbrk(size * 8);
+        ptr[ptr.len] = 0; // Set the next pointer to null
+    } else {
+        // If malloc has been used, we need to find the next free block
+        let current: int = get_current_break(); // Get the current break point
+        let found: bool = false;
+
+        while (current != 0 && !found) {
+            if ((current: array[int])[-1] == 0 && ((current: array[int])[-2] : array[int])[0] >= size) { // Check if the block is free and has enough size
+                found = true;
+                0;
+            } else {
+                current = (current: array[int])[-2]; // Move to the next block
+            }
+        }
+
+        if (!found) {
+            ptr = sbrk(size * 8); // Allocate a new block if no free block was found
+            0;
+        } else {
+            ptr = current: array[int]; // Use the found free block
+            ptr[ptr.len + 1] = 1; // Mark the block as used
+        }
+    }
 
 	return ptr;
 }
 
-fn free(ptr: array[int]): void {
+fn free(ptr: array[int]): int {
+    // Free a block of memory allocated by malloc
+    // This will mark the block as free and add it to the linked list of free blocks
+
+    if (ptr.len <= 0) {
+        exception("free: pointer must be valid", 1);
+    }
+
+    let size: int = ptr.len; // Get the size of the block
+    ptr[ptr.len + 1] = 0; // Flag the block as free
 }
 
 fn calloc(size: int): array[int] {

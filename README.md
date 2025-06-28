@@ -7,7 +7,8 @@ A simple compiler for the Dubious programming language (DPL).
 ### Priority features
 
 - TODO: fix problem where structs in function prototypes don't get the path added during typechecking
-- TODO: heap memory stuff
+- TODO: When reallocating a previously freed block, the old block should be split in two if the new block is smaller than the previous one
+- TODO: Free should merge adjacent free blocks.
 - TODO: std library
 - TODO: Wiki
 - TODO: Void pointers?  Im not entirely sure I need it as I can already freely cast anything to anything but that would make for more explicit code. This may be an alternative/complementary to generics, but I feel like it would be worse
