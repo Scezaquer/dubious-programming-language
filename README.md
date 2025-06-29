@@ -9,21 +9,19 @@ A simple compiler for the Dubious programming language (DPL).
 - TODO: fix problem where structs in function prototypes don't get the path added during typechecking
 - TODO: std library
 - TODO: Wiki
-- TODO: Void pointers?  Im not entirely sure I need it as I can already freely cast anything to anything but that would make for more explicit code. This may be an alternative/complementary to generics, but I feel like it would be worse
 - TODO: let strings be defined over multiple lines like "hello "\n"world" in code would evaluate to the literal "hello world"
-- TODO: ellipses in function args
 - TODO: circular imports when the two files are in different namespaces cause a compilation crash (infinite import loop)
 
 ### Optional
 
 - TODO: optimize multiple files importing the same methods (only generate code for one of them instead of having redundant asm)
-- TODO: Should code be generated for unused functions ?
 - TODO: optimized register allocation ?
 - TODO: default function parameters ?
 - TODO: kwargs ?
 - TODO: Give the option to generate LLVM IR instead of x86_64
-- TODO: improve #include
-- TODO: exclude functions that are never called from code generation
+- TODO: exclude functions that are never called from code generation ?
+- TODO: ellipses in function args ? you could always just pass an array or a struct
+- TODO: Void pointers?  Im not entirely sure I need it as I can already freely cast anything to anything but that would make for more explicit code. This may be an alternative/complementary to generics, but I feel like it would be worse
 
 # Usage
 
@@ -56,6 +54,7 @@ an x86_64 assembly file or an elf64 binary.
 
 - If the input file does not exist, the compiler will print an error message and exit.
 - If there are issues reading the input file, the compiler will panic with a message.
+- If the code to compiled is incorrect, The compiler will panic and print a message pointing out the line and the nature of the error.
 
 
 ## Operator Precedence Table
@@ -85,20 +84,20 @@ Uninitialized variables default to 0.
 
 ++ and -- are NOT assignment operators (i.e. `++a` will evaluate to `a+1` but the value of `a` will be unchanged).
 
-For loop iterator variables can be declared inside the loop itself they have to be declared before. i.e.
+For loop iterator variables can be declared inside the loop itself, i.e. the following is legal syntax.
 ```
 for (let i: int = 0; i < 10; i += 1){
 	...
 }
 ```
-is legal syntax. Strictly speaking it is equivalent to
+Strictly speaking it is equivalent to
 ```
 let i: int = 0;
 for (0; i < 10; i += 1){
 	...
 }
 ```
-Therefore `i` remains accessible after the loop.
+Therefore `i` remains accessible after the loop in both cases.
 
 Furthermore all 3 fields have to contain an expression, although the expression may have no side effects, i.e
 ```
@@ -135,13 +134,13 @@ TODO: N dimensional arrays (on stack):
 ```
 let arr[3]: list[int] = [0, 1, 2];
 let arr2d[3, 4]: list[int] = [[0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3]];
-let arr2d[3, 4]: list[int] = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]; // TODO: Do I make this legal? Is it equivalent to the array above? Probably shouldn't because it opens a whole can of worms with mismatched dimensions, like assigning a [4, 3] array to a [3, 4] array pointer which could lead to some sneaky bugs. Probably best to enfore strict dim match.
+let arr2d[3, 4]: list[int] = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3];
 
 let arr2d[2, 2]: list[int] = [[0], [1, 2]];	// Arrays are cast to the smallest rectangular array that can contain them. Undefined entries default to 0, so this is equivalent to [[0, 0], [1, 2]]
 arr2d[3]; // returns 1: Treat arrays as flat when indexed like this
 arr2d[1, 0]; // returns 1 as well
 
-arr2d[3, 4] = 3; // TODO: Special syntax that initializes all entries to 3
+arr2d.len; // The length of arr2d (when flattened). Here, it's 4.
 ```
 
 The compiler should treat all arrays as flat and substitute dimensional indexing by it's equivalent flat indexing,
@@ -351,8 +350,8 @@ and how you can typecast asm statements.
 ## Include
 
 The `#include <relative_path>` preprocessor macro is what allows you to split
-code into multiple files. The way it works is extremely simple: it will essentially
-be substituted with the code from the included file.
+code into multiple files. The way it works is extremely simple: the include will
+essentially be substituted with the code from the included file.
 
 It is also possible to include a folder, in which case the preprocessor will
 look for an `include.dpl` file in that folder, and include this file.
@@ -438,7 +437,7 @@ a reserved namespace that can't be used elsewhere, to avoid ambiguities.
 Just as in C, the DPL standard library comes with it's own `malloc` and `free`,
 as well as a few other useful fonctions to manipulate the heap effectively.
 
-It may quickly come to the attention of DPL users that there is no way of
+It may come to the attention of DPL users that there is no way of
 procedurally generating arrays. Something like `[0] * 8` generating an array of 0s
 of size 8. The reason is simple: array literals are on the stack, and stack-based
 structures must have a known size at compile time.
@@ -492,3 +491,47 @@ std::mem::malloc_call_count();
 // Print the heap layout, for debugging purposes
 std::mem::print_heap_layout();
 ```
+
+## Generic types
+
+The type system in DPL can be quite strict, but that is a problem if you want
+to create generic functions or structures. For example, it would be terrible
+having to write two different implementations for a linked list of ints and a
+linked list of floats. This is where generics come in handy.
+
+```
+fn return2:<T, U, V, W>(i: T, j: U, k: V, l: W): T {
+	let tmp: T = i;
+	let tmp2: U = tmp + j;
+	let tmp3: V = tmp2 + k;
+	let tmp4: W = tmp3 + l;
+	return tmp4;
+}
+
+fn main(): int {
+	return return2:<int, int, int, int>(2, 3, 4, 5);
+}
+```
+
+```
+struct S:<T> {
+	first_attribute: int;
+	second_attribute: T;
+	third_attribute: char;
+	fourth_attribute: T;
+}
+
+fn main(): int {
+	let a: S:<int> = S:<int>{ 1, 2, 'a', 3 };
+	let b: S:<float> = S:<float>{ 1, 2.0, 'b', 3.0 };
+	return a.second_attribute + a.fourth_attribute + a.first_attribute;
+}
+```
+
+Generics can be used in functions or structs. Each one can have arbitrarily
+many generics defined by writing `:<>` after the name of the function or struct.
+These generics can then be used in the struct/function body, arguments and return types.
+
+To use a generic function or struct, you bind a concrete type to each generic.
+This concrete type will then substitute the generic in all the function/struct,
+allowing you to only write a single function or struct for different types.
