@@ -1,17 +1,74 @@
 #include <std>
 
 fn main(): int {
-	let arr: array[int] = std::mem::malloc(10);
-	// arr[0] = 1;
-	// arr[3] = 4;
-	// arr[5] = 6;
-	// arr[9] = 10;
-	std::io::printarrayln:<int>(arr);
-	std::io::printiln(arr.len);
-	std::io::printiln(arr[10]);
-	std::io::printiln(arr[11]);
-	std::io::printiln(arr[12]);
+	let arr1: array[int] = std::mem::malloc(10);
+	let arr2: array[int] = std::mem::malloc(10);
+	let arr3: array[int] = std::mem::malloc(10);
+
+	std::io::printarrayln:<int>(arr2);
+	std::io::printiln(arr2.len);
+	std::io::printiln(arr2[arr2.len]);
+	std::io::printiln(arr2[arr2.len + 1]);
+	std::io::printiln(arr2[arr2.len + 2]);
+	std::io::printiln(arr2[arr2.len + 3]);
 
 	std::mem::print_heap_layout();
+
+	std::mem::free(arr2);
+
+	std::io::printarrayln:<int>(arr2);
+	std::io::printiln(arr2.len);
+	std::io::printiln(arr2[arr2.len]);
+	std::io::printiln(arr2[arr2.len + 1]);
+	std::io::printiln(arr2[arr2.len + 2]);
+	std::io::printiln(arr2[arr2.len + 3]);
+	std::mem::print_heap_layout();
+
+
+	let arr4: array[int] = std::mem::malloc(10);
+	std::mem::print_heap_layout();
+	std::io::printarrayln:<int>(arr4);
+	std::io::printiln(arr4.len);
+	std::io::printiln(arr4[arr4.len]);
+	std::io::printiln(arr4[arr4.len + 1]);
+	std::io::printiln(arr4[arr4.len + 2]);
+	std::io::printiln(arr4[arr4.len + 3]);
+
+	std::mem::free(arr1);
+	std::mem::free(arr4);
+
+	std::io::print("\n");
+	for (let i: int = 0; i < 42; i += 1) {
+		std::io::printi(arr1[i-1]);
+		std::io::print(", ");
+	}
+	std::io::print("\n");
+
+	std::mem::print_heap_layout();
+
+	let arr5: array[int] = std::mem::malloc(10);
+	std::mem::print_heap_layout();
+
+	let arr6: array[int] = std::mem::malloc(5);
+	std::mem::print_heap_layout();
+	let arr7: array[int] = std::mem::malloc(25);
+	let arr8: array[int] = std::mem::malloc(15);
+	std::mem::print_heap_layout();
+	std::mem::free(arr3);
+	std::mem::free(arr7);
+	std::mem::print_heap_layout();
+	std::mem::free(arr6);
+	std::mem::malloc(50);
+	std::mem::print_heap_layout();
+
+	// The final layout should be (with the adresses being randomized):
+	// Free flag (0=free),     address,        next,           len,    len(+meta)
+	//                 1,      744739968,      744739536,      50,     50(54)
+	//                 1,      744739536,      744739384,      15,     15(19)
+	//                 0,      744739384,      744738928,      53,     53(57)
+	//                 1,      744738928,      0,              10,     10(14)
+	// Malloc has been called 9 times.
+	// There are 4 blocks in total
+
 	return 0;
 }

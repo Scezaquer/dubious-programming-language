@@ -7,8 +7,6 @@ A simple compiler for the Dubious programming language (DPL).
 ### Priority features
 
 - TODO: fix problem where structs in function prototypes don't get the path added during typechecking
-- TODO: When reallocating a previously freed block, the old block should be split in two if the new block is smaller than the previous one
-- TODO: Free should merge adjacent free blocks.
 - TODO: std library
 - TODO: Wiki
 - TODO: Void pointers?  Im not entirely sure I need it as I can already freely cast anything to anything but that would make for more explicit code. This may be an alternative/complementary to generics, but I feel like it would be worse
@@ -435,8 +433,62 @@ means that you can use an "absolute" path to access anything by doing
 `toplevel::some_namespace::some_function`. This also implies that `toplevel` is
 a reserved namespace that can't be used elsewhere, to avoid ambiguities.
 
-## Constructing arrays at runtime
+## Memory management
+
+Just as in C, the DPL standard library comes with it's own `malloc` and `free`,
+as well as a few other useful fonctions to manipulate the heap effectively.
+
+It may quickly come to the attention of DPL users that there is no way of
+procedurally generating arrays. Something like `[0] * 8` generating an array of 0s
+of size 8. The reason is simple: array literals are on the stack, and stack-based
+structures must have a known size at compile time.
+
+Instead, in order to generate structures whose size may be unknown at compile
+time, the heap is made available by the standard library.
 
 ```
-let x: array[float] = [0.0] * (expr : int);
+#include <std>
+let arr: array[int] = std::mem::malloc(10);	// This returns an array[int] of the requested size
+
+// ... do stuff with arr
+
+std::mem::free(arr);	// Free the memory once it is no longer needed
+```
+
+There are a few things to note:
+- The signature of malloc is `malloc(size: int): array[int]`. You may then cast
+the `array[int]` you get to whatever type you desire.
+- The values in the array returned by malloc are uninitialized and may contain
+garbage. See `std::mem::calloc` or `std::mem::arrset` to initialize the memory.
+- The argument is NOT a number of bytes, but a number of dwords, as
+every type in DPL takes one dword.
+
+Once you are done using the memory, you should free it so that it may be recycled.
+Keep in mind: there is no garbage collector in DPL.
+
+Other useful methods include the following
+```
+#include <std>
+
+// This returns an array[int] of the requested size
+let arr: array[int] = std::mem::malloc(10);
+
+// Same as malloc, but initializes all the values in the array to 0
+let arr2: array[int] = std::mem::calloc(10);
+
+// Copies the values in arr to a new block of memory of the specified size and
+// frees the old block. If The new size is less than the old, the memory block will be truncated.
+let arr: array[int] = std::mem::realloc(arr, 15);  
+
+// Set all the values in arr to 1. Note that the function signature is arrset:<T>(arr: array[T], value: T): T
+std::mem::arrset:<int>(arr, 1);
+
+// Free the memory once it is no longer needed
+std::mem::free(arr);	
+
+// Return the number of times malloc has been called in total
+std::mem::malloc_call_count();
+
+// Print the heap layout, for debugging purposes
+std::mem::print_heap_layout();
 ```
