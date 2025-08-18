@@ -1,0 +1,84 @@
+#include <std>
+
+fn main(): int {
+	// Test the memory allocation functions
+
+	let mat: std::math::matrices::Matrix = std::math::matrices::eye(3);
+	std::math::matrices::println(mat);
+
+	std::mem::print_heap_layout();
+	std::math::matrices::free(mat);
+
+	let mat1: std::math::matrices::Matrix = std::math::matrices::zero(2, 2);
+	let mat2: std::math::matrices::Matrix = std::math::matrices::uninitialized(2, 2);
+
+	mat1.data[0][0] = 1.0;
+	mat1.data[0][1] = 2.0;
+	mat1.data[1][0] = 4.0;
+	mat1.data[1][1] = 3.0;
+
+	mat2.data[0][0] = 5.0;
+	mat2.data[0][1] = 6.0;
+	mat2.data[1][0] = 8.0;
+	mat2.data[1][1] = 7.0;
+
+	std::math::matrices::println(mat1);
+	std::io::print("Det: ");
+	std::io::printfln(std::math::matrices::det(mat1));
+
+	std::math::matrices::println(mat2);
+		std::io::print("Det: ");
+	std::io::printfln(std::math::matrices::det(mat2));
+
+	let mat3: std::math::matrices::Matrix = std::math::matrices::mul(mat1, mat2);
+	std::math::matrices::println(mat3);
+
+	std::math::matrices::transpose(mat3);
+	std::math::matrices::println(mat3);
+
+	let mat4: std::math::matrices::Matrix = std::math::matrices::add(mat3, mat1);
+	std::math::matrices::println(mat3);
+
+	std::math::matrices::free(mat1);
+	std::math::matrices::free(mat2);
+	std::math::matrices::free(mat3);
+	std::math::matrices::free(mat4);
+
+	std::mem::print_heap_layout();
+
+	////////////
+
+	let mat: std::math::matrices::Matrix = std::math::matrices::eye(5);
+	let arr: array[float] = [
+			[1.0, 2.0, 3.0, 4.0, 5.0],
+			[-1.0, -4.0, 3.0, 4.0, 5.0],
+			[2.0, 3.0, 4.0, -3.0, 6.0],
+			[3.0, 4.0, 15.0, 6.0, 7.0],
+			[8.0, 5.0, 6.0, 6.0, 8.0]
+	];
+
+	std::math::matrices::arrcpy(mat, arr);
+
+	std::math::matrices::println(mat);
+	std::io::print("Det: ");
+	let d: float = std::math::matrices::det(mat);
+	std::io::printfln(d);
+	// This determinant should be 14267.99999999999
+
+	std::math::matrices::inv(mat);
+	std::math::matrices::println(mat);
+
+	/* Correct inverse
+	-0.293103 0.048359 -0.010092 -0.019343 0.177460
+	0.264367 -0.182786 0.003364 0.006447 -0.059153
+	-0.120689 0.013456 0.005887 0.094617 -0.020185
+	0.137931 -0.008410 -0.128679 0.003364 0.012615
+	0.114942 0.062097 0.100084 -0.058172 -0.009812
+	*/
+
+	std::math::matrices::free(mat);
+
+	std::io::printfln(0.01);
+
+	return 0;
+}

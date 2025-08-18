@@ -1,3 +1,5 @@
+#include <../exception.dpl>
+
 fn sqrt(x: float): float {
 	if (x < 0.0) {
 		exception("Square root of negative number", 1);

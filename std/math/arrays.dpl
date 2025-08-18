@@ -1,3 +1,5 @@
+#include <../exception.dpl>
+
 fn max:<T>(arr: array[T]): T {
 	// Return the maximum value in the array
 	if (arr.len == 0) {

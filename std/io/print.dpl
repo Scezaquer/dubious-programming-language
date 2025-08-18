@@ -78,6 +78,23 @@ fn printf(f: float): int {
 	print("."); // Print the decimal point
 	frac *= 1000000.0; // Scale the fractional part to 6 decimal places
 	i = floor(frac); // Convert the scaled fractional part to int
+
+	// Zero-pad the fractional part to always have 6 digits
+	let t: int = i;
+	let digits: int = 0;
+	if (t == 0) {
+		digits = 1;
+	}
+	while (t > 0) {
+		digits = digits + 1;
+		t = t / 10;
+	}
+	let zeros: int = 6 - digits;
+	while (zeros > 0) {
+		print("0");
+		zeros = zeros - 1;
+	}
+
 	printi(i); // Print the fractional part
 
 	return 0;

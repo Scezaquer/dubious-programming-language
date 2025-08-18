@@ -6,11 +6,11 @@ A simple compiler for the Dubious programming language (DPL).
 
 ### Priority features
 
-- TODO: fix problem where structs in function prototypes don't get the path added during typechecking
 - TODO: std library
 - TODO: Wiki
 - TODO: let strings be defined over multiple lines like "hello "\n"world" in code would evaluate to the literal "hello world"
 - TODO: circular imports when the two files are in different namespaces cause a compilation crash (infinite import loop)
+- TODO: There is *something* broken with early returns but I'm not sure what it is.
 
 ### Optional
 
@@ -34,8 +34,10 @@ an x86_64 assembly file or an elf64 binary.
 - `input_file`: The input file to read (required).
 - `--output-file`, `-o`: The output file to write (default is `out`).
 - `--ast`, `-a`: Print the AST (default is `false`).
-- `--tokens`, `-t`: Print the tokens (default is `false`).
+- `--tokens`, `-T`: Print the tokens (default is `false`).
 - `--output-asm`, `-S`: Output an assembly file instead of a binary (default is `false`).
+- `--both`, `-b`: Output both an assembly file and a binary (default is `false`).
+- `--time`, `-t`: Print how long each compilation step takes (default is `false`).
 
 ## Example
 
@@ -54,12 +56,12 @@ an x86_64 assembly file or an elf64 binary.
 
 - If the input file does not exist, the compiler will print an error message and exit.
 - If there are issues reading the input file, the compiler will panic with a message.
-- If the code to compiled is incorrect, The compiler will panic and print a message pointing out the line and the nature of the error.
+- If the code to compile is incorrect, The compiler will panic and print a message pointing out the line and the nature of the error.
 
 
 ## Operator Precedence Table
 
-1. **Member access**: `.`, `::`
+1. **Member access**: `.`
 2. **Unary operators**: `++a`, `--a`, `+a`, `-a`, `!a`, `~a`, `*a`, `&a`
 3. **Multiplicative operators**: `a * b`, `a / b`, `a % b`
 4. **Additive operators**: `a + b`, `a - b`
@@ -330,10 +332,14 @@ to float will read `0x1` as if it was the IEEE 754 representation of a float,
 which is about `5e-324`.
 
 In order to convert from int to float, or float to int, you should use the
-`inttof(x: float)` and `ftoint(x: float)` functions in cast.dpl. These will actually
+`std::math::inttof(x: float)` and `std::math::ftoint(x: float)` functions in cast.dpl. These will actually
 give the correct number, unlike type casting. Note that ftoint rounds to the
-closest integer. If the decimal is .5, see x86-64 `cvtsd2si` doc to know if
-it will round up or down. TODO: implement in stdlib, make .5 behavior reliable.
+closest integer. If the decimal is .5, it should round to the closest even, but
+see x86-64 `cvtsd2si` doc to know if it will round up or down. You may also use
+`std::math::ceil(x: float)` or `std::math::floor(x: float)`.
+
+TODO: using ftoint after ceil or floor should be broken as ceil and floor overwrite
+the variable that controls how the rounding is done.
 
 ## Type casting
 

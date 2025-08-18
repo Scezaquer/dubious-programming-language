@@ -58,12 +58,14 @@ fn main(): int {
 	std::mem::free(arr7);
 	std::mem::print_heap_layout();
 	std::mem::free(arr6);
-	std::mem::malloc(50);
+
+	let arr9: array[int] =std::mem::malloc(50);
+	std::mem::free(arr9);
 	std::mem::print_heap_layout();
 
 	// The final layout should be (with the adresses being randomized):
 	// Free flag (0=free),     address,        next,           len,    len(+meta)
-	//                 1,      744739968,      744739536,      50,     50(54)
+	//                 0,      744739968,      744739536,      50,     50(54)
 	//                 1,      744739536,      744739384,      15,     15(19)
 	//                 0,      744739384,      744738928,      53,     53(57)
 	//                 1,      744738928,      0,              10,     10(14)

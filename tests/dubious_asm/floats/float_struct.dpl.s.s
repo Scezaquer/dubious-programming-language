@@ -87,8 +87,8 @@ main:
     ret				;return by default if no return statement was reached
 
 section .data
-	.float.2: dq -0.7
 	.float.0: dq 1.7
 	.float.1: dq 0.8
+	.float.2: dq -0.7
 	mxcsr_val dd 0
 	malloc_counter dd 0

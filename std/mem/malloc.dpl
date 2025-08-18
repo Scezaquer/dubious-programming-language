@@ -160,13 +160,11 @@ fn free(ptr: array[int]): int {
     ptr = merge_with_next_if_free(ptr); // Merge with the next block if it is free
 
     // See if the previous block is free
-    if ptr: int + (ptr.len + 3)*8 >= get_current_break() {
-        return 0; // If the block is at the end of the heap, we don't need to do anything
-    }
-    
-    if ptr[ptr.len + ptr[ptr.len + 3] + 6] == 0 {
-        ptr = (ptr: int + (ptr.len + 4)*8): array[int]; // Move the pointer to the previous block
-        ptr = merge_with_next_if_free(ptr);
+    if ptr: int + (ptr.len + 3)*8 < get_current_break() {
+        if ptr[ptr.len + ptr[ptr.len + 3] + 6] == 0 {
+            ptr = (ptr: int + (ptr.len + 4)*8): array[int]; // Move the pointer to the previous block
+            ptr = merge_with_next_if_free(ptr);
+        }
     }
 
     return 0; // Return 0 to indicate success

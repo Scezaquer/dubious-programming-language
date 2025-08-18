@@ -54,7 +54,7 @@ impl<T> Typed<T> {
 }
 
 pub fn error<T>(msg: &str, token: &TokenWithDebugInfo<T>) -> ! {
-    panic!("{} Line {}: {}", token.file, token.line, msg);
+    panic!("{}:{}: {}", token.file, token.line, msg);
 }
 
 pub fn error_unexpected_token<T>(expected: &str, token: &TokenWithDebugInfo<T>) -> !

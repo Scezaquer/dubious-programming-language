@@ -2107,6 +2107,34 @@ fn type_function(
     }
 }
 
+fn type_function_prototype(
+    function: (Type, Vec<Type>),
+    context: &mut Context,
+    name: String
+) -> (Type, Vec<Type>) {
+    let (return_type, args) = function;
+
+    let namespace = context.namespace.clone();
+    context.namespace = if let Some(pos) = name.rfind("::") {
+        name[..pos + 2].to_string()
+    } else {
+        context.namespace_root.clone()
+    };
+
+    let new_return_type = check_if_struct_or_enum(context, TokenWithDebugInfo{internal_tok: return_type, line:0, file:"".into()});
+
+    let mut new_args = Vec::new();
+
+    for arg_type in args.clone() {
+        let arg_type = check_if_struct_or_enum(context, TokenWithDebugInfo{internal_tok: arg_type, line:0, file:"".into()});
+        new_args.push(arg_type.internal_tok);
+    }
+
+    context.namespace = namespace;
+
+    (new_return_type.internal_tok, new_args)
+}
+
 fn get_all_functions_structs_enums_consts(
     namespace: &TokenWithDebugInfo<Namespace>,
     namespace_path: &str,
@@ -2412,6 +2440,14 @@ fn typechecking(
             .concrete_structs
             .insert(id, (ordered_members, unordered_lookup_table));
     }
+
+    let old_concrete_functions = std::mem::take(&mut context.concrete_functions);
+    let mut new_concrete_functions: HashMap<String, (Type, Vec<Type>)> = HashMap::new();
+    for (name, (ret, args)) in old_concrete_functions.into_iter() {
+        let (new_ret, new_args) = type_function_prototype((ret, args), &mut context, name.clone());
+        new_concrete_functions.insert(name, (new_ret, new_args));
+    }
+    context.concrete_functions = new_concrete_functions;
 
     for function in functions {
         let Function { generics, .. } = &function.expr.internal_tok;

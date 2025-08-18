@@ -2,6 +2,7 @@
 #include <combinatorics.dpl>
 #include <constants.dpl>
 #include <exp.dpl>
+#include <../exception.dpl>
 
 fn sin(x : float) : float {
 	// This takes radians as input

@@ -7,3 +7,4 @@
 #include <exp.dpl>
 #include <trig.dpl>
 #include <arrays.dpl>
+#include <matrices.dpl>
