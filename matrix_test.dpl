@@ -65,8 +65,9 @@ fn main(): int {
 	std::io::printfln(d);
 	// This determinant should be 14267.99999999999
 
-	std::math::matrices::inv(mat);
-	std::math::matrices::println(mat);
+	let mat_inv: std::math::matrices::Matrix = std::math::matrices::inv_notinplace(mat);
+	std::math::matrices::println(mat);	// Should be unchanged
+	std::math::matrices::println(mat_inv);
 
 	/* Correct inverse
 	-0.293103 0.048359 -0.010092 -0.019343 0.177460
@@ -77,6 +78,7 @@ fn main(): int {
 	*/
 
 	std::math::matrices::free(mat);
+	std::math::matrices::free(mat_inv);
 
 	std::io::printfln(0.01);
 

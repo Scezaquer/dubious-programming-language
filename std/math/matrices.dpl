@@ -419,3 +419,9 @@ fn inv(mat: Matrix): Matrix {
 	free(invMat);
 	return mat;
 }
+
+fn inv_notinplace(mat: Matrix): Matrix {
+	// Create a new matrix containing the inverse of the one given as argument
+	let result: Matrix = clone(mat);
+	return inv(result);
+}
