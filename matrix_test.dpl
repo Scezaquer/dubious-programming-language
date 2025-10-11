@@ -1,17 +1,17 @@
 #include <std>
 
 fn main(): int {
-	// Test the memory allocation functions
-
+	// Create a 3x3 identity matrix and display it
 	let mat: std::math::matrices::Matrix = std::math::matrices::eye(3);
 	std::math::matrices::println(mat);
 
-	std::mem::print_heap_layout();
-	std::math::matrices::free(mat);
+	std::mem::print_heap_layout();	// Creating a matrix calls malloc a few times
+	std::math::matrices::free(mat);	// Special free function for matrices
 
-	let mat1: std::math::matrices::Matrix = std::math::matrices::zero(2, 2);
-	let mat2: std::math::matrices::Matrix = std::math::matrices::uninitialized(2, 2);
+	let mat1: std::math::matrices::Matrix = std::math::matrices::zero(2, 2);			// Zero matrix
+	let mat2: std::math::matrices::Matrix = std::math::matrices::uninitialized(2, 2);	// Uninitialized matrix
 
+	// Populate matrices
 	mat1.data[0][0] = 1.0;
 	mat1.data[0][1] = 2.0;
 	mat1.data[1][0] = 4.0;
@@ -22,6 +22,7 @@ fn main(): int {
 	mat2.data[1][0] = 8.0;
 	mat2.data[1][1] = 7.0;
 
+	// Print matrices, compute their determinants
 	std::math::matrices::println(mat1);
 	std::io::print("Det: ");
 	std::io::printfln(std::math::matrices::det(mat1));
@@ -30,14 +31,17 @@ fn main(): int {
 		std::io::print("Det: ");
 	std::io::printfln(std::math::matrices::det(mat2));
 
+	// Matrix multiplication
 	let mat3: std::math::matrices::Matrix = std::math::matrices::mul(mat1, mat2);
 	std::math::matrices::println(mat3);
 
+	// Matrix transpose
 	std::math::matrices::transpose(mat3);
 	std::math::matrices::println(mat3);
 
+	// Matrix addition
 	let mat4: std::math::matrices::Matrix = std::math::matrices::add(mat3, mat1);
-	std::math::matrices::println(mat3);
+	std::math::matrices::println(mat4);
 
 	std::math::matrices::free(mat1);
 	std::math::matrices::free(mat2);
@@ -46,9 +50,11 @@ fn main(): int {
 
 	std::mem::print_heap_layout();
 
-	////////////
+	//////////// 5x5 matrix
 
-	let mat: std::math::matrices::Matrix = std::math::matrices::eye(5);
+	let mat: std::math::matrices::Matrix = std::math::matrices::uninitialized(5, 5);
+
+	// Use an array to initialize the matrix. Nicer for somewhat large matrices
 	let arr: array[float] = [
 			[1.0, 2.0, 3.0, 4.0, 5.0],
 			[-1.0, -4.0, 3.0, 4.0, 5.0],
@@ -56,7 +62,6 @@ fn main(): int {
 			[3.0, 4.0, 15.0, 6.0, 7.0],
 			[8.0, 5.0, 6.0, 6.0, 8.0]
 	];
-
 	std::math::matrices::arrcpy(mat, arr);
 
 	std::math::matrices::println(mat);
@@ -65,6 +70,7 @@ fn main(): int {
 	std::io::printfln(d);
 	// This determinant should be 14267.99999999999
 
+	// Compute a matrix inverse
 	let mat_inv: std::math::matrices::Matrix = std::math::matrices::inv_notinplace(mat);
 	std::math::matrices::println(mat);	// Should be unchanged
 	std::math::matrices::println(mat_inv);
@@ -79,8 +85,6 @@ fn main(): int {
 
 	std::math::matrices::free(mat);
 	std::math::matrices::free(mat_inv);
-
-	std::io::printfln(0.01);
 
 	return 0;
 }

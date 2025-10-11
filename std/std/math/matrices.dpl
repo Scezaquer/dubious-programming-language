@@ -1,0 +1,427 @@
+#namespace matrices
+
+#include <../mem>
+#include <../io>
+#include <../exception.dpl>
+
+/*
+AS A RULE:
+- Any operation between two matrices is, by default, not performed in-place.
+- Any operation between a matrix and a scalar is, by default, performed in-place.
+*/
+
+struct Matrix {
+	rows: int;
+	cols: int;
+	data: array[array[float]]
+}
+
+fn print(mat: Matrix): int {
+	// Print the matrix to the console
+	for (let i: int = 0; i < mat.rows; i += 1) {
+		for (let j: int = 0; j < mat.cols; j += 1) {
+			io::printf(mat.data[i][j]);
+			if (j < mat.cols - 1) {
+				io::print(" ");
+			}
+		}
+		io::print("\n");
+	}
+}
+
+fn println(mat: Matrix): int {
+	// Print the matrix to the console with a newline at the end
+	print(mat);
+	io::print("\n");
+}
+
+fn uninitialized(rows: int, cols: int): Matrix {
+	// Create a matrix with uninitialized values of size rows x cols
+	// This is sometimes useful for performance
+	let mat: Matrix = mem::malloc(3): Matrix;
+	mat.rows = rows;
+	mat.cols = cols;
+	mat.data = mem::malloc(rows): array[array[float]];
+	for (let i: int = 0; i < rows; i += 1) {
+		mat.data[i] = mem::malloc(cols): array[float];
+	}
+	return mat;
+}
+
+fn zero(rows: int, cols: int): Matrix {
+	// Create a zero matrix of size rows x cols
+	let mat: Matrix = mem::malloc(3): Matrix;
+	mat.rows = rows;
+	mat.cols = cols;
+	mat.data = mem::malloc(rows): array[array[float]];
+	for (let i: int = 0; i < rows; i += 1) {
+		mat.data[i] = mem::malloc(cols): array[float];
+		for (let j: int = 0; j < cols; j += 1) {
+			mat.data[i][j] = 0.0;
+		}
+	}
+	return mat;
+}
+
+fn eye(size: int): Matrix {
+	// Create an identity matrix of size size x size
+	let mat: Matrix = zero(size, size);
+	for (let i: int = 0; i < size; i += 1) {
+		mat.data[i][i] = 1.0;
+	}
+	return mat;
+}
+
+fn free(mat: Matrix): int {
+	// Free the memory allocated for the matrix
+	for (let i: int = 0; i < mat.rows; i += 1) {
+		mem::free(mat.data[i]: array[int]);
+	}
+	mem::free(mat.data: array[int]);
+	mem::free(mat: array[int]);
+}
+
+fn transpose_notinplace(mat: Matrix): Matrix {
+	// Create a transpose without modifying the original matrix
+	let transposed: Matrix = zero(mat.cols, mat.rows);
+	for (let i: int = 0; i < mat.rows; i += 1) {
+		for (let j: int = 0; j < mat.cols; j += 1) {
+			transposed.data[j][i] = mat.data[i][j];
+		}
+	}
+	return transposed;
+}
+
+fn transpose(mat: Matrix): Matrix {
+	// Transpose the matrix in place
+	if (mat.rows != mat.cols) {
+		exception("In-place transpose requires a square matrix", 1);
+	}
+	for (let i: int = 0; i < mat.rows; i += 1) {
+		for (let j: int = i + 1; j < mat.cols; j += 1) {
+			let temp: float = mat.data[i][j];
+			mat.data[i][j] = mat.data[j][i];
+			mat.data[j][i] = temp;
+		}
+	}
+	return mat;
+}
+
+fn fadd(mat: Matrix, value: float): Matrix {
+	// In-place: add a constant value to each element
+	for (let i: int = 0; i < mat.rows; i += 1) {
+		for (let j: int = 0; j < mat.cols; j += 1) {
+			mat.data[i][j] = mat.data[i][j] + value;
+		}
+	}
+	return mat;
+}
+
+fn fadd_notinplace(mat: Matrix, value: float): Matrix {
+	// Create a new matrix with each element increased by value
+	let result: Matrix = uninitialized(mat.rows, mat.cols);
+	for (let i: int = 0; i < mat.rows; i += 1) {
+		for (let j: int = 0; j < mat.cols; j += 1) {
+			result.data[i][j] = mat.data[i][j] + value;
+		}
+	}
+	return result;
+}
+
+fn fsub(mat: Matrix, value: float): Matrix {
+	// In-place: subtract a constant value from each element
+	for (let i: int = 0; i < mat.rows; i += 1) {
+		for (let j: int = 0; j < mat.cols; j += 1) {
+			mat.data[i][j] = mat.data[i][j] - value;
+		}
+	}
+	return mat;
+}
+
+fn fsub_notinplace(mat: Matrix, value: float): Matrix {
+	// Create a new matrix with each element decreased by value
+	let result: Matrix = uninitialized(mat.rows, mat.cols);
+	for (let i: int = 0; i < mat.rows; i += 1) {
+		for (let j: int = 0; j < mat.cols; j += 1) {
+			result.data[i][j] = mat.data[i][j] - value;
+		}
+	}
+	return result;
+}
+
+fn fmul(mat: Matrix, value: float): Matrix {
+	// In-place: multiply each element by a constant value
+	for (let i: int = 0; i < mat.rows; i += 1) {
+		for (let j: int = 0; j < mat.cols; j += 1) {
+			mat.data[i][j] = mat.data[i][j] * value;
+		}
+	}
+	return mat;
+}
+
+fn fmul_notinplace(mat: Matrix, value: float): Matrix {
+	// Create a new matrix with each element multiplied by value
+	let result: Matrix = uninitialized(mat.rows, mat.cols);
+	for (let i: int = 0; i < mat.rows; i += 1) {
+		for (let j: int = 0; j < mat.cols; j += 1) {
+			result.data[i][j] = mat.data[i][j] * value;
+		}
+	}
+	return result;
+}
+
+fn fdiv(mat: Matrix, value: float): Matrix {
+	// In-place: divide each element by a constant value
+	if (toplevel::std::math::absf(value) < 0.000000000000001) {
+		exception("Division by zero", 1);
+	}
+	for (let i: int = 0; i < mat.rows; i += 1) {
+		for (let j: int = 0; j < mat.cols; j += 1) {
+			mat.data[i][j] = mat.data[i][j] / value;
+		}
+	}
+	return mat;
+}
+
+fn fdiv_notinplace(mat: Matrix, value: float): Matrix {
+	// Create a new matrix with each element divided by value
+	if (toplevel::std::math::absf(value) < 0.000000000000001) {
+		exception("Division by zero", 1);
+	}
+	let result: Matrix = uninitialized(mat.rows, mat.cols);
+	for (let i: int = 0; i < mat.rows; i += 1) {
+		for (let j: int = 0; j < mat.cols; j += 1) {
+			result.data[i][j] = mat.data[i][j] / value;
+		}
+	}
+	return result;
+}
+
+fn add_inplace(mat1: Matrix, mat2: Matrix): Matrix {
+	// In-place: add two matrices
+	if (mat1.rows != mat2.rows || mat1.cols != mat2.cols) {
+		exception("Matrix dimensions do not match for addition", 1);
+	}
+	for (let i: int = 0; i < mat1.rows; i += 1) {
+		for (let j: int = 0; j < mat1.cols; j += 1) {
+			mat1.data[i][j] += mat2.data[i][j];
+		}
+	}
+	return mat1;
+}
+
+fn add(mat1: Matrix, mat2: Matrix): Matrix {
+	// Create a new matrix for the result
+	if (mat1.rows != mat2.rows || mat1.cols != mat2.cols) {
+		exception("Matrix dimensions do not match for addition", 1);
+	}
+	let result: Matrix = uninitialized(mat1.rows, mat1.cols);
+	for (let i: int = 0; i < mat1.rows; i += 1) {
+		for (let j: int = 0; j < mat1.cols; j += 1) {
+			result.data[i][j] = mat1.data[i][j] + mat2.data[i][j];
+		}
+	}
+	return result;
+}
+
+fn sub_inplace(mat1: Matrix, mat2: Matrix): Matrix {
+	// In-place: subtract two matrices
+	if (mat1.rows != mat2.rows || mat1.cols != mat2.cols) {
+		exception("Matrix dimensions do not match for subtraction", 1);
+	}
+	for (let i: int = 0; i < mat1.rows; i += 1) {
+		for (let j: int = 0; j < mat1.cols; j += 1) {
+			mat1.data[i][j] -= mat2.data[i][j];
+		}
+	}
+	return mat1;
+}
+
+fn sub(mat1: Matrix, mat2: Matrix): Matrix {
+	// Create a new matrix for the result
+	if (mat1.rows != mat2.rows || mat1.cols != mat2.cols) {
+		exception("Matrix dimensions do not match for subtraction", 1);
+	}
+	let result: Matrix = uninitialized(mat1.rows, mat1.cols);
+	for (let i: int = 0; i < mat1.rows; i += 1) {
+		for (let j: int = 0; j < mat1.cols; j += 1) {
+			result.data[i][j] = mat1.data[i][j] - mat2.data[i][j];
+		}
+	}
+	return result;
+}
+
+fn mul(mat1: Matrix, mat2: Matrix): Matrix {
+	// multiply two matrices. Not in-place, don't forget to free
+	if (mat1.cols != mat2.rows) {
+		io::print("mat1 dims = (");
+		io::printi(mat1.rows);
+		io::print(", ");
+		io::printi(mat1.cols);
+		io::print("), mat2 dims = (");
+		io::printi(mat2.rows);
+		io::print(", ");
+		io::printi(mat2.cols);
+		io::println(")");
+		exception("Matrix dimensions do not match for multiplication", 1);
+	}
+	let result: Matrix = zero(mat1.rows, mat2.cols);
+	for (let i: int = 0; i < mat1.rows; i += 1) {
+		for (let j: int = 0; j < mat2.cols; j += 1) {
+			for (let k: int = 0; k < mat1.cols; k += 1) {
+				result.data[i][j] += mat1.data[i][k] * (mat2.data[k][j]);
+			}
+		}
+	}
+	return result;
+}
+
+fn det(mat: Matrix): float {
+	// Compute the determinant of the matrix
+	if (mat.rows != mat.cols) {
+		exception("Determinant requires a square matrix", 1);
+	}
+	let n: int = mat.rows;
+	let tmp: Matrix = uninitialized(n, n);
+	for (let i: int = 0; i < n; i += 1) {
+		for (let j: int = 0; j < n; j += 1) {
+			tmp.data[i][j] = mat.data[i][j];
+		}
+	}
+	let sign: int = 1;
+	let detVal: float = 1.0;
+	for (let i: int = 0; i < n; i += 1) {
+		// Pivot selection (partial pivoting)
+		let pivotRow: int = i;
+		let maxAbs: float = toplevel::std::math::absf(tmp.data[i][i]);
+		for (let r: int = i + 1; r < n; r += 1) {
+			let v: float = toplevel::std::math::absf(tmp.data[r][i]);
+			if (v > maxAbs) {
+				maxAbs = v;
+				pivotRow = r;
+			}
+		}
+		if (maxAbs < 0.000000000000001) {
+			free(tmp);
+			// return 0.0;
+		}
+		if (pivotRow != i) {
+			let rowTmp: array[float] = tmp.data[i];
+			tmp.data[i] = tmp.data[pivotRow];
+			tmp.data[pivotRow] = rowTmp;
+			sign = -sign;
+		}
+		for (let r: int = i + 1; r < n; r += 1) {
+			let factor: float = tmp.data[r][i] / (tmp.data[i][i]);
+			for (let c: int = i; c < n; c += 1) {
+				tmp.data[r][c] = tmp.data[r][c] - factor * (tmp.data[i][c]);
+			}
+		}
+	}
+	for (let i: int = 0; i < n; i += 1) {
+		detVal = detVal * (tmp.data[i][i]);
+	}
+	if (sign < 0) {
+		detVal = detVal * -1.0;
+	}
+	free(tmp);
+	return detVal;
+}
+
+fn arrcpy(mat: Matrix, input: array[float]): Matrix {
+	// Takes the values in the array and puts them in the matrix
+	if (input.len != (mat.rows * mat.cols)) {
+		exception("Input array size does not match matrix size", 1);
+	}
+	for (let i: int = 0; i < mat.rows; i += 1) {
+		for (let j: int = 0; j < mat.cols; j += 1) {
+			mat.data[i][j] = input[i * mat.cols + j];
+		}
+	}
+	return mat;
+}
+
+fn clone(mat: Matrix): Matrix {
+	// Create a new matrix and copy the data into it
+	let result: Matrix = uninitialized(mat.rows, mat.cols);
+	for (let i: int = 0; i < mat.rows; i += 1) {
+		for (let j: int = 0; j < mat.cols; j += 1) {
+			result.data[i][j] = mat.data[i][j];
+		}
+	}
+	return result;
+}
+
+fn inv(mat: Matrix): Matrix {
+	// Compute the inverse of the input matrix, in-place
+	if (mat.rows != mat.cols) {
+		exception("Inverse requires a square matrix", 1);
+	}
+	let n: int = mat.rows;
+	let invMat: Matrix = eye(n);
+
+	// Gauss-Jordan elimination with partial pivoting
+	for (let i: int = 0; i < n; i += 1) {
+		// Find pivot
+		let pivotRow: int = i;
+		let maxAbs: float = toplevel::std::math::absf(mat.data[i][i]);
+		for (let r: int = i + 1; r < n; r += 1) {
+			let v: float = toplevel::std::math::absf(mat.data[r][i]);
+			if (v > maxAbs) {
+				maxAbs = v;
+				pivotRow = r;
+			}
+		}
+		if (maxAbs < 0.000000000000001) {
+			free(invMat);
+			exception("Matrix is singular and cannot be inverted", 1);
+		}
+
+		// Swap rows if needed
+		if (pivotRow != i) {
+			let tmpA: array[float] = mat.data[i];
+			mat.data[i] = mat.data[pivotRow];
+			mat.data[pivotRow] = tmpA;
+
+			let tmpB: array[float] = invMat.data[i];
+			invMat.data[i] = invMat.data[pivotRow];
+			invMat.data[pivotRow] = tmpB;
+		}
+
+		// Normalize pivot row
+		let pivot: float = mat.data[i][i];
+		for (let c: int = 0; c < n; c += 1) {
+			mat.data[i][c] = mat.data[i][c] / pivot;
+			invMat.data[i][c] = invMat.data[i][c] / pivot;
+		}
+
+		// Eliminate other rows
+		for (let r: int = 0; r < n; r += 1) {
+			if (r == i) {
+				// skip
+				0.0;
+			} else {
+				let factor: float = mat.data[r][i];
+				for (let c: int = 0; c < n; c += 1) {
+					mat.data[r][c] = mat.data[r][c] - factor * (mat.data[i][c]);
+					invMat.data[r][c] = invMat.data[r][c] - factor * (invMat.data[i][c]);
+				}
+			}
+		}
+	}
+
+	// Copy inverse back into the input matrix
+	for (let i: int = 0; i < n; i += 1) {
+		for (let j: int = 0; j < n; j += 1) {
+			mat.data[i][j] = invMat.data[i][j];
+		}
+	}
+	free(invMat);
+	return mat;
+}
+
+fn inv_notinplace(mat: Matrix): Matrix {
+	// Create a new matrix containing the inverse of the one given as argument
+	let result: Matrix = clone(mat);
+	return inv(result);
+}
