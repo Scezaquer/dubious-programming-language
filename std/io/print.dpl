@@ -165,3 +165,26 @@ fn printarrayfln:<T>(a: array[T]): int {
 	printarrayf:<T>(a);
 	print("\n");
 }
+
+fn printhex(i: int): int {
+	// Print the integer i in hexadecimal format to stdout
+
+	print("0x");
+	let hex_chars: str = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+	let started: bool = false;
+	for (let shift: int = 60; shift >= 0; shift = shift - 4) {
+		let nibble: int = (i >> shift) & 0xF;
+		if (nibble != 0 || started || shift == 0) {
+			printchar(hex_chars[nibble]);
+			started = true;
+		}
+	}
+	return 0;
+}
+
+fn printhexln(i: int): int {
+	// Print the integer i in hexadecimal format to stdout, followed by a newline
+
+	printhex(i);
+	print("\n");
+}

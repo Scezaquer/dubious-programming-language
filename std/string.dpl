@@ -32,19 +32,18 @@ fn strset(s: str, i: int, c: char): str {
 
 fn strlen(s: str): int {
 	// Get the number of bytes in the string s
-	let len: int = s[-1] : int - 1;
+	let len: int = s.len - 1;
 
 	if len == 0 {
 		return 0;
 	}
 
-	let i: int;
-	for (i = 7; i >= 0; i = i - 1) {
+	for (let i: int = 1; i < 8; i = i + 1) {
 		if (((s[len] : int) & (0xFF << (i * 8))) == 0) {
 			break;
 		}
 	}
-	return len*8 + i - 1;
+	return len*8 + i;
 }
 
 fn strcpy(s: str, t: str): str {
@@ -59,4 +58,21 @@ fn strcpy(s: str, t: str): str {
 		s[i] = t[i];
 	}
 	return s;
+}
+
+fn str_equals(s: str, t: str): int {
+	// Compare two strings for equality
+	let len_s: int = s[-1] : int;
+	let len_t: int = t[-1] : int;
+
+	if (len_s != len_t) {
+		return 0;
+	}
+
+	for (let i: int = 0; i < len_s; i = i + 1) {
+		if (s[i] != t[i]) {
+			return 0;
+		}
+	}
+	return 1;
 }

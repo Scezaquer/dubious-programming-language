@@ -1,3 +1,0 @@
-#namespace mem
-
-#include <malloc.dpl>

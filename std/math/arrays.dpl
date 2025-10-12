@@ -1,4 +1,7 @@
+#namespace arrays
 #include <../exception.dpl>
+#include <exp.dpl>
+#include <../mem>
 
 fn max:<T>(arr: array[T]): T {
 	// Return the maximum value in the array
@@ -30,9 +33,23 @@ fn min:<T>(arr: array[T]): T {
 
 fn sum:<T>(arr: array[T]): T {
 	// Return the sum of all elements in the array
-	let sum: T = 0;
+	let sum: T;
 	for (let i: int = 0; i < arr.len; i = i + 1) {
 		sum = sum + arr[i];
 	}
 	return sum;
+}
+
+fn softmax(arr: array[float]): array[float] {
+	// Compute the softmax of the input array. Not in-place
+	let max_val: float = max:<float>(arr);
+	let exps: array[float] = mem::malloc(arr.len): array[float];
+	for (let i: int = 0; i < arr.len; i = i + 1) {
+		exps[i] = exp(arr[i] - max_val);
+	}
+	let sum_exps: float = sum:<float>(exps);
+	for (let i: int = 0; i < exps.len; i = i + 1) {
+		exps[i] = exps[i] / sum_exps;
+	}
+	return exps;
 }

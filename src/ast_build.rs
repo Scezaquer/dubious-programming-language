@@ -4,7 +4,6 @@ use crate::shared::TokenWithDebugInfo;
 use crate::shared::{
 	Type, Typed, error, error_unexpected_token,
 };
-use core::panic;
 use std::slice::Iter;
 use std::vec;
 
@@ -898,7 +897,7 @@ fn parse_assignment_identifier(
     }
 }
 
-fn parse_reassignment_identifier(expr: Expression) -> TokenWithDebugInfo<ReassignmentIdentifier> {
+fn parse_reassignment_identifier(expr: TokenWithDebugInfo<Expression>) -> TokenWithDebugInfo<ReassignmentIdentifier> {
     // pub enum ReassignmentIdentifier {
     // 	Variable(String),
     // 	Dereference(Box<Expression>),
@@ -906,7 +905,7 @@ fn parse_reassignment_identifier(expr: Expression) -> TokenWithDebugInfo<Reassig
     // 	MemberAccess(Box<Expression>, Box<Expression>),
     // }
 
-    match expr {
+    match expr.internal_tok {
         Expression::Atom(Typed {
             expr:
                 TokenWithDebugInfo {
@@ -944,7 +943,7 @@ fn parse_reassignment_identifier(expr: Expression) -> TokenWithDebugInfo<Reassig
             line: expr1.clone().expr.line,
             file: expr1.clone().expr.file,
         },
-        _ => panic!("Invalid reassignment identifier. Only modifiable lvalues are allowed."),
+        _ => error("Invalid reassignment identifier. Only modifiable lvalues are allowed.", &expr),
     }
 }
 
@@ -1247,7 +1246,7 @@ fn parse_expression_with_precedence(
             ); // Parse next term
 
             // Re-parse the left hand side of the assignment expression
-            let assignment_identifier = parse_reassignment_identifier(expr.internal_tok);
+            let assignment_identifier = parse_reassignment_identifier(expr);
             expr = TokenWithDebugInfo {
                 internal_tok: Expression::Assignment(
                     Typed::new(assignment_identifier),

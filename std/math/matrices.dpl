@@ -3,6 +3,8 @@
 #include <../mem>
 #include <../io>
 #include <../exception.dpl>
+#include <../random>
+#include <arrays.dpl>
 
 /*
 AS A RULE:
@@ -58,6 +60,37 @@ fn zero(rows: int, cols: int): Matrix {
 		mat.data[i] = mem::malloc(cols): array[float];
 		for (let j: int = 0; j < cols; j += 1) {
 			mat.data[i][j] = 0.0;
+		}
+	}
+	return mat;
+}
+
+fn one(rows: int, cols: int): Matrix {
+	// Create a matrix of ones of size rows x cols
+	let mat: Matrix = mem::malloc(3): Matrix;
+	mat.rows = rows;
+	mat.cols = cols;
+	mat.data = mem::malloc(rows): array[array[float]];
+	for (let i: int = 0; i < rows; i += 1) {
+		mat.data[i] = mem::malloc(cols): array[float];
+		for (let j: int = 0; j < cols; j += 1) {
+			mat.data[i][j] = 1.0;
+		}
+	}
+	return mat;
+}
+
+fn random(rows: int, cols: int, seed: int): Matrix {
+	// Create a matrix of size rows x cols with random values between 0 and 1
+	let mat: Matrix = mem::malloc(3): Matrix;
+	mat.rows = rows;
+	mat.cols = cols;
+	mat.data = mem::malloc(rows): array[array[float]];
+	for (let i: int = 0; i < rows; i += 1) {
+		mat.data[i] = mem::malloc(cols): array[float];
+		for (let j: int = 0; j < cols; j += 1) {
+			mat.data[i][j] = random::random_float(seed);
+			seed = random::random(seed);
 		}
 	}
 	return mat;
@@ -251,6 +284,33 @@ fn sub(mat1: Matrix, mat2: Matrix): Matrix {
 	return result;
 }
 
+fn hadamard(mat1: Matrix, mat2: Matrix): Matrix {
+	// Element-wise multiplication (Hadamard product), not in-place
+	if (mat1.rows != mat2.rows || mat1.cols != mat2.cols) {
+		exception("Matrix dimensions do not match for Hadamard product", 1);
+	}
+	let result: Matrix = uninitialized(mat1.rows, mat1.cols);
+	for (let i: int = 0; i < mat1.rows; i += 1) {
+		for (let j: int = 0; j < mat1.cols; j += 1) {
+			result.data[i][j] = mat1.data[i][j] * (mat2.data[i][j]);
+		}
+	}
+	return result;
+}
+
+fn hadamard_inplace(mat1: Matrix, mat2: Matrix): Matrix {
+	// Element-wise multiplication (Hadamard product), in-place on mat1
+	if (mat1.rows != mat2.rows || mat1.cols != mat2.cols) {
+		exception("Matrix dimensions do not match for Hadamard product", 1);
+	}
+	for (let i: int = 0; i < mat1.rows; i += 1) {
+		for (let j: int = 0; j < mat1.cols; j += 1) {
+			mat1.data[i][j] = mat1.data[i][j] * (mat2.data[i][j]);
+		}
+	}
+	return mat1;
+}
+
 fn mul(mat1: Matrix, mat2: Matrix): Matrix {
 	// multiply two matrices. Not in-place, don't forget to free
 	if (mat1.cols != mat2.rows) {
@@ -424,4 +484,71 @@ fn inv_notinplace(mat: Matrix): Matrix {
 	// Create a new matrix containing the inverse of the one given as argument
 	let result: Matrix = clone(mat);
 	return inv(result);
+}
+
+fn softmax(mat: Matrix, axis: int): Matrix {
+	// Compute the softmax of the matrix along the specified axis (0 for columns, 1 for rows)
+	// not in-place
+	let result: Matrix = uninitialized(mat.rows, mat.cols);
+	if (axis == 0) {
+		// Softmax along columns
+		for (let j: int = 0; j < mat.cols; j += 1) {
+			let col: array[float] = mem::malloc(mat.rows): array[float];
+			for (let i: int = 0; i < mat.rows; i += 1) {
+				col[i] = mat.data[i][j];
+			}
+			let softmax_col: array[float] = arrays::softmax(col);
+			for (let i: int = 0; i < mat.rows; i += 1) {
+				result.data[i][j] = softmax_col[i];
+			}
+			mem::free(col: array[int]);
+			mem::free(softmax_col: array[int]);
+		}
+	} else if (axis == 1) {
+		// Softmax along rows
+		for (let i: int = 0; i < mat.rows; i += 1) {
+			let row: array[float] = mem::malloc(mat.cols): array[float];
+			for (let j: int = 0; j < mat.cols; j += 1) {
+				row[j] = mat.data[i][j];
+			}
+			let softmax_row: array[float] = arrays::softmax(row);
+			for (let j: int = 0; j < mat.cols; j += 1) {
+				result.data[i][j] = softmax_row[j];
+			}
+			mem::free(row: array[int]);
+			mem::free(softmax_row: array[int]);
+		}
+	} else {
+		free(result);
+		exception("Axis must be 0 (columns) or 1 (rows)", 1);
+	}
+	return result;
+}
+
+fn slice_rows(mat: Matrix, start: int, end: int): Matrix {
+	// Slice the matrix to keep only the rows from start to end (exclusive)
+	if (start < 0 || end > mat.rows || start >= end) {
+		exception("Invalid slice indices", 1);
+	}
+	let result: Matrix = uninitialized(end - start, mat.cols);
+	for (let i: int = start; i < end; i += 1) {
+		for (let j: int = 0; j < mat.cols; j += 1) {
+			result.data[i - start][j] = mat.data[i][j];
+		}
+	}
+	return result;
+}
+
+fn slice_cols(mat: Matrix, start: int, end: int): Matrix {
+	// Slice the matrix to keep only the columns from start to end (exclusive)
+	if (start < 0 || end > mat.cols || start >= end) {
+		exception("Invalid slice indices", 1);
+	}
+	let result: Matrix = uninitialized(mat.rows, end - start);
+	for (let i: int = 0; i < mat.rows; i += 1) {
+		for (let j: int = start; j < end; j += 1) {
+			result.data[i][j - start] = mat.data[i][j];
+		}
+	}
+	return result;
 }

@@ -1,0 +1,18 @@
+struct S1 {
+	one: int;
+	two: char;
+}
+
+struct S2 {
+	three: float;
+	four: array[S1];
+}
+
+fn main(): int {
+	let a : S1 = S1{ 1, 'a' };
+	let b : S1 = S1{ 2, 'b' };
+	let c : S1 = S1{ 3, 'c' };
+	let arr: array[S1] = [a, b, c];
+	let s2: S2 = S2{ 1.0, arr };
+	return s2.four[1].two : int;
+}

@@ -88,7 +88,7 @@ main:
 
 section .data
 	.float.0: dq 1.7
-	.float.1: dq 0.8
 	.float.2: dq -0.7
+	.float.1: dq 0.8
 	mxcsr_val dd 0
 	malloc_counter dd 0
