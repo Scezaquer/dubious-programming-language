@@ -48,31 +48,30 @@ fn strlen(s: str): int {
 
 fn strcpy(s: str, t: str): str {
 	// Copy the string t into s
-	let len: int = t[-1] : int;
-	if (len != s[-1] : int) {
+	if (t.len != s.len) {
 		exception("Mismatched string lengths", 1);
 	}
 
 	let i: int;
-	for (i = 0; i < len; i = i + 1) {
+	for (i = 0; i < t.len; i = i + 1) {
 		s[i] = t[i];
 	}
 	return s;
 }
 
-fn str_equals(s: str, t: str): int {
+fn str_equals(s: str, t: str): bool {
 	// Compare two strings for equality
-	let len_s: int = s[-1] : int;
-	let len_t: int = t[-1] : int;
 
-	if (len_s != len_t) {
-		return 0;
+	if (s.len != t.len) {
+		return false;
 	}
 
-	for (let i: int = 0; i < len_s; i = i + 1) {
+	let is_equal: bool = true;
+	for (let i: int = 0; i < s.len; i = i + 1) {
 		if (s[i] != t[i]) {
-			return 0;
+			is_equal = false;
+			break;
 		}
 	}
-	return 1;
+	return is_equal;
 }
