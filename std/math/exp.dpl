@@ -58,6 +58,10 @@ fn powfi(x: float, n: int): float {
 	return result;
 }
 
+fn powff(x: float, y: float): float {
+	return exp(y * ln(x));
+}
+
 fn exp(x: float): float {
 	if (x < -709.0) {
 		return 0.0; // Underflow, exp(x) is too small to represent
